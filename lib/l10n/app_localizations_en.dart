@@ -28,11 +28,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearFinished => 'Clear finished';
 
   @override
-  String get scenarioCompressTitle => 'Make it small';
+  String get scenarioArchiveTitle => 'For the archive';
 
   @override
-  String get scenarioCompressHint =>
-      'Looks the same, takes far less space. Good for keeping and for Google Photos.';
+  String get scenarioArchiveHint =>
+      'Camera videos take far less space and look the same as the originals. Shooting dates, camera details, sound and colours are kept.';
 
   @override
   String get scenarioResolveTitle => 'Edit in DaVinci Resolve';
@@ -42,25 +42,38 @@ class AppLocalizationsEn extends AppLocalizations {
       'Makes videos open with picture and sound in Resolve on Linux.';
 
   @override
-  String get presetCompressHevc => 'Works everywhere';
+  String get archiveFormatTitle => 'Format';
 
   @override
-  String get presetCompressHevcHint =>
-      'Plays on phones, TVs, computers and Google Photos.';
+  String get archiveAv1 => 'Smallest file';
 
   @override
-  String get presetCompressAv1 => 'Smallest file';
+  String get archiveAv1Hint =>
+      'Plays on computers and newer devices: iPhone 15 Pro and later, Macs with M3, TVs from about 2020.';
 
   @override
-  String get presetCompressAv1Hint =>
-      'Smaller still, but needs a recent phone, TV or computer to play.';
+  String get archiveHevc => 'Works everywhere';
 
   @override
-  String get presetCompressGpu => 'Fastest';
+  String get archiveHevcHint =>
+      'The same look in a file up to a third larger. Plays almost everywhere, older iPhones, Macs and TVs included.';
 
   @override
-  String get presetCompressGpuHint =>
-      'Uses the graphics card: much quicker, files a little larger.';
+  String get archiveSpeedTitle => 'Speed';
+
+  @override
+  String get archiveCpu => 'Thorough';
+
+  @override
+  String get archiveCpuHint =>
+      'The processor encodes: slower, and the file is the smallest.';
+
+  @override
+  String get archiveGpu => 'Fast';
+
+  @override
+  String get archiveGpuHint =>
+      'The graphics card encodes: several times faster. Busy footage comes out the same size, calm footage up to 2.5 times larger.';
 
   @override
   String get presetResolveStudio => 'Resolve Studio';
@@ -75,18 +88,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get presetResolveFreeHint =>
       'The picture is converted too. Files become much larger.';
-
-  @override
-  String get qualityTitle => 'Quality';
-
-  @override
-  String get qualityCompact => 'Smaller file';
-
-  @override
-  String get qualityHigh => 'Recommended';
-
-  @override
-  String get qualityMaximum => 'Best quality';
 
   @override
   String get sizeTitle => 'File size';
@@ -390,6 +391,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cmdFastStart =>
       'Put the index first, so playback can start while downloading';
+
+  @override
+  String get cmdFastStartKeepingTags =>
+      'Put the index first, so playback can start while downloading, and keep the camera\'s make and model';
+
+  @override
+  String get cmdLevelLimit =>
+      'Stay within what every player of video this size handles';
+
+  @override
+  String get cmdDropTag =>
+      'Leave out the original\'s file type tag, which does not fit the new file';
 
   @override
   String get cmdContainer => 'File type of the result';

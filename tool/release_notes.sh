@@ -24,7 +24,8 @@ cat <<EOF
 **FFmpeg is not included.** Install FFmpeg 8 or newer, so that \`ffmpeg\` and
 \`ffprobe\` are found on the \`PATH\`. Linux distribution packages and Homebrew
 have everything the app uses. On Windows take a "full" build: the smaller
-"essentials" builds have no AV1 encoder, and "Smallest file" fails with them.
+"essentials" builds have no AV1 encoder, so "For the archive" makes larger
+HEVC files with them, and "Smallest" for the free Resolve fails.
 
 The app is not signed, so Windows and macOS ask before running it for the
 first time:

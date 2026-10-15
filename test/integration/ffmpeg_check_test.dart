@@ -9,7 +9,7 @@ import 'package:tvv_videoconvertor/core/ffmpeg/runner.dart';
 import 'package:tvv_videoconvertor/core/media/ffprobe.dart';
 import 'package:tvv_videoconvertor/core/output/output_namer.dart';
 import 'package:tvv_videoconvertor/core/queue/job_executor.dart';
-import 'package:tvv_videoconvertor/core/scenarios/compress.dart';
+import 'package:tvv_videoconvertor/core/scenarios/archive.dart';
 import 'package:tvv_videoconvertor/core/scenarios/scenario.dart';
 
 import '../support/test_media.dart';
@@ -66,7 +66,7 @@ void main() {
     final ffprobe = Ffprobe(media!.paths.ffprobe);
     final source = await media!.clip('clip.mp4', seconds: 1);
     final info = await ffprobe.probe(source);
-    final plan = CompressPreset.hevc.plan(info, const {}, capabilities);
+    final plan = const ArchivePreset().plan(info, const {}, capabilities);
     expect(plan.kind, PlanKind.encode);
 
     final handle = await JobExecutor(FfmpegRunner(media!.paths.ffmpeg)).start(
@@ -90,7 +90,7 @@ void main() {
     );
 
     final output = await ffprobe.probe(result.outputPath!);
-    expect(output.video!.codec, 'hevc');
+    expect(output.video!.codec, 'av1');
     expect(output.audio, isNotEmpty);
   });
 }

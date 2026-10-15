@@ -18,6 +18,7 @@ import '../../sources/sources_controller.dart';
 import '../../theme.dart';
 import '../headings.dart';
 import '../scenario_texts.dart';
+import '../size_change_text.dart';
 import '../technical_text.dart';
 import 'command_dialog.dart';
 import 'language_button.dart';
@@ -55,9 +56,7 @@ class RecipePane extends ConsumerWidget {
 
     final selected = findPreset(recipe.presetId)!;
     final scenario = scenarios.firstWhere((s) => s.presets.contains(selected));
-    final presets = scenario.presets
-        .where((preset) => presetAvailable(preset, capabilities))
-        .toList();
+    final presets = scenario.presets;
     // The technical line describes what will really happen to the first
     // selected video (its sound may need converting where a typical file's
     // does not); with nothing selected, or a video that needs no work, it
@@ -70,6 +69,16 @@ class RecipePane extends ConsumerWidget {
     final shownPlan = selectedPlan != null && selectedPlan.producesOutput
         ? selectedPlan
         : typicalPlan(selected, recipe.values, capabilities);
+    // Options whose chosen variant has its own explanation under its row.
+    final explainedOptions = selected.options.where(
+      (option) =>
+          optionVisible(selected, option, recipe.values, capabilities) &&
+          choiceHint(
+            l10n,
+            option.id,
+            selected.choice(recipe.values, option.id),
+          ).isNotEmpty,
+    );
     final advanced = [
       for (final option in selected.options)
         if (advancedOptionVisible(selected, option, recipe.values)) option,
@@ -115,14 +124,8 @@ class RecipePane extends ConsumerWidget {
                         const SizedBox(height: 4),
                         _ScenarioGrid(
                           selected: scenario,
-                          onSelect: (s) => controller.selectPreset(
-                            s.presets
-                                .firstWhere(
-                                  (preset) =>
-                                      presetAvailable(preset, capabilities),
-                                )
-                                .id,
-                          ),
+                          onSelect: (s) =>
+                              controller.selectPreset(s.presets.first.id),
                         ),
                         if (presets.length > 1) ...[
                           if (constraints.maxHeight >= _Spacing.roomyFrom)
@@ -151,14 +154,21 @@ class RecipePane extends ConsumerWidget {
                           ),
                         ],
                         // One explanation: of the variant where there are
-                        // several, otherwise of the goal.
-                        _Hint(
-                          presets.length > 1
-                              ? presetHint(l10n, selected.id)
-                              : scenarioHint(l10n, scenario.id),
-                        ),
+                        // several, otherwise of the goal. Where the options
+                        // explain themselves, the goal's explanation needs
+                        // the roomier window; it is also the goal's tooltip.
+                        if (presets.length > 1)
+                          _Hint(presetHint(l10n, selected.id))
+                        else if (explainedOptions.isEmpty ||
+                            constraints.maxHeight >= _Spacing.roomyFrom)
+                          _Hint(scenarioHint(l10n, scenario.id)),
                         for (final option in selected.options)
-                          if (optionVisible(selected, option, recipe.values))
+                          if (optionVisible(
+                            selected,
+                            option,
+                            recipe.values,
+                            capabilities,
+                          )) ...[
                             _OptionRow(
                               preset: selected,
                               option: option,
@@ -167,6 +177,15 @@ class RecipePane extends ConsumerWidget {
                               onChanged: (value) =>
                                   controller.setOption(option.id, value),
                             ),
+                            // What the chosen variant trades away.
+                            _Hint(
+                              choiceHint(
+                                l10n,
+                                option.id,
+                                selected.choice(recipe.values, option.id),
+                              ),
+                            ),
+                          ],
                         _LabeledRow(
                           label: l10n.convertTitle,
                           child: SegmentedButton<SampleChoice>(
@@ -520,6 +539,10 @@ class _OptionRow extends StatelessWidget {
         for (final choice in option.choices)
           ButtonSegment(
             value: choice,
+            tooltip: switch (choiceHint(l10n, option.id, choice)) {
+              '' => null,
+              final hint => hint,
+            },
             label: _SegmentLabel(
               choiceLabel(l10n, preset.id, choice),
               caption: choiceCaption(
@@ -586,7 +609,7 @@ class _SegmentLabel extends StatelessWidget {
             Text(text, maxLines: 1, softWrap: false),
             if (caption case final caption?)
               technicalCaption
-                  ? TechnicalText(caption, color: quiet)
+                  ? TechnicalText(caption, color: quiet, caption: true)
                   : _Caption(caption, color: quiet),
           ],
         ),
@@ -610,6 +633,9 @@ class _Caption extends StatelessWidget {
       maxLines: 1,
       style: theme.textTheme.labelSmall?.copyWith(
         color: color ?? theme.colorScheme.onSurfaceVariant,
+        // As large as a technical caption, so the rows match.
+        fontSize: captionFontSize,
+        height: captionLineHeight / captionFontSize,
       ),
     );
   }
@@ -655,9 +681,10 @@ class _MoreOptionsDialog extends ConsumerWidget {
         width: 380,
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (final option in preset.options)
-              if (advancedOptionVisible(preset, option, recipe.values))
+              if (advancedOptionVisible(preset, option, recipe.values)) ...[
                 _OptionRow(
                   preset: preset,
                   option: option,
@@ -667,6 +694,15 @@ class _MoreOptionsDialog extends ConsumerWidget {
                       .read(recipeProvider.notifier)
                       .setOption(option.id, value),
                 ),
+                // What the chosen variant trades away, as on the panel.
+                _Hint(
+                  choiceHint(
+                    l10n,
+                    option.id,
+                    preset.choice(recipe.values, option.id),
+                  ),
+                ),
+              ],
           ],
         ),
       ),
@@ -762,6 +798,7 @@ class _AddControls extends ConsumerWidget {
     final measuring = selected.any((v) => previews[v.id]?.measuring ?? false);
 
     final String summary;
+    String? larger;
     if (selected.isEmpty) {
       summary = l10n.selectVideosHint;
     } else if (addableSelected == 0) {
@@ -769,6 +806,7 @@ class _AddControls extends ConsumerWidget {
     } else if (recipe.isSample) {
       summary = l10n.samplesCount(addableSelected);
     } else if (batch != null) {
+      larger = format.largerBy(batch.before, batch.after);
       summary = [
         '${l10n.videoCount(selected.length)}  ·  ${format.bytes(batch.before)}'
             ' → ${l10n.aboutSize(format.bytes(batch.after))}',
@@ -793,8 +831,9 @@ class _AddControls extends ConsumerWidget {
             height: 36,
             child: Align(
               alignment: AlignmentDirectional.bottomStart,
-              child: Text(
+              child: SizeChangeText(
                 summary,
+                larger: larger,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(

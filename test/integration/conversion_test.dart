@@ -24,7 +24,7 @@ import 'package:tvv_videoconvertor/core/media/ffprobe.dart';
 import 'package:tvv_videoconvertor/core/media/media_info.dart';
 import 'package:tvv_videoconvertor/core/output/output_namer.dart';
 import 'package:tvv_videoconvertor/core/queue/job_executor.dart';
-import 'package:tvv_videoconvertor/core/scenarios/compress.dart';
+import 'package:tvv_videoconvertor/core/scenarios/archive.dart';
 import 'package:tvv_videoconvertor/core/scenarios/extract_audio.dart';
 import 'package:tvv_videoconvertor/core/scenarios/remux.dart';
 import 'package:tvv_videoconvertor/core/scenarios/resolve_linux.dart';
@@ -249,7 +249,10 @@ void main() {
     });
   });
 
-  group('Compress', () {
+  group('For the archive', () {
+    const archive = ArchivePreset();
+    const hevc = {'codec': 'hevc'};
+
     test('AV1 output is 10-bit 4:2:0 in MP4 with AAC audio', () async {
       if (unavailable()) return;
       final source = await media!.clip(
@@ -259,7 +262,7 @@ void main() {
         audio: ['-c:a', 'pcm_s24le'],
       );
 
-      final output = await convert(CompressPreset.av1, source);
+      final output = await convert(archive, source);
 
       expect(output.video!.codec, 'av1');
       expect(output.video!.pixFmt, 'yuv420p10le');
@@ -269,15 +272,15 @@ void main() {
 
     // The presets pass no colour arguments: FFmpeg is relied on to carry the
     // tags through. These tests are what holds it to that.
-    for (final preset in <Preset>[
-      CompressPreset.av1,
-      CompressPreset.hevc,
-      ResolveLinuxPreset.free,
+    for (final (name, preset, values) in <(String, Preset, OptionValues)>[
+      ('archive_av1', archive, const {}),
+      ('archive_hevc', archive, hevc),
+      ('resolve_free', ResolveLinuxPreset.free, const {}),
     ]) {
-      test('${preset.id} keeps the HLG colour tags of the source', () async {
+      test('$name keeps the HLG colour tags of the source', () async {
         if (unavailable()) return;
         final source = await media!.clip(
-          'hlg_${preset.id}.mov',
+          'hlg_$name.mov',
           video: [
             '-c:v',
             'libx265',
@@ -292,7 +295,11 @@ void main() {
         final input = await ffprobe.probe(source);
         expect(input.video!.color.isHdr, isTrue);
 
-        final color = (await convert(preset, source)).video!.color;
+        final color = (await convert(
+          preset,
+          source,
+          values: values,
+        )).video!.color;
 
         expect(color.primaries, 'bt2020');
         expect(color.transfer, 'arib-std-b67');
@@ -304,7 +311,7 @@ void main() {
       if (unavailable()) return;
       final source = await media!.clip('to_hevc.mp4');
 
-      final output = await convert(CompressPreset.hevc, source);
+      final output = await convert(archive, source, values: hevc);
 
       expect(output.video!.codec, 'hevc');
       expect(output.video!.bitDepth, 10);
@@ -314,18 +321,54 @@ void main() {
       );
     });
 
-    test('the graphics card preset works when a card is present', () async {
+    // A camera writes MOV; MP4 keeps its make and model only when asked.
+    for (final codec in ['av1', 'hevc']) {
+      test('$codec keeps the date, place, camera and timecode', () async {
+        if (unavailable()) return;
+        final source = await media!.clip(
+          'camera_$codec.mov',
+          extra: [
+            '-timecode',
+            '01:00:00:00',
+            '-metadata',
+            'make=Example Camera Co',
+            '-metadata',
+            'model=Example Z 1',
+            '-metadata',
+            'location=+50.4501+030.5234/',
+            '-metadata',
+            'creation_time=2024-06-01T10:00:00Z',
+          ],
+        );
+
+        final output = await convert(archive, source, values: {'codec': codec});
+
+        expect(output.tags, containsPair('make', 'Example Camera Co'));
+        expect(output.tags, containsPair('model', 'Example Z 1'));
+        expect(output.tags, containsPair('location', '+50.4501+030.5234/'));
+        expect(output.tags['creation_time'], startsWith('2024-06-01T10:00:00'));
+        // The camera's MOV file type is not claimed for the MP4.
+        expect(output.tags['major_brand'], 'isom');
+        expect(
+          await media!.streams(output.path, 'codec_tag_string'),
+          contains('tmcd'),
+        );
+      });
+    }
+
+    test('the graphics card works when a card is present', () async {
       if (unavailable()) return;
-      if (CompressPreset.gpuEncoder(capabilities) == null) {
+      final format = ArchivePreset.formatFor(const {}, capabilities);
+      if (ArchivePreset.gpuEncoder(capabilities, format) == null) {
         markTestSkipped('no working hardware encoder on this machine');
         return;
       }
       final source = await media!.clip('to_gpu.mp4', size: '1280x720');
 
-      final output = await convert(CompressPreset.gpu, source);
+      final output = await convert(archive, source, values: {'speed': 'gpu'});
 
       expect(output.video!.bitDepth, 10);
-      expect(output.video!.codec, anyOf('av1', 'hevc'));
+      expect(output.video!.codec, format);
     });
   });
 
@@ -540,13 +583,19 @@ void main() {
         seconds: 40,
       );
       final info = await ffprobe.probe(source);
-      final plan = CompressPreset.hevc.plan(info, const {}, capabilities);
+      final plan = const ArchivePreset().plan(info, const {
+        'codec': 'hevc',
+      }, capabilities);
 
       final estimate = await SampleEstimator(
         FfmpegRunner(media!.paths.ffmpeg),
         workDir: Directory(media!.file('estimates')),
       ).estimate(info, plan);
-      final actual = await convert(CompressPreset.hevc, source);
+      final actual = await convert(
+        const ArchivePreset(),
+        source,
+        values: const {'codec': 'hevc'},
+      );
 
       expect(estimate!.measured, isTrue);
       expect(estimate.bytes, closeTo(actual.sizeBytes, actual.sizeBytes * 0.3));
@@ -565,9 +614,7 @@ void main() {
         );
         final info = await ffprobe.probe(source);
         // Software AV1 at this size takes long enough to be interrupted.
-        final plan = CompressPreset.av1.plan(info, {
-          'quality': 'maximum',
-        }, capabilities);
+        final plan = const ArchivePreset().plan(info, const {}, capabilities);
         final workDir = Directory(media!.file('stopped_estimates'));
         final estimator = SampleEstimator(
           FfmpegRunner(media!.paths.ffmpeg),
@@ -638,12 +685,12 @@ void main() {
           media!.dir.path,
           'Converted',
           'Samples',
-          'queued_sample_hevc-crf20_sample10s.mp4',
+          'queued_sample_av1-crf24_sample10s.mp4',
         ),
       );
       final sample = await ffprobe.probe(job.outputPath);
       expect(sample.duration.inMilliseconds, closeTo(10000, 100));
-      expect(sample.video!.codec, 'hevc');
+      expect(sample.video!.codec, 'av1');
       expect(wholeVideoEstimate(job, job.result!), isNotNull);
     });
 
@@ -652,7 +699,7 @@ void main() {
       final source = await media!.clip('queued_whole.mp4');
       final container = await app();
       await container.read(sourcesProvider.notifier).addPaths([source]);
-      container.read(recipeProvider.notifier).setOption('quality', 'maximum');
+      container.read(recipeProvider.notifier).setOption('codec', 'hevc');
 
       container.read(queueProvider.notifier).addSelected();
       final job = (await finished(container)).single;
@@ -660,7 +707,7 @@ void main() {
       expect(job.status, JobStatus.done);
       expect(
         File(
-          p.join(media!.dir.path, 'Converted', 'queued_whole_hevc-crf18.mp4'),
+          p.join(media!.dir.path, 'Converted', 'queued_whole_hevc-crf21.mp4'),
         ).existsSync(),
         isTrue,
       );
@@ -675,10 +722,8 @@ void main() {
       );
       final container = await app();
       await container.read(sourcesProvider.notifier).addPaths([source]);
-      // Software AV1 at this size takes long enough to be interrupted.
-      container.read(recipeProvider.notifier)
-        ..selectPreset(CompressPreset.av1.id)
-        ..setOption('quality', 'maximum');
+      // The default, software AV1, takes long enough at this size to be
+      // interrupted.
       container.read(queueProvider.notifier).addSelected();
       final writing = Completer<void>();
       final subscription = container.listen(queueProvider, (_, state) {
@@ -773,7 +818,9 @@ void main() {
       if (unavailable()) return;
       final source = await media!.clip('long.mp4', seconds: 6);
       final info = await ffprobe.probe(source);
-      final plan = CompressPreset.hevc.plan(info, const {}, capabilities);
+      final plan = const ArchivePreset().plan(info, const {
+        'codec': 'hevc',
+      }, capabilities);
       final handle = await executor.start(
         jobFor(
           info,
@@ -801,9 +848,7 @@ void main() {
       );
       final info = await ffprobe.probe(source);
       // Software AV1 at this size takes long enough to be interrupted.
-      final plan = CompressPreset.av1.plan(info, {
-        'quality': 'maximum',
-      }, capabilities);
+      final plan = const ArchivePreset().plan(info, const {}, capabilities);
       final job = jobFor(info, plan);
       final handle = await executor.start(job);
       await handle.progress.first;
@@ -848,7 +893,9 @@ void main() {
         size: '1280x720',
       );
       final info = await ffprobe.probe(source);
-      final plan = CompressPreset.hevc.plan(info, const {}, capabilities);
+      final plan = const ArchivePreset().plan(info, const {
+        'codec': 'hevc',
+      }, capabilities);
       final handle = await executor.start(jobFor(info, plan));
       var updates = 0;
       handle.progress.listen((_) => updates++);

@@ -81,6 +81,27 @@ void main() {
       expect(parts.first.args, ['-map_metadata', '-1']);
       expect(parts.first.meaning, ArgMeaning.dropMetadata);
     });
+
+    test('keeping the camera tags and dropping a stale one are told apart', () {
+      final parts = splitCommand([
+        '-movflags',
+        '+faststart',
+        '-movflags',
+        '+faststart+use_metadata_tags',
+        '-metadata',
+        'major_brand=',
+        '-maxrate',
+        '40M',
+        'out.mp4',
+      ]);
+
+      expect(parts.map((p) => p.meaning).take(4), [
+        ArgMeaning.fastStart,
+        ArgMeaning.fastStartKeepingTags,
+        ArgMeaning.dropTag,
+        ArgMeaning.levelLimit,
+      ]);
+    });
   });
 
   group('explained', () {

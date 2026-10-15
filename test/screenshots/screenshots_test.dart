@@ -177,6 +177,14 @@ void main() {
         await save(tester, '5_ukrainian');
       });
 
+      testWidgets('the sound', (tester) async {
+        final sources = await pumpApp(tester, environment(), look: look);
+        await addVideos(tester, sources, files);
+        await tester.tap(find.byIcon(Icons.music_note_rounded));
+        await tester.pump();
+        await save(tester, '7_sound');
+      });
+
       testWidgets('smallest window, the tallest settings', (tester) async {
         final env = environment();
         final sources = await pumpApp(

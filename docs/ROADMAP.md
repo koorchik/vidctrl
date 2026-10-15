@@ -5,9 +5,10 @@
 - **Engine:** file inspection, per-file plans, FFmpeg runner with progress,
   graceful cancel and pause, safe output handling, capability detection
   (encoders, working hardware encoders, accepted SVT-AV1 parameters).
-- **Goals:** "Make it small" (HEVC, AV1, graphics card), "Edit in DaVinci
-  Resolve" on Linux (Studio and free), "Send to a phone", "Get the sound",
-  "Remove personal data" and "Change file type".
+- **Goals:** "For the archive" (AV1 or HEVC, processor or graphics card,
+  camera tags kept), "Edit in DaVinci Resolve" on Linux (Studio and free),
+  "Send to a phone", "Get the sound", "Remove personal data" and "Change
+  file type".
 - **UI:** videos, settings and queue as separate parts; the queue starts by
   itself and can be paused, reordered and edited; the same video can be
   queued with different settings, and output names carry the settings;
@@ -31,9 +32,12 @@
      neutral file names (a name can give away a place or a date).
    - Send to a phone: "fit into N MB" for services with a size limit.
    - Get the sound: choose which track, or all of them.
-2. **Quality calibration.** The quality levels are starting values. Measure
-   them on real footage (VMAF) and fix the numbers so that "Recommended" and
-   "Best quality" mean the same across encoders.
+2. **Quality calibration.** "For the archive" is matched with XPSNR on
+   three 4K clips (phone, slideshow, screen recording). Still to do: footage
+   from dedicated cameras (Nikon, Sony, Canon), a check with VMAF (needs an
+   FFmpeg with `libvmaf`), Intel, AMD and Apple graphics, and the other
+   goals' quality levels. A fixed number cannot suit both calm and busy
+   footage; choosing it per video from a measured sample would.
 3. **Check in Resolve.** Import converted files into Resolve to confirm picture
    and sound decode. The free edition and the AV1 "Smallest" variant still need
    a test on a machine with the free edition.

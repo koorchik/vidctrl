@@ -16,6 +16,7 @@ import '../../queue/queue_state.dart';
 import '../../theme.dart';
 import '../headings.dart';
 import '../scenario_texts.dart';
+import '../size_change_text.dart';
 import '../technical_text.dart';
 import 'command_dialog.dart';
 import 'media_details_dialog.dart';
@@ -45,8 +46,9 @@ class QueuePane extends ConsumerWidget {
                 PaneTitle(l10n.queueTitle),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Text(
+                  child: SizeChangeText(
                     _headline(l10n, format, state, progress),
+                    larger: _grownBy(format, state),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -122,14 +124,28 @@ class QueuePane extends ConsumerWidget {
           l10n.progressLeft(format.wait(progress.left!)),
       ].join('  ·  ');
     }
+    final (:before, :after) = _doneSizes(state);
+    if (before == 0) return '';
+    return '${l10n.allDone}: ${l10n.savedSummary(format.bytes(before), format.bytes(after))}'
+        ', ${format.sizeChange(before, after)}';
+  }
+
+  /// What the finished whole videos weighed before and after.
+  ({int before, int after}) _doneSizes(QueueState state) {
     final done = state.jobs.where(
       (j) => j.status == JobStatus.done && !j.isSample,
     );
-    if (done.isEmpty) return '';
-    final before = done.fold<int>(0, (s, j) => s + j.info.sizeBytes);
-    final after = done.fold<int>(0, (s, j) => s + (j.result?.outputBytes ?? 0));
-    return '${l10n.allDone}: ${l10n.savedSummary(format.bytes(before), format.bytes(after))}'
-        ', ${format.sizeChange(before, after)}';
+    return (
+      before: done.fold<int>(0, (s, j) => s + j.info.sizeBytes),
+      after: done.fold<int>(0, (s, j) => s + (j.result?.outputBytes ?? 0)),
+    );
+  }
+
+  /// The headline's "N% larger", when the finished videos grew.
+  String? _grownBy(Formatter format, QueueState state) {
+    if (state.busy || state.paused) return null;
+    final (:before, :after) = _doneSizes(state);
+    return format.largerBy(before, after);
   }
 
   /// Progress across the jobs of this run, weighted by how much video each
@@ -244,8 +260,17 @@ class _JobTile extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(height: 2),
-                Text(
+                SizeChangeText(
                   _statusLine(l10n, format, whole),
+                  larger:
+                      job.status == JobStatus.done &&
+                          !job.isSample &&
+                          job.result?.outputBytes != null
+                      ? format.largerBy(
+                          job.info.sizeBytes,
+                          job.result!.outputBytes!,
+                        )
+                      : null,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: _statusColor(context),
                   ),
@@ -498,22 +523,26 @@ class _JobTile extends ConsumerWidget {
 }
 
 /// The job's goal in plain words, with the technical summary beside it.
-class _GoalLine extends StatelessWidget {
+class _GoalLine extends ConsumerWidget {
   const _GoalLine({required this.job});
 
   final QueueJob job;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final capabilities = ref
+        .watch(environmentProvider)
+        .requireValue
+        .capabilities;
     final preset = findPreset(job.recipe.presetId)!;
     final scenario = scenarios.firstWhere((s) => s.presets.contains(preset));
     // What was chosen, in the words of the panel: goal, variant, options.
     final plain = [
       scenarioTitle(l10n, scenario.id),
       if (scenario.presets.length > 1) presetTitle(l10n, preset.id),
-      ...chosenOptions(l10n, preset, job.recipe.values),
+      ...chosenOptions(l10n, preset, job.recipe.values, capabilities),
     ].join(' · ');
     // In the goal's own colour, where the look gives goals colours.
     final look = AppLook.of(context);

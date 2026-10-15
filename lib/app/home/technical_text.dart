@@ -12,7 +12,13 @@ import '../theme.dart';
 /// Technical terms on the main screen appear only through this widget; a
 /// test holds the UI to that.
 class TechnicalText extends StatelessWidget {
-  const TechnicalText(this.text, {super.key, this.align, this.color});
+  const TechnicalText(
+    this.text, {
+    super.key,
+    this.align,
+    this.color,
+    this.caption = false,
+  });
 
   final String text;
   final TextAlign? align;
@@ -21,11 +27,19 @@ class TechnicalText extends StatelessWidget {
   /// as on a chosen segment.
   final Color? color;
 
+  /// Under a choice's label (`AV1` under "Smallest file"), where the
+  /// technical name is what tells the choices apart: a little larger.
+  final bool caption;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final quiet = color ?? theme.colorScheme.onSurfaceVariant;
     final small = theme.textTheme.labelSmall;
+    // The line is as tall in the fixed-width font as in the interface font,
+    // so rows are the same height in both looks.
+    final lineHeight = caption ? captionLineHeight : 16.0;
+    final monoSize = caption ? 11.5 : 10.0;
     return Text(
       text,
       textAlign: align,
@@ -34,18 +48,25 @@ class TechnicalText extends StatelessWidget {
       style: AppLook.of(context).monoCaptions
           ? small?.copyWith(
               fontFamily: monoFontFamily,
-              fontSize: 10,
+              fontSize: monoSize,
               fontWeight: FontWeight.w400,
-              // The line stays as tall as in the interface font, so rows
-              // are the same height in both looks.
-              height: 1.6,
+              height: lineHeight / monoSize,
               letterSpacing: 0,
               color: quiet,
             )
-          : small?.copyWith(color: quiet, letterSpacing: 0.2),
+          : small?.copyWith(
+              color: quiet,
+              letterSpacing: 0.2,
+              fontSize: caption ? captionFontSize : null,
+              height: caption ? lineHeight / captionFontSize : null,
+            ),
     );
   }
 }
+
+/// The size of a caption under a choice's label, technical or not.
+const captionFontSize = 12.5;
+const captionLineHeight = 17.0;
 
 /// A typical camera file: what presets are described with before (or
 /// without) any real file in the list.
@@ -243,6 +264,25 @@ String? choiceCaption(
       return scale == null ? null : _lines(int.parse(scale.group(1)!));
     case 'mode':
       return codecName(video) ?? l10n.techNoReencode;
+    // The sound format inside a file type whose name does not say it.
+    case 'format' when preset.id.startsWith('audio'):
+      return switch (choice) {
+        'm4a' => 'AAC',
+        'wav' => 'PCM',
+        _ => null,
+      };
+    // The format alone, whatever does the encoding.
+    case 'codec' when preset.id.startsWith('archive'):
+      return codecName(video)?.split(' · ').first;
+    // What does the encoding: the encoder library, or the graphics card's
+    // maker.
+    case 'speed':
+      if (video is! VideoEncode) return null;
+      return switch (video.encoder) {
+        'libsvtav1' => 'SVT-AV1',
+        'libx265' => 'x265',
+        _ => codecName(video)!.split(' · ').last,
+      };
     default:
       return null;
   }

@@ -69,4 +69,13 @@ class Formatter {
         ? l10n.percentSmaller(-percent)
         : l10n.percentLarger(percent);
   }
+
+  /// `240% larger`, or null when the size did not grow: what a line shows
+  /// in another colour.
+  String? largerBy(int before, int after) {
+    final change = sizeChange(before, after);
+    return before > 0 && ((after - before) * 100 / before).round() > 0
+        ? change
+        : null;
+  }
 }

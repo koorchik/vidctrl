@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A Flutter desktop app (Linux, Windows, macOS) that converts batches of videos
-by goal ("Make it small", "Edit in DaVinci Resolve", "Send to a phone", …). It
+by goal ("For the archive", "Edit in DaVinci Resolve", "Send to a phone", …). It
 drives the `ffmpeg` and `ffprobe` executables as separate processes; it does
 not link FFmpeg libraries. FFmpeg is not bundled yet: it is found on `PATH`
 (FFmpeg 8 or newer, with `libx265`, `libsvtav1`, `prores_ks`, `dnxhd`).
@@ -35,7 +35,8 @@ flutter test tool/make_screenshots.dart               # redraws the README's pic
 dart run tool/desktop_entry.dart                      # Linux: registers the icon with the desktop
 
 dart run tool/convert.dart --list                     # the engine without the UI
-dart run tool/convert.dart compress.hevc clip.mov --dry-run
+dart run tool/convert.dart archive.master clip.mov --dry-run
+dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for "For the archive"
 ```
 
 - Several `--exclude-tags` flags do not combine; use the `"a || b"` form.
@@ -157,8 +158,12 @@ videos and gets small files that look the same, with no help.
   anything bigger opens in a small window ("More options…"). If the test
   fails after a change, make the change fit; do not raise the minimum window
   size without a reason.
-- **Safe defaults.** "Make it small" with "Works everywhere" is pre-selected:
-  drop videos, press Add to queue, done.
+- **Safe defaults.** "For the archive" is pre-selected: one quality, the
+  highest, in AV1 (HEVC where FFmpeg has no AV1). Drop videos, press Add to
+  queue, done. Its format and speed rows each say under them what the chosen
+  variant trades away (`choiceHint` in `scenario_texts.dart`; each variant's
+  is also its tooltip). With such rows, the goal's own explanation shows
+  only in the roomier window, so the smallest one still fits.
 - More is available on request only: "More options…", and "Show the command"
   and "Video details" in the ⋯ menus.
 
@@ -241,7 +246,25 @@ The UI renders presets and options generically; it needs no other change.
 - **Muxer-specific options** such as `-write_tmcd` and `-movflags` make
   FFmpeg fail on other containers; add them only for MP4/MOV.
 - **MP4 drops unknown tags** such as `make` when writing; MOV keeps them.
-  Matters for test fixtures with planted metadata.
+  Matters for test fixtures with planted metadata. `-movflags
+  use_metadata_tags` keeps them in MP4, but then also copies the source's
+  `major_brand` and `compatible_brands` tags (a camera MOV's `qt`), so the
+  archive goal blanks those with `-metadata major_brand=` and the like. The
+  real file type box is unaffected.
+- **NVENC's constant quality is capped.** With `-rc vbr -cq N -b:v 0` and
+  no `-maxrate`, NVENC limits the bitrate by itself (about 21 Mbit/s for
+  HEVC, 31 for AV1 at 4K), so on detailed footage `-cq 20` and `-cq 24` gave
+  byte-identical files and a picture below the CPU encoders'. A high
+  `-maxrate` alone makes it write HEVC level 6.1, which some players refuse;
+  a 40M limit alone makes it pick level 5.0 in the high tier. The archive
+  goal sets `-level` and `-tier main` for the picture size and frame rate
+  and that level's limit (`playableLevel` in `archive.dart`). Two-pass
+  (`-multipass`) gave nothing measurable in this mode, at 40% more time.
+- **Quality numbers** in `archive.dart` were matched with FFmpeg's `xpsnr`
+  filter (no `libvmaf` in Ubuntu's build), on 10-second 4K pieces, to at
+  least 42 dB on the hardest clip; `tool/calibrate_archive.dart` repeats
+  the measurement on any clips. One number cannot give the same score on
+  calm and busy footage, so the hardest clip decides.
 - **Tone mapping** needs the `zscale` and `tonemap` filters, which not every
   build has; `Capabilities.hasFilter` is checked first.
 - **Cancel:** `q` on stdin makes FFmpeg finish the file and exit with code 0,

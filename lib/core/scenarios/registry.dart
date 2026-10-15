@@ -1,4 +1,4 @@
-import 'compress.dart';
+import 'archive.dart';
 import 'extract_audio.dart';
 import 'remux.dart';
 import 'resolve_linux.dart';
@@ -9,7 +9,7 @@ import 'strip_metadata.dart';
 /// Every scenario the app offers, in display order. This list is the single
 /// place a new scenario has to be added.
 const scenarios = <Scenario>[
-  compressScenario,
+  archiveScenario,
   resolveLinuxScenario,
   sharePhoneScenario,
   extractAudioScenario,

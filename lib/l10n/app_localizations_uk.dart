@@ -28,11 +28,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get clearFinished => 'Прибрати готові';
 
   @override
-  String get scenarioCompressTitle => 'Зменшити розмір';
+  String get scenarioArchiveTitle => 'Для архіву';
 
   @override
-  String get scenarioCompressHint =>
-      'Виглядає так само, займає значно менше місця. Добре для зберігання та Google Фото.';
+  String get scenarioArchiveHint =>
+      'Відео з камери займатимуть значно менше місця й виглядатимуть так само, як оригінал. Дати зйомки, дані камери, звук і кольори зберігаються.';
 
   @override
   String get scenarioResolveTitle => 'Монтувати в Resolve';
@@ -42,25 +42,38 @@ class AppLocalizationsUk extends AppLocalizations {
       'Щоб відео відкривалися в DaVinci Resolve на Linux із зображенням і звуком.';
 
   @override
-  String get presetCompressHevc => 'Працює всюди';
+  String get archiveFormatTitle => 'Формат';
 
   @override
-  String get presetCompressHevcHint =>
-      'Відтворюється на телефонах, телевізорах, комп’ютерах і в Google Фото.';
+  String get archiveAv1 => 'Найменший файл';
 
   @override
-  String get presetCompressAv1 => 'Найменший файл';
+  String get archiveAv1Hint =>
+      'Відтворюється на комп’ютерах і новіших пристроях: iPhone 15 Pro і новіших, Mac з M3, телевізорах приблизно з 2020 року.';
 
   @override
-  String get presetCompressAv1Hint =>
-      'Ще менший, але потребує нового телефона, телевізора чи комп’ютера.';
+  String get archiveHevc => 'Працює всюди';
 
   @override
-  String get presetCompressGpu => 'Найшвидше';
+  String get archiveHevcHint =>
+      'Та сама якість, файл до третини більший. Відтворюється майже всюди, зокрема на старших iPhone, Mac і телевізорах.';
 
   @override
-  String get presetCompressGpuHint =>
-      'Використовує відеокарту: значно швидше, файли трохи більші.';
+  String get archiveSpeedTitle => 'Швидкість';
+
+  @override
+  String get archiveCpu => 'Ретельно';
+
+  @override
+  String get archiveCpuHint =>
+      'Кодує процесор: повільніше, але файл найменший.';
+
+  @override
+  String get archiveGpu => 'Швидко';
+
+  @override
+  String get archiveGpuHint =>
+      'Кодує відеокарта: у кілька разів швидше. Складні кадри займають стільки ж, спокійні — до 2,5 раза більше.';
 
   @override
   String get presetResolveStudio => 'Resolve Studio';
@@ -75,18 +88,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get presetResolveFreeHint =>
       'Зображення теж конвертується. Файли стають значно більшими.';
-
-  @override
-  String get qualityTitle => 'Якість';
-
-  @override
-  String get qualityCompact => 'Менший файл';
-
-  @override
-  String get qualityHigh => 'Рекомендовано';
-
-  @override
-  String get qualityMaximum => 'Найкраща якість';
 
   @override
   String get sizeTitle => 'Розмір файлу';
@@ -391,6 +392,18 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get cmdFastStart =>
       'Індекс на початку, щоб відтворення починалося під час завантаження';
+
+  @override
+  String get cmdFastStartKeepingTags =>
+      'Індекс на початку, щоб відтворення починалося під час завантаження, і зберегти марку та модель камери';
+
+  @override
+  String get cmdLevelLimit =>
+      'Не виходити за межі, які підтримує будь-який програвач відео такого розміру';
+
+  @override
+  String get cmdDropTag =>
+      'Не переносити позначку типу файлу оригіналу: новому файлу вона не підходить';
 
   @override
   String get cmdContainer => 'Тип файлу результату';

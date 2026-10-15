@@ -3,9 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/output/output_namer.dart';
-import '../../core/scenarios/compress.dart';
+import '../../core/scenarios/archive.dart';
 import '../../core/scenarios/registry.dart';
-import '../providers.dart';
 import '../settings.dart';
 import 'recipe.dart';
 
@@ -40,13 +39,17 @@ class RecipeController extends Notifier<RecipeState> {
     return RecipeState(
       recipe:
           _restoreGoal(store.read(_goalKey)) ??
-          Recipe(presetId: compressScenario.presets.first.id),
+          Recipe(presetId: archiveScenario.presets.first.id),
       output: _restoreOutput(store.read(_outputKey)),
     );
   }
 
+  /// Choosing the goal that is already chosen keeps its options, which may
+  /// have been set under "More options".
   void selectPreset(String presetId) {
-    if (findPreset(presetId) == null) return;
+    if (findPreset(presetId) == null || presetId == state.recipe.presetId) {
+      return;
+    }
     _setGoal(state.recipe.copyWith(presetId: presetId, values: const {}));
   }
 
@@ -88,19 +91,12 @@ class RecipeController extends Notifier<RecipeState> {
     );
   }
 
-  /// The goal used last time, if it still exists and works on this computer.
+  /// The goal used last time, if it still exists. Choices this computer
+  /// cannot make, such as the graphics card, fall back in the plan itself.
   Recipe? _restoreGoal(Object? saved) {
     if (saved is! Map) return null;
     final preset = findPreset('${saved['preset']}');
     if (preset == null) return null;
-    final capabilities = ref
-        .read(environmentProvider)
-        .requireValue
-        .capabilities;
-    if (preset.id == CompressPreset.gpu.id &&
-        CompressPreset.gpuEncoder(capabilities) == null) {
-      return null;
-    }
     final values = saved['values'];
     return Recipe(
       presetId: preset.id,

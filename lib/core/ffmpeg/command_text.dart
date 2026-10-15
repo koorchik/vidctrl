@@ -46,6 +46,9 @@ enum ArgMeaning {
   keyframeInterval,
   playerTag,
   fastStart,
+  fastStartKeepingTags,
+  dropTag,
+  levelLimit,
   container,
   output,
   other,
@@ -110,7 +113,11 @@ ArgMeaning _meaning(String option, String value) => switch (option) {
   '-r' => ArgMeaning.frameRate,
   '-g' => ArgMeaning.keyframeInterval,
   '-tag:v' => ArgMeaning.playerTag,
+  '-movflags' when value.contains('use_metadata_tags') =>
+    ArgMeaning.fastStartKeepingTags,
   '-movflags' => ArgMeaning.fastStart,
+  '-metadata' when value.endsWith('=') => ArgMeaning.dropTag,
+  '-maxrate' || '-bufsize' || '-level' || '-tier' => ArgMeaning.levelLimit,
   '-f' => ArgMeaning.container,
   '-svtav1-params' ||
   '-x265-params' ||

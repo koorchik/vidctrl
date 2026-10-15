@@ -109,8 +109,8 @@ void main() {
       await settle();
 
       expect(jobs().map((j) => j.outputPath), [
-        converted('a_hevc-crf20.mp4'),
-        converted('b_hevc-crf20.mp4'),
+        converted('a_av1-crf24.mp4'),
+        converted('b_av1-crf24.mp4'),
       ]);
       expect(jobs().first.status, JobStatus.running);
       expect(env.executor.started, hasLength(1));
@@ -135,8 +135,8 @@ void main() {
 
       recipe().selectPreset('share.phone');
 
-      expect(jobs().single.recipe.presetId, 'compress.hevc');
-      expect(jobs().single.plan.nameSuffix, '_hevc-crf20');
+      expect(jobs().single.recipe.presetId, 'archive.master');
+      expect(jobs().single.plan.nameSuffix, '_av1-crf24');
     });
 
     test(
@@ -145,12 +145,12 @@ void main() {
         await sources().addPaths(['/videos/a.mp4']);
         queue().addSelected();
 
-        recipe().setOption('quality', 'maximum');
+        recipe().setOption('codec', 'hevc');
         queue().addSelected();
 
         expect(jobs().map((j) => p.basename(j.outputPath)), [
-          'a_hevc-crf20.mp4',
-          'a_hevc-crf18.mp4',
+          'a_av1-crf24.mp4',
+          'a_hevc-crf21.mp4',
         ]);
       },
     );
@@ -174,7 +174,7 @@ void main() {
 
       queue().addSelected();
 
-      expect(jobs().last.outputPath, converted('a_hevc-crf20 (2).mp4'));
+      expect(jobs().last.outputPath, converted('a_av1-crf24 (2).mp4'));
     });
 
     test('a video that is already right is skipped, not converted', () async {
@@ -332,7 +332,7 @@ void main() {
       final job = jobs().single;
       expect(
         job.outputPath,
-        p.join('/videos', 'Converted', 'Samples', 'a_hevc-crf20_sample10s.mp4'),
+        p.join('/videos', 'Converted', 'Samples', 'a_av1-crf24_sample10s.mp4'),
       );
       expect(job.sample!.length, sampleLength);
       expect(env.executor.last.job.sample!.start, Duration.zero);
@@ -354,12 +354,12 @@ void main() {
       recipe().setSample(SampleChoice.start);
 
       queue().addSelected();
-      recipe().selectPreset('compress.av1');
+      recipe().setOption('codec', 'hevc');
       queue().addSelected();
 
       expect(jobs().map((j) => p.basename(j.outputPath)), [
-        'a_hevc-crf20_sample10s.mp4',
-        'a_av1-crf25_sample10s.mp4',
+        'a_av1-crf24_sample10s.mp4',
+        'a_hevc-crf21_sample10s.mp4',
       ]);
     });
 
@@ -403,8 +403,8 @@ void main() {
         queue().convertWhole(jobs().single.id);
 
         expect(jobs().last.isSample, isFalse);
-        expect(jobs().last.outputPath, converted('a_hevc-crf20.mp4'));
-        expect(jobs().last.recipe.presetId, 'compress.hevc');
+        expect(jobs().last.outputPath, converted('a_av1-crf24.mp4'));
+        expect(jobs().last.recipe.presetId, 'archive.master');
       },
     );
 
@@ -413,7 +413,7 @@ void main() {
       recipe().selectPreset('share.phone');
       sources().select(video('a.mp4').id);
       queue().addSelected();
-      recipe().selectPreset('compress.av1');
+      recipe().selectPreset('archive.master');
       sources().select(video('b.mp4').id);
 
       queue().useSettings(jobs().single.id);
@@ -480,5 +480,22 @@ void main() {
       expect(restored.recipe.sample, SampleChoice.none);
       expect(restored.output.customDir, '/exports');
     });
+
+    test('a goal the app no longer has gives way to the default', () async {
+      final settings = MemorySettingsStore()
+        ..values['goal'] = {'preset': 'compress.hevc', 'values': {}};
+
+      container = await start(settings: settings);
+
+      expect(container.read(recipeProvider).recipe.presetId, 'archive.master');
+    });
+  });
+
+  test('choosing the goal already chosen keeps its options', () {
+    recipe().setOption('codec', 'hevc');
+
+    recipe().selectPreset('archive.master');
+
+    expect(container.read(recipeProvider).recipe.values, {'codec': 'hevc'});
   });
 }

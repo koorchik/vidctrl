@@ -16,12 +16,16 @@ other:
 
 ## What it does today
 
-- **Make it small.** Shrinks a video to a fraction of its size while looking
-  the same: for storing finished videos and for uploading camera footage to
-  services such as Google Photos. Output is 10-bit, in a choice of
-  - *Works everywhere* (HEVC, the default),
-  - *Smallest file* (AV1),
-  - *Fastest* (graphics card, offered only when a working one is found).
+- **For the archive.** Turns camera videos into a master copy for keeping:
+  a fraction of the size, looking the same as the original. One quality, the
+  highest; the defaults need no thought. Shooting dates, place, timecode and
+  the camera's make and model are kept. Two choices, each saying what it
+  trades away:
+  - *Format:* *Smallest file* (AV1, the default) or *Works everywhere*
+    (HEVC, a larger file that also plays on older iPhones, Macs and TVs).
+    Without AV1 in the installed FFmpeg, HEVC is used.
+  - *Speed:* *Thorough* (the processor) or *Fast* (the graphics card: much
+    quicker, a larger file; offered only when a working one is found).
 
   Sound is made compact too: the lossless sound of an editor export (FLAC,
   PCM) becomes AAC at 320 kbit/s, which is a small part of a high-quality
@@ -58,7 +62,7 @@ The window has three parts:
 
 Change the settings and press Add to queue again to get the same video in
 another form: each job keeps the settings it was added with, and output names
-carry them (`clip_hevc-crf20.mp4`, `clip_av1-crf25.mp4`, `clip_phone-1080p.mp4`).
+carry them (`clip_av1-crf24.mp4`, `clip_hevc-crf21.mp4`, `clip_phone-1080p.mp4`).
 
 Also:
 
@@ -95,8 +99,11 @@ Early but working on Linux. Not done yet:
   the computer awake and pausing are not implemented, and the tests of
   stopping a conversion part-way fail.
 - Only one video is converted at a time.
-- The quality levels are sensible starting values, not yet measured on real
-  footage.
+- "For the archive" is set so that every format and encoder reaches an
+  XPSNR of at least 42 dB, reported as visually lossless, on the hardest of
+  three 4K clips measured (phone, slideshow, screen recording). Footage from
+  a dedicated camera, and Intel, AMD and Apple graphics, are not measured
+  yet. The other goals' quality levels are starting values.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -105,8 +112,9 @@ See [docs/ROADMAP.md](docs/ROADMAP.md).
 - FFmpeg 8 or newer with `ffprobe`, on the `PATH`, built with `libx265`,
   `libsvtav1`, `prores_ks` and `dnxhd`. Linux distribution packages and
   Homebrew include these. On Windows take a "full" build (Chocolatey's
-  `ffmpeg-full`): the "essentials" builds lack `libsvtav1`, and without it
-  "Smallest file" fails.
+  `ffmpeg-full`): the "essentials" builds lack `libsvtav1`, so "For the
+  archive" makes the larger HEVC files, and "Smallest" for the free Resolve
+  fails.
 - To build: [Flutter](https://docs.flutter.dev/get-started/install) 3.47 or
   newer with desktop support. On Linux also `ninja-build` and `libgtk-3-dev`.
 
@@ -156,9 +164,9 @@ The conversion engine can be driven without the UI:
 ```sh
 dart run tool/convert.dart --list                 # goals and their options
 dart run tool/convert.dart --caps                 # what this FFmpeg and machine can do
-dart run tool/convert.dart compress.hevc clip.mov # convert one file
+dart run tool/convert.dart archive.master clip.mov # convert one file
 dart run tool/convert.dart resolve.studio clip.mp4 --dry-run   # only show the plan and command
-dart run tool/convert.dart compress.av1 clip.mov --sample 30:10 --opt quality=maximum
+dart run tool/convert.dart archive.master clip.mov --sample 30:10 --opt codec=hevc
 ```
 
 ## How it is organised

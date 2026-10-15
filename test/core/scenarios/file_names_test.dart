@@ -8,10 +8,9 @@ import '../../support/fake_media.dart';
 /// video with different settings can be told apart.
 void main() {
   const cases = [
-    ('compress.hevc', <String, String>{}, '_hevc-crf20'),
-    ('compress.hevc', {'quality': 'maximum'}, '_hevc-crf18'),
-    ('compress.av1', {'quality': 'compact'}, '_av1-crf29'),
-    ('compress.gpu', <String, String>{}, '_av1-nvenc-cq28'),
+    ('archive.master', <String, String>{}, '_av1-crf24'),
+    ('archive.master', {'codec': 'hevc'}, '_hevc-crf21'),
+    ('archive.master', {'speed': 'gpu'}, '_av1-nvenc-cq28'),
     ('resolve.studio', <String, String>{}, '_resolve'),
     ('resolve.studio', {'convertVideo': 'yes'}, '_prores422'),
     ('resolve.free', <String, String>{}, '_prores422'),
@@ -45,9 +44,11 @@ void main() {
   });
 
   test('HEVC on an Apple graphics chip names its quality scale', () {
-    final plan = findPreset('compress.gpu')!
-        .plan(clip(), const {}, withGpu({'hevc_videotoolbox'}));
+    final plan = findPreset('archive.master')!.plan(clip(), const {
+      'codec': 'hevc',
+      'speed': 'gpu',
+    }, withGpu({'hevc_videotoolbox'}));
 
-    expect(plan.nameSuffix, '_hevc-videotoolbox-q65');
+    expect(plan.nameSuffix, '_hevc-videotoolbox-q75');
   });
 }

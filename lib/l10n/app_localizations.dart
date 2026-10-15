@@ -134,17 +134,17 @@ abstract class AppLocalizations {
   /// **'Clear finished'**
   String get clearFinished;
 
-  /// No description provided for @scenarioCompressTitle.
+  /// No description provided for @scenarioArchiveTitle.
   ///
   /// In en, this message translates to:
-  /// **'Make it small'**
-  String get scenarioCompressTitle;
+  /// **'For the archive'**
+  String get scenarioArchiveTitle;
 
-  /// No description provided for @scenarioCompressHint.
+  /// No description provided for @scenarioArchiveHint.
   ///
   /// In en, this message translates to:
-  /// **'Looks the same, takes far less space. Good for keeping and for Google Photos.'**
-  String get scenarioCompressHint;
+  /// **'Camera videos take far less space and look the same as the originals. Shooting dates, camera details, sound and colours are kept.'**
+  String get scenarioArchiveHint;
 
   /// No description provided for @scenarioResolveTitle.
   ///
@@ -158,41 +158,65 @@ abstract class AppLocalizations {
   /// **'Makes videos open with picture and sound in Resolve on Linux.'**
   String get scenarioResolveHint;
 
-  /// No description provided for @presetCompressHevc.
+  /// No description provided for @archiveFormatTitle.
   ///
   /// In en, this message translates to:
-  /// **'Works everywhere'**
-  String get presetCompressHevc;
+  /// **'Format'**
+  String get archiveFormatTitle;
 
-  /// No description provided for @presetCompressHevcHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Plays on phones, TVs, computers and Google Photos.'**
-  String get presetCompressHevcHint;
-
-  /// No description provided for @presetCompressAv1.
+  /// No description provided for @archiveAv1.
   ///
   /// In en, this message translates to:
   /// **'Smallest file'**
-  String get presetCompressAv1;
+  String get archiveAv1;
 
-  /// No description provided for @presetCompressAv1Hint.
+  /// No description provided for @archiveAv1Hint.
   ///
   /// In en, this message translates to:
-  /// **'Smaller still, but needs a recent phone, TV or computer to play.'**
-  String get presetCompressAv1Hint;
+  /// **'Plays on computers and newer devices: iPhone 15 Pro and later, Macs with M3, TVs from about 2020.'**
+  String get archiveAv1Hint;
 
-  /// No description provided for @presetCompressGpu.
+  /// No description provided for @archiveHevc.
   ///
   /// In en, this message translates to:
-  /// **'Fastest'**
-  String get presetCompressGpu;
+  /// **'Works everywhere'**
+  String get archiveHevc;
 
-  /// No description provided for @presetCompressGpuHint.
+  /// No description provided for @archiveHevcHint.
   ///
   /// In en, this message translates to:
-  /// **'Uses the graphics card: much quicker, files a little larger.'**
-  String get presetCompressGpuHint;
+  /// **'The same look in a file up to a third larger. Plays almost everywhere, older iPhones, Macs and TVs included.'**
+  String get archiveHevcHint;
+
+  /// No description provided for @archiveSpeedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed'**
+  String get archiveSpeedTitle;
+
+  /// No description provided for @archiveCpu.
+  ///
+  /// In en, this message translates to:
+  /// **'Thorough'**
+  String get archiveCpu;
+
+  /// No description provided for @archiveCpuHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The processor encodes: slower, and the file is the smallest.'**
+  String get archiveCpuHint;
+
+  /// No description provided for @archiveGpu.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast'**
+  String get archiveGpu;
+
+  /// No description provided for @archiveGpuHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The graphics card encodes: several times faster. Busy footage comes out the same size, calm footage up to 2.5 times larger.'**
+  String get archiveGpuHint;
 
   /// No description provided for @presetResolveStudio.
   ///
@@ -217,30 +241,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The picture is converted too. Files become much larger.'**
   String get presetResolveFreeHint;
-
-  /// No description provided for @qualityTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Quality'**
-  String get qualityTitle;
-
-  /// No description provided for @qualityCompact.
-  ///
-  /// In en, this message translates to:
-  /// **'Smaller file'**
-  String get qualityCompact;
-
-  /// No description provided for @qualityHigh.
-  ///
-  /// In en, this message translates to:
-  /// **'Recommended'**
-  String get qualityHigh;
-
-  /// No description provided for @qualityMaximum.
-  ///
-  /// In en, this message translates to:
-  /// **'Best quality'**
-  String get qualityMaximum;
 
   /// No description provided for @sizeTitle.
   ///
@@ -775,6 +775,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Put the index first, so playback can start while downloading'**
   String get cmdFastStart;
+
+  /// No description provided for @cmdFastStartKeepingTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Put the index first, so playback can start while downloading, and keep the camera\'s make and model'**
+  String get cmdFastStartKeepingTags;
+
+  /// No description provided for @cmdLevelLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay within what every player of video this size handles'**
+  String get cmdLevelLimit;
+
+  /// No description provided for @cmdDropTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave out the original\'s file type tag, which does not fit the new file'**
+  String get cmdDropTag;
 
   /// No description provided for @cmdContainer.
   ///

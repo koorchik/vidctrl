@@ -6,9 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tvv_videoconvertor/app/app.dart';
+import 'package:tvv_videoconvertor/app/home/size_change_text.dart';
 import 'package:tvv_videoconvertor/app/home/technical_text.dart';
 import 'package:tvv_videoconvertor/app/providers.dart';
 import 'package:tvv_videoconvertor/app/window.dart';
+import 'package:tvv_videoconvertor/core/ffmpeg/capabilities.dart';
 import 'package:tvv_videoconvertor/core/media/ffprobe.dart';
 import 'package:tvv_videoconvertor/core/settings/settings_store.dart';
 
@@ -36,6 +38,21 @@ const jargon = [
   'MOV',
   'MP4',
 ];
+
+/// Fails when any of [seen] uses one of the [jargon] words.
+void expectNoJargon(List<String> seen) {
+  for (final term in jargon) {
+    final word = RegExp(
+      '(?<![A-Za-z0-9])${RegExp.escape(term)}(?![A-Za-z0-9])',
+      caseSensitive: false,
+    );
+    expect(
+      seen.where(word.hasMatch),
+      isEmpty,
+      reason: '"$term" should not be a main label',
+    );
+  }
+}
 
 void main() {
   late FakeEnvironment env;
@@ -86,7 +103,7 @@ void main() {
 
       expect(env.executor.started, hasLength(1));
       expect(find.textContaining('Starting…'), findsOneWidget);
-      expect(find.textContaining('→ holiday_hevc-crf20.mp4'), findsOneWidget);
+      expect(find.textContaining('→ holiday_av1-crf24.mp4'), findsOneWidget);
     });
 
     testWidgets('each selected video previews what will happen to it', (
@@ -161,8 +178,8 @@ void main() {
       await tester.tap(find.text('Add all (2)'));
       await tester.pump();
 
-      expect(find.textContaining('holiday_hevc-crf20.mp4'), findsOneWidget);
-      expect(find.textContaining('second_hevc-crf20.mp4'), findsOneWidget);
+      expect(find.textContaining('holiday_av1-crf24.mp4'), findsOneWidget);
+      expect(find.textContaining('second_av1-crf24.mp4'), findsOneWidget);
     });
 
     testWidgets('one video, two settings: two jobs with different names', (
@@ -172,19 +189,15 @@ void main() {
       await addVideos(tester, sources, ['/videos/holiday.mp4']);
       await addToQueue(tester);
 
-      await tester.tap(find.text('Best quality'));
+      await tester.tap(find.text('Works everywhere'));
       await tester.pump();
       await addToQueue(tester);
 
-      expect(find.textContaining('holiday_hevc-crf20.mp4'), findsOneWidget);
-      expect(find.textContaining('holiday_hevc-crf18.mp4'), findsOneWidget);
-      // Each job says what was chosen, in the words of the panel.
+      expect(find.textContaining('holiday_av1-crf24.mp4'), findsOneWidget);
+      expect(find.textContaining('holiday_hevc-crf21.mp4'), findsOneWidget);
+      // Each job says what was changed, in the words of the panel.
       expect(
-        find.text('Make it small · Works everywhere · Quality: Recommended'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Make it small · Works everywhere · Quality: Best quality'),
+        find.text('For the archive · Format: Works everywhere'),
         findsOneWidget,
       );
     });
@@ -354,6 +367,78 @@ void main() {
       expect(find.text('DNxHR'), findsOneWidget);
     });
 
+    group('the archive', () {
+      testWidgets('says on the panel what each format trades away', (
+        tester,
+      ) async {
+        await pumpApp(tester, env);
+        expect(find.text('More options…'), findsNothing);
+        expect(find.textContaining('iPhone 15 Pro'), findsOneWidget);
+
+        await tester.tap(find.text('Works everywhere'));
+        await tester.pump();
+
+        expect(find.textContaining('iPhone 15 Pro'), findsNothing);
+        expect(find.textContaining('up to a third larger'), findsOneWidget);
+      });
+
+      testWidgets('offers the graphics card only where one works', (
+        tester,
+      ) async {
+        await pumpApp(tester, env);
+        expect(find.text('Fast'), findsNothing);
+
+        await tester.pumpWidget(const SizedBox());
+        await pumpApp(
+          tester,
+          FakeEnvironment(capabilities: withGpu({'av1_nvenc'})),
+        );
+        expect(find.text('Fast'), findsOneWidget);
+        expect(find.widgetWithText(TechnicalText, 'NVIDIA'), findsOneWidget);
+
+        // This card makes no HEVC, so with HEVC there is no choice left.
+        await tester.tap(find.text('Works everywhere'));
+        await tester.pump();
+        expect(find.text('Fast'), findsNothing);
+      });
+
+      testWidgets('without AV1 in this FFmpeg, there is nothing to choose', (
+        tester,
+      ) async {
+        await pumpApp(
+          tester,
+          FakeEnvironment(
+            capabilities: const Capabilities(
+              ffmpegVersion: 'test',
+              encoders: {'libx265', 'libx264', 'aac'},
+            ),
+          ),
+        );
+
+        expect(find.text('Smallest file'), findsNothing);
+        expect(
+          find.widgetWithText(
+            TechnicalText,
+            'HEVC 10-bit, CRF 21 · sound copied as is · MP4',
+          ),
+          findsOneWidget,
+        );
+      });
+
+      for (final locale in const [Locale('en'), Locale('uk')]) {
+        testWidgets('its choices name no technical terms '
+            '(${locale.languageCode})', (tester) async {
+          await pumpApp(
+            tester,
+            FakeEnvironment(capabilities: withGpu({'av1_nvenc'})),
+            locale: locale,
+          );
+
+          expectNoJargon(plainTexts(tester));
+        });
+      }
+    });
+
     testWidgets('the technical line tells what happens to the sound', (
       tester,
     ) async {
@@ -367,7 +452,7 @@ void main() {
       expect(
         find.widgetWithText(
           TechnicalText,
-          'HEVC 10-bit, CRF 20 · AAC 320k · MP4',
+          'AV1 10-bit, CRF 24 · AAC 320k · MP4',
         ),
         findsOneWidget,
       );
@@ -375,17 +460,59 @@ void main() {
 
     testWidgets('the format is named beside each plain choice', (tester) async {
       await pumpApp(tester, env);
-
-      expect(find.widgetWithText(TechnicalText, 'HEVC'), findsOneWidget);
-      expect(find.widgetWithText(TechnicalText, 'AV1'), findsOneWidget);
-      expect(find.widgetWithText(TechnicalText, 'CRF 20'), findsOneWidget);
       expect(
         find.widgetWithText(
           TechnicalText,
-          'HEVC 10-bit, CRF 20 · sound copied as is · MP4',
+          'AV1 10-bit, CRF 24 · sound copied as is · MP4',
         ),
         findsOneWidget,
       );
+
+      expect(find.widgetWithText(TechnicalText, 'AV1'), findsOneWidget);
+      expect(find.widgetWithText(TechnicalText, 'HEVC'), findsOneWidget);
+    });
+
+    testWidgets('the sound file types name the sound they hold', (
+      tester,
+    ) async {
+      await pumpApp(tester, env);
+      await tester.tap(find.text('Get the sound'));
+      await tester.pump();
+
+      expect(find.widgetWithText(TechnicalText, 'AAC'), findsOneWidget);
+      expect(find.widgetWithText(TechnicalText, 'PCM'), findsOneWidget);
+    });
+
+    testWidgets('a result larger than its original says so in another colour', (
+      tester,
+    ) async {
+      final sources = await pumpApp(tester, env);
+      await addVideos(tester, sources, ['/videos/holiday.mp4']);
+      await addToQueue(tester);
+      // The original is 750 MB.
+      env.executor.last.finish(bytes: 900000000);
+      await tester.pump();
+      await tester.pump();
+
+      // In the job's line and in the queue's headline.
+      final lines = tester.widgetList<RichText>(
+        find.descendant(
+          of: find.byWidgetPredicate(
+            (w) => w is SizeChangeText && w.larger == '20% larger',
+          ),
+          matching: find.byType(RichText),
+        ),
+      );
+      expect(lines, hasLength(2));
+      for (final line in lines) {
+        TextSpan? phrase;
+        line.text.visitChildren((span) {
+          if (span is TextSpan && span.text == '20% larger') phrase = span;
+          return phrase == null;
+        });
+        expect(phrase?.style?.color, isNotNull);
+        expect(phrase?.style?.color, isNot(line.text.style?.color));
+      }
     });
   });
 
@@ -403,20 +530,11 @@ void main() {
         await tester.tap(find.byType(FilledButton).last);
         await tester.pump();
 
-        final seen = plainTexts(tester)
-          // File names are the user's own and may look like anything.
-          ..removeWhere((t) => t.startsWith(RegExp(r'(holiday|nikon)\.')));
-        for (final term in jargon) {
-          final word = RegExp(
-            '(?<![A-Za-z0-9])${RegExp.escape(term)}(?![A-Za-z0-9])',
-            caseSensitive: false,
-          );
-          expect(
-            seen.where(word.hasMatch),
-            isEmpty,
-            reason: '"$term" should not be a main label',
-          );
-        }
+        expectNoJargon(
+          plainTexts(tester)
+            // File names are the user's own and may look like anything.
+            ..removeWhere((t) => t.startsWith(RegExp(r'(holiday|nikon)\.'))),
+        );
       },
     );
   }
