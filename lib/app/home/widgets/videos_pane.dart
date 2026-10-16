@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -109,7 +111,7 @@ class _AddButtons extends ConsumerWidget {
         acceptedTypeGroups: [
           XTypeGroup(
             label: 'Video',
-            extensions: [for (final e in videoExtensions) e.substring(1)],
+            extensions: dialogExtensions(linux: Platform.isLinux),
           ),
         ],
       );

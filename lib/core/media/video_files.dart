@@ -25,6 +25,22 @@ const videoExtensions = {
 bool looksLikeVideo(String path) =>
     videoExtensions.contains(p.extension(path).toLowerCase());
 
+/// The extensions for the file dialog's filter, without the dot. GTK on
+/// Linux matches them case-sensitively, which would hide a camera's
+/// `DSC_0001.MOV`, so there each letter is given in both cases:
+/// `[mM][oO][vV]`.
+List<String> dialogExtensions({required bool linux}) => [
+  for (final e in videoExtensions)
+    linux
+        ? e
+              .substring(1)
+              .replaceAllMapped(
+                RegExp('[a-z]'),
+                (m) => '[${m[0]}${m[0]!.toUpperCase()}]',
+              )
+        : e.substring(1),
+];
+
 /// Turns what the user dropped into a list of files: files are kept as they
 /// are, folders are searched for videos, including subfolders. Hidden files
 /// and folders are skipped, which also keeps the app's own unfinished

@@ -313,6 +313,10 @@ The UI renders presets and options generically; it needs no other change.
   buttons in the panel's corner use `showMenuUnder`
   (`home/widgets/button_menu.dart`) instead, which lines the menu up with the
   button's right side. A test opens both at the smallest window.
+- **File dialog on Linux:** GTK matches the filter's patterns
+  case-sensitively, so `*.mov` hides a camera's `DSC_0001.MOV`.
+  `dialogExtensions` (`media/video_files.dart`) gives each letter in both
+  cases there (`[mM][oO][vV]`); Windows and macOS get plain extensions.
 - **Resolve on Linux** (Blackmagic's codec list for 21.1): no AAC in either
   edition, no H.264/H.265 in the free edition. Checked in Studio 21.1.1:
   AC-3 does not play (silent from MOV and MP4, distorted from MKV), Opus
