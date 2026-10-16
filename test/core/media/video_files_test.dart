@@ -45,7 +45,8 @@ void main() {
       expect(found.map((f) => p.relative(f, from: folder.path)), [
         'C0001.MP4',
         'DSC_0001.MOV',
-        'PRIVATE/AVCHD/00000.MTS',
+        // In the system's own form: backslashes on Windows.
+        p.join('PRIVATE', 'AVCHD', '00000.MTS'),
         'clip.Mkv',
       ]);
     });
