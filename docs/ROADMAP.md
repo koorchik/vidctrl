@@ -3,7 +3,7 @@
 ## Done
 
 - **Engine:** file inspection, per-file plans, FFmpeg runner with progress,
-  graceful cancel and pause, safe output handling, capability detection
+  cancel and pause, safe output handling, capability detection
   (encoders, working hardware encoders, accepted SVT-AV1 parameters).
 - **Goals:** "For the archive" (AV1 or HEVC, processor or graphics card,
   camera tags kept), "Edit in DaVinci Resolve" on Linux (Studio and free),

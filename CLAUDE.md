@@ -82,7 +82,7 @@ Capabilities)` (`scenarios/scenario.dart`) looks at one file and returns a
 - `ffmpeg/command_builder.dart` turns a plan into arguments. A sample is the
   same arguments plus a time range, so a sample cannot differ from the real
   result. `forDisplay: true` gives the version shown to people.
-- `ffmpeg/runner.dart` runs the process (progress, graceful cancel, pause);
+- `ffmpeg/runner.dart` runs the process (progress, cancel, pause);
   `queue/job_executor.dart` wraps one conversion: temporary file, rename on
   success, cleanup on failure.
 - `estimate/size_estimator.dart` predicts output size: calculated for copies
@@ -267,11 +267,14 @@ The UI renders presets and options generically; it needs no other change.
   calm and busy footage, so the hardest clip decides.
 - **Tone mapping** needs the `zscale` and `tonemap` filters, which not every
   build has; `Capabilities.hasFilter` is checked first.
-- **Cancel:** `q` on stdin makes FFmpeg finish the file and exit with code 0,
-  so the runner tracks cancellation itself. `cancel()` only asks: FFmpeg has
-  exited and the `.part` file is gone when the handle's `result` completes.
-  An app that leaves in between abandons a running FFmpeg and the unfinished
-  file, so closing the window goes through `QueueController.shutDown()` and
+- **Cancel kills FFmpeg.** `q` on stdin makes FFmpeg finish the file first,
+  and a 4K AV1 encode then takes half a minute to empty its pipeline
+  (SIGTERM nearly as long). The file is deleted anyway, so `cancel()` sends
+  SIGKILL. The exit code cannot tell a cancelled run from a finished one, so
+  the runner tracks cancellation itself. FFmpeg has exited and the `.part`
+  file is gone only when the handle's `result` completes. An app that leaves
+  in between abandons a running FFmpeg and the unfinished file, so closing
+  the window goes through `QueueController.shutDown()` and
   `EstimateCache.stopMeasuring()`, which wait.
 - **Expected size** of a quality-targeted encode cannot be calculated; the
   estimator encodes 3-second pieces spread over the video (picture only; the

@@ -623,7 +623,7 @@ void main() {
     });
 
     test(
-      'stopping a measurement waits for FFmpeg and leaves nothing',
+      'stopping a measurement ends FFmpeg at once and leaves nothing',
       () async {
         if (unavailable()) return;
         final source = await media!.clip(
@@ -645,8 +645,10 @@ void main() {
         while (!workDir.existsSync() || workDir.listSync().isEmpty) {
           await Future<void>.delayed(const Duration(milliseconds: 20));
         }
+        final stopwatch = Stopwatch()..start();
         await estimator.cancelAll();
 
+        expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
         expect(workDir.listSync(), isEmpty);
         expect(await estimate, isNull);
       },
@@ -877,7 +879,7 @@ void main() {
       final result = await handle.result;
 
       expect(result.status, ConversionStatus.cancelled);
-      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 10)));
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
       expect(File(job.outputPath).existsSync(), isFalse);
       expect(leftovers(), isEmpty);
     });

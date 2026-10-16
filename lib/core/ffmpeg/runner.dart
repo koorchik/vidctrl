@@ -45,9 +45,6 @@ class FfmpegRun {
     _result = _watch();
   }
 
-  /// How long FFmpeg gets to finish the file after being asked to stop,
-  /// before it is terminated.
-  static const gracePeriod = Duration(seconds: 5);
   static const _keptErrorLines = 40;
 
   final Process _process;
@@ -56,7 +53,6 @@ class FfmpegRun {
   late final Future<RunResult> _result;
   bool _cancelRequested = false;
   bool _paused = false;
-  Timer? _killTimer;
 
   Stream<ProgressSnapshot> get progress => _progress.stream;
   Future<RunResult> get result => _result;
@@ -83,11 +79,10 @@ class FfmpegRun {
 
     final exitCode = await _process.exitCode;
     await Future.wait([stdoutDone, stderrDone]);
-    _killTimer?.cancel();
     await _progress.close();
 
-    // After a graceful stop FFmpeg exits with 0, so the exit code cannot tell
-    // a cancelled run from a finished one.
+    // FFmpeg may have finished just before it was stopped, so the exit code
+    // cannot tell a cancelled run from a finished one.
     final status = _cancelRequested
         ? RunStatus.cancelled
         : (exitCode == 0 ? RunStatus.completed : RunStatus.failed);
@@ -98,26 +93,14 @@ class FfmpegRun {
     );
   }
 
-  /// Asks FFmpeg to stop. It is first asked politely (`q` on stdin), which
-  /// lets it close the file properly; if it has not exited after
-  /// [gracePeriod] it is terminated.
+  /// Stops FFmpeg at once. Whatever it was writing is thrown away, so it is
+  /// not asked to finish the file: asked with `q`, a 4K AV1 encode takes
+  /// half a minute to empty its pipeline. [result] completes once it has
+  /// exited. A suspended process is stopped too.
   Future<void> cancel() async {
     if (_cancelRequested) return;
     _cancelRequested = true;
-    // A suspended process cannot read the request.
-    if (_paused) resume();
-    try {
-      _process.stdin.write('q');
-      await _process.stdin.flush();
-    } on Object {
-      // The process has already gone, or closed stdin: terminate below.
-    }
-    _killTimer = Timer(gracePeriod, () {
-      _process.kill(ProcessSignal.sigterm);
-      _killTimer = Timer(const Duration(seconds: 2), () {
-        _process.kill(ProcessSignal.sigkill);
-      });
-    });
+    _process.kill(ProcessSignal.sigkill);
   }
 
   /// Suspends the process. Returns false where that is not supported.
