@@ -74,4 +74,3 @@ signing and notarization, automatic updates.
 ## Open decisions
 
 - Licence for the app code.
-- Application identifier (currently the Flutter template default).
