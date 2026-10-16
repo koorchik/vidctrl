@@ -333,8 +333,16 @@ The UI renders presets and options generically; it needs no other change.
   for the close that `destroy()` itself causes. Answering that with another
   `destroy()` reaches the plugin after the window is gone and crashes the app
   on Linux (a segmentation fault that `flutter run` shows only as "Lost
-  connection to device"). `WindowCloseGuard` destroys once. The engine's
-  "The implicit view cannot be removed" line on every close is harmless.
+  connection to device"). `WindowCloseGuard` destroys once. On Linux the
+  window must not really be destroyed: that shuts the Flutter engine down,
+  and with NVIDIA's driver the app then crashes after `main()` returns, in
+  the driver's exit handler (a core dump in `libnvidia-eglcore`, under
+  `__run_exit_handlers`, on Wayland and X11). A blank Flutter app does not
+  crash, because Flutter's own close quits and leaves the window in place;
+  `window_manager` replaces that close with its own. The runner's
+  `window_delete_event_cb` (`linux/runner/my_application.cc`) does what
+  Flutter's does. It runs after the plugin's handler, which can still keep
+  the window open.
 - **App icon:** the drawing in `tool/make_icons.dart` is the source; it
   writes the macOS, Windows and Linux files, so change the drawing and never
   the files. On Linux the runner sets the window icon, which only X11

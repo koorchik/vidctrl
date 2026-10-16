@@ -38,6 +38,19 @@ static void set_window_icons(GtkWindow* window) {
   g_list_free_full(icons, g_object_unref);
 }
 
+// Quits when the window closes, leaving the window in place, as Flutter's own
+// close does (fl_platform_handler.cc). Destroying the window shuts the Flutter
+// engine down and ends its EGL display, and NVIDIA's driver then crashes in
+// its exit handler after main() returns. It runs after window_manager's
+// handler, which keeps the window open while the app asks or cleans up.
+static gboolean window_delete_event_cb(GtkWidget* window, GdkEvent* event,
+                                       gpointer user_data) {
+  // The window holds a reference to the application; let it go.
+  gtk_window_set_application(GTK_WINDOW(window), nullptr);
+  g_application_quit(G_APPLICATION(user_data));
+  return TRUE;
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
@@ -99,6 +112,10 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+  // After the plugins, so that window_manager's handler comes first.
+  g_signal_connect(window, "delete-event", G_CALLBACK(window_delete_event_cb),
+                   application);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
