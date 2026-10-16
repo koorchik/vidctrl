@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/core/estimate/progress_estimator.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/capabilities.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/progress_parser.dart';
+import 'package:vidctrl/core/estimate/progress_estimator.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
+import 'package:vidctrl/core/ffmpeg/progress_parser.dart';
 
 void main() {
   group('progress parser', () {

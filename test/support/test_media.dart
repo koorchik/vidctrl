@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:tvv_videoconvertor/core/ffmpeg/locator.dart';
+import 'package:vidctrl/core/ffmpeg/locator.dart';
 
 /// Generates small synthetic clips that stand in for real camera files, so
 /// conversion tests need no footage in the repository.
@@ -16,7 +16,7 @@ class TestMedia {
   static Future<TestMedia?> create() async {
     final paths = FfmpegLocator().locate();
     if (paths == null) return null;
-    final dir = await Directory.systemTemp.createTemp('videoconvertor_test_');
+    final dir = await Directory.systemTemp.createTemp('vidctrl_test_');
     return TestMedia._(paths, dir);
   }
 

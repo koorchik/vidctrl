@@ -1457,7 +1457,7 @@ abstract class AppLocalizations {
   /// Application name shown in the window title.
   ///
   /// In en, this message translates to:
-  /// **'TVV Video Converter'**
+  /// **'VidCtrl'**
   String get appTitle;
 
   /// No description provided for @noteVariableFrameRate.

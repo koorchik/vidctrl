@@ -790,7 +790,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get noteNo => 'ні';
 
   @override
-  String get appTitle => 'TVV Відеоконвертер';
+  String get appTitle => 'VidCtrl';
 
   @override
   String get noteVariableFrameRate =>

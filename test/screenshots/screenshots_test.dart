@@ -7,10 +7,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/app/theme.dart';
-import 'package:tvv_videoconvertor/app/window.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/locator.dart';
-import 'package:tvv_videoconvertor/core/media/ffprobe.dart';
+import 'package:vidctrl/app/theme.dart';
+import 'package:vidctrl/app/window.dart';
+import 'package:vidctrl/core/ffmpeg/locator.dart';
+import 'package:vidctrl/core/media/ffprobe.dart';
 
 import '../support/fake_media.dart';
 import '../support/fakes.dart';

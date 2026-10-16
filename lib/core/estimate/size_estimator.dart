@@ -144,7 +144,9 @@ class SampleEstimator implements OutputEstimator {
   SampleEstimator(this._runner, {Directory? workDir})
     : _workDir =
           workDir ??
-          Directory(p.join(Directory.systemTemp.path, 'tvv_estimates_$pid'));
+          Directory(
+            p.join(Directory.systemTemp.path, 'vidctrl_estimates_$pid'),
+          );
 
   final FfmpegRunner _runner;
   final Directory _workDir;

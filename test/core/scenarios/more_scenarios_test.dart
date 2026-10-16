@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/core/media/media_info.dart';
-import 'package:tvv_videoconvertor/core/scenarios/extract_audio.dart';
-import 'package:tvv_videoconvertor/core/scenarios/remux.dart';
-import 'package:tvv_videoconvertor/core/scenarios/scenario.dart';
-import 'package:tvv_videoconvertor/core/scenarios/share_phone.dart';
-import 'package:tvv_videoconvertor/core/scenarios/strip_metadata.dart';
+import 'package:vidctrl/core/media/media_info.dart';
+import 'package:vidctrl/core/scenarios/extract_audio.dart';
+import 'package:vidctrl/core/scenarios/remux.dart';
+import 'package:vidctrl/core/scenarios/scenario.dart';
+import 'package:vidctrl/core/scenarios/share_phone.dart';
+import 'package:vidctrl/core/scenarios/strip_metadata.dart';
 
 import '../../support/fake_media.dart';
 

@@ -226,7 +226,7 @@
   "noteNotStated": "не вказано",
   "noteYes": "так",
   "noteNo": "ні",
-  "appTitle": "TVV Відеоконвертер",
+  "appTitle": "VidCtrl",
   "noteVariableFrameRate": "Нерівномірну частоту кадрів буде виправлено.",
   "noteHevc422": "Цей формат запису відтворюється в Resolve лише з новою відеокартою NVIDIA.",
   "noteExperimentalAv1": "Найменші файли важче плавно монтувати.",

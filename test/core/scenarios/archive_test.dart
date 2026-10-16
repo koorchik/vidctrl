@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/capabilities.dart';
-import 'package:tvv_videoconvertor/core/media/media_info.dart';
-import 'package:tvv_videoconvertor/core/scenarios/archive.dart';
-import 'package:tvv_videoconvertor/core/scenarios/scenario.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
+import 'package:vidctrl/core/media/media_info.dart';
+import 'package:vidctrl/core/scenarios/archive.dart';
+import 'package:vidctrl/core/scenarios/scenario.dart';
 
 import '../../support/fake_media.dart';
 

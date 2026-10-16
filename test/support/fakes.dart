@@ -1,19 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/misc.dart' show Override;
-import 'package:tvv_videoconvertor/app/providers.dart';
-import 'package:tvv_videoconvertor/core/estimate/progress_estimator.dart';
-import 'package:tvv_videoconvertor/core/estimate/size_estimator.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/capabilities.dart';
-import 'package:tvv_videoconvertor/core/media/ffprobe.dart';
+import 'package:vidctrl/app/providers.dart';
+import 'package:vidctrl/core/estimate/progress_estimator.dart';
+import 'package:vidctrl/core/estimate/size_estimator.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
+import 'package:vidctrl/core/media/ffprobe.dart';
 
 import 'dart:typed_data';
 
-import 'package:tvv_videoconvertor/core/media/media_info.dart';
-import 'package:tvv_videoconvertor/core/media/thumbnail.dart';
-import 'package:tvv_videoconvertor/core/platform/sleep_inhibitor.dart';
-import 'package:tvv_videoconvertor/core/queue/job_executor.dart';
-import 'package:tvv_videoconvertor/core/scenarios/scenario.dart';
+import 'package:vidctrl/core/media/media_info.dart';
+import 'package:vidctrl/core/media/thumbnail.dart';
+import 'package:vidctrl/core/platform/sleep_inhibitor.dart';
+import 'package:vidctrl/core/queue/job_executor.dart';
+import 'package:vidctrl/core/scenarios/scenario.dart';
 
 import 'fake_media.dart';
 

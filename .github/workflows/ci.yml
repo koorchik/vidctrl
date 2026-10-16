@@ -101,7 +101,7 @@ jobs:
       - name: Package (Linux)
         if: runner.os == 'Linux'
         env:
-          NAME: tvv-videoconvertor-${{ steps.version.outputs.version }}
+          NAME: vidctrl-${{ steps.version.outputs.version }}
         run: |
           tar -C build/linux/x64/release --transform "s,^bundle,$NAME," \
             -czf "$NAME-linux-x64.tar.gz" bundle
@@ -109,18 +109,18 @@ jobs:
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath tvv-videoconvertor-${{ steps.version.outputs.version }}-windows-x64.zip
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath vidctrl-${{ steps.version.outputs.version }}-windows-x64.zip
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
-        run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/tvv_videoconvertor.app tvv-videoconvertor-${{ steps.version.outputs.version }}-macos.zip
+        run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/VidCtrl.app vidctrl-${{ steps.version.outputs.version }}-macos.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: tvv-videoconvertor-${{ matrix.target }}
+          name: vidctrl-${{ matrix.target }}
           path: |
-            tvv-videoconvertor-*.tar.gz
-            tvv-videoconvertor-*.zip
+            vidctrl-*.tar.gz
+            vidctrl-*.zip
           if-no-files-found: error
 
   # Pushing a version tag publishes a release with the three archives, once

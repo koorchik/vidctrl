@@ -2,8 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/app/home/home_screen.dart';
-import 'package:tvv_videoconvertor/app/window_close_guard.dart';
+import 'package:vidctrl/app/home/home_screen.dart';
+import 'package:vidctrl/app/window_close_guard.dart';
 
 import '../support/fakes.dart';
 import '../support/pump_app.dart';

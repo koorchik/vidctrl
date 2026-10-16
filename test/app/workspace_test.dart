@@ -1,17 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
-import 'package:tvv_videoconvertor/app/estimates/estimate_cache.dart';
-import 'package:tvv_videoconvertor/app/providers.dart';
-import 'package:tvv_videoconvertor/app/queue/queue_controller.dart';
-import 'package:tvv_videoconvertor/app/queue/queue_state.dart';
-import 'package:tvv_videoconvertor/app/recipe/recipe.dart';
-import 'package:tvv_videoconvertor/app/recipe/recipe_controller.dart';
-import 'package:tvv_videoconvertor/app/settings.dart';
-import 'package:tvv_videoconvertor/app/sources/preview_controller.dart';
-import 'package:tvv_videoconvertor/app/sources/sources_controller.dart';
-import 'package:tvv_videoconvertor/core/output/output_namer.dart';
-import 'package:tvv_videoconvertor/core/settings/settings_store.dart';
+import 'package:vidctrl/app/estimates/estimate_cache.dart';
+import 'package:vidctrl/app/providers.dart';
+import 'package:vidctrl/app/queue/queue_controller.dart';
+import 'package:vidctrl/app/queue/queue_state.dart';
+import 'package:vidctrl/app/recipe/recipe.dart';
+import 'package:vidctrl/app/recipe/recipe_controller.dart';
+import 'package:vidctrl/app/settings.dart';
+import 'package:vidctrl/app/sources/preview_controller.dart';
+import 'package:vidctrl/app/sources/sources_controller.dart';
+import 'package:vidctrl/core/output/output_namer.dart';
+import 'package:vidctrl/core/settings/settings_store.dart';
 
 import '../support/fake_media.dart';
 import '../support/fakes.dart';

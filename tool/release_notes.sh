@@ -17,9 +17,9 @@ cat <<EOF
 
 | System | Download | Then |
 |---|---|---|
-| Linux (x64) | \`tvv-videoconvertor-$version-linux-x64.tar.gz\` | Unpack it and run \`tvv_videoconvertor\` in the folder |
-| Windows (x64) | \`tvv-videoconvertor-$version-windows-x64.zip\` | Unpack it and run \`tvv_videoconvertor.exe\` |
-| macOS | \`tvv-videoconvertor-$version-macos.zip\` | Unpack it and open the app |
+| Linux (x64) | \`vidctrl-$version-linux-x64.tar.gz\` | Unpack it and run \`vidctrl\` in the folder |
+| Windows (x64) | \`vidctrl-$version-windows-x64.zip\` | Unpack it and run \`vidctrl.exe\` |
+| macOS | \`vidctrl-$version-macos.zip\` | Unpack it and open the app |
 
 **FFmpeg is not included.** Install FFmpeg 8 or newer, so that \`ffmpeg\` and
 \`ffprobe\` are found on the \`PATH\`. Linux distribution packages and Homebrew

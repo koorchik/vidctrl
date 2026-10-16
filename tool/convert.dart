@@ -8,16 +8,16 @@
 
 import 'dart:io';
 
-import 'package:tvv_videoconvertor/core/estimate/progress_estimator.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/capabilities.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/command_builder.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/command_text.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/locator.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/runner.dart';
-import 'package:tvv_videoconvertor/core/media/ffprobe.dart';
-import 'package:tvv_videoconvertor/core/output/output_namer.dart';
-import 'package:tvv_videoconvertor/core/queue/job_executor.dart';
-import 'package:tvv_videoconvertor/core/scenarios/registry.dart';
+import 'package:vidctrl/core/estimate/progress_estimator.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
+import 'package:vidctrl/core/ffmpeg/command_builder.dart';
+import 'package:vidctrl/core/ffmpeg/command_text.dart';
+import 'package:vidctrl/core/ffmpeg/locator.dart';
+import 'package:vidctrl/core/ffmpeg/runner.dart';
+import 'package:vidctrl/core/media/ffprobe.dart';
+import 'package:vidctrl/core/output/output_namer.dart';
+import 'package:vidctrl/core/queue/job_executor.dart';
+import 'package:vidctrl/core/scenarios/registry.dart';
 
 Future<void> main(List<String> arguments) async {
   final args = [...arguments];

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
-import 'package:tvv_videoconvertor/core/ffmpeg/locator.dart';
-import 'package:tvv_videoconvertor/core/output/output_namer.dart';
+import 'package:vidctrl/core/ffmpeg/locator.dart';
+import 'package:vidctrl/core/output/output_namer.dart';
 
 void main() {
   group('output path', () {

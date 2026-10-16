@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/core/media/ffprobe.dart';
-import 'package:tvv_videoconvertor/core/media/media_info.dart';
+import 'package:vidctrl/core/media/ffprobe.dart';
+import 'package:vidctrl/core/media/media_info.dart';
 
 import '../../support/fake_media.dart';
 

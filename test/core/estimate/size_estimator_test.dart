@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/core/estimate/size_estimator.dart';
-import 'package:tvv_videoconvertor/core/scenarios/scenario.dart';
+import 'package:vidctrl/core/estimate/size_estimator.dart';
+import 'package:vidctrl/core/scenarios/scenario.dart';
 
 import '../../support/fake_media.dart';
 

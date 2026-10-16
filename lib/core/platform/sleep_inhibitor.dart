@@ -29,7 +29,7 @@ class _HelperInhibitor implements SleepInhibitor {
   factory _HelperInhibitor.linux() => _HelperInhibitor('systemd-inhibit', [
     '--what=sleep:idle',
     '--mode=block',
-    '--who=TVV Video Converter',
+    '--who=VidCtrl',
     '--why=Converting videos',
     'cat',
   ]);

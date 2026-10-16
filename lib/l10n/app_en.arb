@@ -423,7 +423,7 @@
   "noteNotStated": "not stated",
   "noteYes": "yes",
   "noteNo": "no",
-  "appTitle": "TVV Video Converter",
+  "appTitle": "VidCtrl",
   "@appTitle": {
     "description": "Application name shown in the window title."
   },

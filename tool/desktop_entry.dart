@@ -89,10 +89,9 @@ String _entry(String id) =>
     '''
 [Desktop Entry]
 Type=Application
-Name=TVV Video Converter
-Name[uk]=TVV Відеоконвертер
+Name=VidCtrl
 Icon=$id
-Exec=tvv_videoconvertor
+Exec=vidctrl
 StartupWMClass=$id
 NoDisplay=true
 ''';

@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/command_text.dart';
+import 'package:vidctrl/core/ffmpeg/command_text.dart';
 
 void main() {
   const args = [

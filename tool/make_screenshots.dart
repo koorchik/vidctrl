@@ -13,12 +13,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/app/home/widgets/recipe_pane.dart';
-import 'package:tvv_videoconvertor/app/queue/queue_controller.dart';
-import 'package:tvv_videoconvertor/app/recipe/recipe.dart';
-import 'package:tvv_videoconvertor/app/recipe/recipe_controller.dart';
-import 'package:tvv_videoconvertor/app/theme.dart';
-import 'package:tvv_videoconvertor/core/media/ffprobe.dart';
+import 'package:vidctrl/app/home/widgets/recipe_pane.dart';
+import 'package:vidctrl/app/queue/queue_controller.dart';
+import 'package:vidctrl/app/recipe/recipe.dart';
+import 'package:vidctrl/app/recipe/recipe_controller.dart';
+import 'package:vidctrl/app/theme.dart';
+import 'package:vidctrl/core/media/ffprobe.dart';
 
 import '../test/support/fake_media.dart';
 import '../test/support/fakes.dart';

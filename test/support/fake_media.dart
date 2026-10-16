@@ -1,5 +1,5 @@
-import 'package:tvv_videoconvertor/core/ffmpeg/capabilities.dart';
-import 'package:tvv_videoconvertor/core/media/media_info.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
+import 'package:vidctrl/core/media/media_info.dart';
 
 const movContainer = 'mov,mp4,m4a,3gp,3g2,mj2';
 const mkvContainer = 'matroska,webm';

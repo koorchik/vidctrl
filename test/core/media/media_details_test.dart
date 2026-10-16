@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/core/media/media_details.dart';
+import 'package:vidctrl/core/media/media_details.dart';
 
 void main() {
   Map<String, Object?> recorded() =>

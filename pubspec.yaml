@@ -1,4 +1,4 @@
-name: tvv_videoconvertor
+name: vidctrl
 description: "Batch video converter for everyday tasks: a friendly front end for FFmpeg."
 publish_to: 'none'
 

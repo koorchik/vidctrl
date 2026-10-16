@@ -786,7 +786,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noteNo => 'no';
 
   @override
-  String get appTitle => 'TVV Video Converter';
+  String get appTitle => 'VidCtrl';
 
   @override
   String get noteVariableFrameRate => 'Uneven frame timing will be fixed.';

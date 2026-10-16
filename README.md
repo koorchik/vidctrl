@@ -1,4 +1,4 @@
-# TVV Video Converter
+# VidCtrl
 
 A desktop app that converts batches of videos for a few everyday goals, built
 for people who do not want to learn what a codec is. It is a friendly front end
@@ -152,7 +152,7 @@ git push origin v0.2.0
 ```
 
 The app is given the tag's version, and the files are named after it
-(`tvv-videoconvertor-0.2.0-linux-x64.tar.gz`). A tag with a hyphen, such as
+(`vidctrl-0.2.0-linux-x64.tar.gz`). A tag with a hyphen, such as
 `v0.2.0-beta.1`, is published as a pre-release. The notes explain how to get
 the app going and list the commits since the release before
 (`tool/release_notes.sh`).

@@ -7,15 +7,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
-import 'package:tvv_videoconvertor/app/app.dart';
-import 'package:tvv_videoconvertor/app/home/home_screen.dart';
-import 'package:tvv_videoconvertor/app/home/technical_text.dart';
-import 'package:tvv_videoconvertor/app/providers.dart';
-import 'package:tvv_videoconvertor/app/settings.dart';
-import 'package:tvv_videoconvertor/core/settings/settings_store.dart';
-import 'package:tvv_videoconvertor/app/sources/sources_controller.dart';
-import 'package:tvv_videoconvertor/app/theme.dart';
-import 'package:tvv_videoconvertor/app/window.dart';
+import 'package:vidctrl/app/app.dart';
+import 'package:vidctrl/app/home/home_screen.dart';
+import 'package:vidctrl/app/home/technical_text.dart';
+import 'package:vidctrl/app/providers.dart';
+import 'package:vidctrl/app/settings.dart';
+import 'package:vidctrl/core/settings/settings_store.dart';
+import 'package:vidctrl/app/sources/sources_controller.dart';
+import 'package:vidctrl/app/theme.dart';
+import 'package:vidctrl/app/window.dart';
 
 import 'fakes.dart';
 

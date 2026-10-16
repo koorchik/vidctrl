@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/command_builder.dart';
-import 'package:tvv_videoconvertor/core/scenarios/scenario.dart';
+import 'package:vidctrl/core/ffmpeg/command_builder.dart';
+import 'package:vidctrl/core/scenarios/scenario.dart';
 
 void main() {
   const audioFix = ConversionPlan(

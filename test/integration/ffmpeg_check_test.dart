@@ -4,13 +4,13 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/capabilities.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/runner.dart';
-import 'package:tvv_videoconvertor/core/media/ffprobe.dart';
-import 'package:tvv_videoconvertor/core/output/output_namer.dart';
-import 'package:tvv_videoconvertor/core/queue/job_executor.dart';
-import 'package:tvv_videoconvertor/core/scenarios/archive.dart';
-import 'package:tvv_videoconvertor/core/scenarios/scenario.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
+import 'package:vidctrl/core/ffmpeg/runner.dart';
+import 'package:vidctrl/core/media/ffprobe.dart';
+import 'package:vidctrl/core/output/output_namer.dart';
+import 'package:vidctrl/core/queue/job_executor.dart';
+import 'package:vidctrl/core/scenarios/archive.dart';
+import 'package:vidctrl/core/scenarios/scenario.dart';
 
 import '../support/test_media.dart';
 

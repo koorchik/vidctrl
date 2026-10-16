@@ -19,11 +19,11 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:path/path.dart' as p;
-import 'package:tvv_videoconvertor/core/ffmpeg/capabilities.dart';
-import 'package:tvv_videoconvertor/core/ffmpeg/locator.dart';
-import 'package:tvv_videoconvertor/core/media/ffprobe.dart';
-import 'package:tvv_videoconvertor/core/scenarios/archive.dart';
-import 'package:tvv_videoconvertor/core/scenarios/scenario.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
+import 'package:vidctrl/core/ffmpeg/locator.dart';
+import 'package:vidctrl/core/media/ffprobe.dart';
+import 'package:vidctrl/core/scenarios/archive.dart';
+import 'package:vidctrl/core/scenarios/scenario.dart';
 
 /// The quality options encoders take, whichever this one uses.
 const _qualityFlags = [
