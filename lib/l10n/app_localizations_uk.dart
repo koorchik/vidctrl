@@ -505,6 +505,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get techNoReencode => 'без перекодування';
 
   @override
+  String get techOnlySound => 'лише звук';
+
+  @override
   String techUpTo(String lines) {
     return 'до $lines';
   }

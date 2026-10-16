@@ -505,6 +505,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get techNoReencode => 'no re-encoding';
 
   @override
+  String get techOnlySound => 'only the sound changes';
+
+  @override
   String techUpTo(String lines) {
     return 'up to $lines';
   }

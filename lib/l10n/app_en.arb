@@ -233,6 +233,7 @@
   "techSoundCopied": "sound copied as is",
   "techNoSound": "no sound",
   "techNoReencode": "no re-encoding",
+  "techOnlySound": "only the sound changes",
   "techUpTo": "up to {lines}",
   "@techUpTo": {
     "placeholders": {

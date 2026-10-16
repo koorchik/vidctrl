@@ -147,6 +147,7 @@
   "techSoundCopied": "звук без змін",
   "techNoSound": "без звуку",
   "techNoReencode": "без перекодування",
+  "techOnlySound": "лише звук",
   "techUpTo": "до {lines}",
   "inQueueCount": "у черзі: {count}",
   "doneCount": "готово: {count}",

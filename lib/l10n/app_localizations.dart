@@ -980,6 +980,12 @@ abstract class AppLocalizations {
   /// **'no re-encoding'**
   String get techNoReencode;
 
+  /// No description provided for @techOnlySound.
+  ///
+  /// In en, this message translates to:
+  /// **'only the sound changes'**
+  String get techOnlySound;
+
   /// No description provided for @techUpTo.
   ///
   /// In en, this message translates to:

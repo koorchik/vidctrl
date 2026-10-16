@@ -230,7 +230,12 @@ String presetCaption(
   Capabilities capabilities,
 ) {
   final plan = typicalPlan(preset, values, capabilities);
-  return codecName(plan.video) ?? l10n.techNoReencode;
+  final audio = plan.audio;
+  // A kept picture can still come with its sound converted, as in Resolve
+  // Studio. Which format the sound takes depends on the file, so the
+  // summary under the panel names it, not this caption.
+  return codecName(plan.video) ??
+      (audio is AudioEncode ? l10n.techOnlySound : l10n.techNoReencode);
 }
 
 /// The short technical name under an option's plain label: the quality
