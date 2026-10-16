@@ -30,18 +30,18 @@ const gpuEncoderPreference = [
 /// The quality numbers, set so that each way of encoding comes as close to
 /// the original: an XPSNR (luma) of at least 42 dB, the level reported as
 /// visually lossless, on the hardest of the clips measured, and more on the
-/// others. Measured in October 2026 on 10-second pieces of three 4K clips: a
-/// phone video of a moving car (the hardest), a photo slideshow and a screen
-/// recording. Footage from a dedicated camera is still to be measured.
+/// others. Measured in October 2026 on 10-second 4K pieces: two of handheld
+/// footage from a Nikon camera (the hardest), a phone video of a moving car
+/// and a photo slideshow. On the hardest piece all four give 42.0 to 42.1 dB.
 ///
 /// One number cannot give the same closeness on every kind of footage. On
-/// the hardest clip all four came out within 7% of each other in size; on
-/// calm footage the graphics card's files were up to 2.5 times larger, and
-/// HEVC's up to a third larger, than AV1's on the processor.
-const svtAv1Crf = '24';
-const x265Crf = '21';
-const nvencAv1Cq = '28';
-const nvencHevcCq = '24';
+/// the hardest piece HEVC on the processor came out 15% larger than AV1, and
+/// the graphics card's files 1.7 (AV1) and 2 (HEVC) times larger; on calm
+/// footage those were 1.5, 2.4 and 3 times.
+const svtAv1Crf = '35';
+const x265Crf = '24';
+const nvencAv1Cq = '32';
+const nvencHevcCq = '26';
 
 /// The level a player needs for a picture of this size and frame rate, and
 /// the most its main tier allows per second: 4.1 up to 1080p at 60 frames,

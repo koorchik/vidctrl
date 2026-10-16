@@ -60,7 +60,7 @@ Future<void> main(List<String> arguments) async {
   // Each way of encoding the goal offers here, and the numbers to try.
   final ways = <(String, OptionValues, List<num>)>[
     if (ArchivePreset.encodesAv1(capabilities))
-      ('svt-av1', {'codec': 'av1'}, [18, 21, 24, 27, 30]),
+      ('svt-av1', {'codec': 'av1'}, [23, 27, 31, 35, 39]),
     ('x265', {'codec': 'hevc'}, [16, 19, 22, 25, 28]),
     if (ArchivePreset.gpuEncoder(capabilities, 'av1') case final encoder?)
       (encoder, {'codec': 'av1', 'speed': 'gpu'}, [20, 24, 28, 32, 36]),
@@ -95,8 +95,11 @@ Future<void> main(List<String> arguments) async {
           final at = settings.indexWhere(_qualityFlags.contains);
           settings[at + 1] = number.round().toString();
           final clock = Stopwatch()..start();
+          // Every frame of the piece, none added or dropped, so that the
+          // comparison can pair them by order.
           await _ffmpeg(paths.ffmpeg, [
-            '-i', piece, '-an', '-c:v', video.encoder, ...settings, //
+            '-i', piece, '-an', '-fps_mode', 'passthrough', //
+            '-c:v', video.encoder, ...settings,
             if (video.filters.isNotEmpty) ...['-vf', video.filters.join(',')],
             '-pix_fmt', video.pixFmt, out,
           ]);
@@ -198,11 +201,14 @@ Iterable<(_Point, _Point)> _pairs(List<_Point> points) sync* {
   }
 }
 
+/// Frames are paired by order, not by time: the piece's container rounds
+/// times to milliseconds and the encode's does not, and at 29.97 frames a
+/// second pairing by time compared every other frame with its neighbour.
 Future<double> _xpsnr(String ffmpeg, String encoded, String original) async {
+  const byOrder = 'settb=1/30,setpts=N,format=yuv420p10le';
   final result = await Process.run(ffmpeg, [
     '-hide_banner', '-nostats', '-i', encoded, '-i', original, //
-    '-lavfi',
-    '[0:v]format=yuv420p10le[d];[1:v]format=yuv420p10le[r];[d][r]xpsnr',
+    '-lavfi', '[0:v]$byOrder[d];[1:v]$byOrder[r];[d][r]xpsnr',
     '-f', 'null', '-',
   ]);
   final scores = RegExp(r'XPSNR\s+y:\s*([\d.]+)')

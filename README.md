@@ -62,7 +62,7 @@ The window has three parts:
 
 Change the settings and press Add to queue again to get the same video in
 another form: each job keeps the settings it was added with, and output names
-carry them (`clip_av1-crf24.mp4`, `clip_hevc-crf21.mp4`, `clip_phone-1080p.mp4`).
+carry them (`clip_av1-crf35.mp4`, `clip_hevc-crf24.mp4`, `clip_phone-1080p.mp4`).
 
 Also:
 
@@ -101,9 +101,9 @@ Early but working on Linux. Not done yet:
 - Only one video is converted at a time.
 - "For the archive" is set so that every format and encoder reaches an
   XPSNR of at least 42 dB, reported as visually lossless, on the hardest of
-  three 4K clips measured (phone, slideshow, screen recording). Footage from
-  a dedicated camera, and Intel, AMD and Apple graphics, are not measured
-  yet. The other goals' quality levels are starting values.
+  the 4K clips measured (from a Nikon camera, a phone and a slideshow).
+  Other cameras, and Intel, AMD and Apple graphics, are not measured yet.
+  The other goals' quality levels are starting values.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).
 

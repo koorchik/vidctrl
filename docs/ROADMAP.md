@@ -32,9 +32,9 @@
      neutral file names (a name can give away a place or a date).
    - Send to a phone: "fit into N MB" for services with a size limit.
    - Get the sound: choose which track, or all of them.
-2. **Quality calibration.** "For the archive" is matched with XPSNR on
-   three 4K clips (phone, slideshow, screen recording). Still to do: footage
-   from dedicated cameras (Nikon, Sony, Canon), a check with VMAF (needs an
+2. **Quality calibration.** "For the archive" is matched with XPSNR on 4K
+   clips from a Nikon camera, a phone and a slideshow. Still to do: footage
+   from other cameras (Sony, Canon), a check with VMAF (needs an
    FFmpeg with `libvmaf`), Intel, AMD and Apple graphics, and the other
    goals' quality levels. A fixed number cannot suit both calm and busy
    footage; choosing it per video from a measured sample would.

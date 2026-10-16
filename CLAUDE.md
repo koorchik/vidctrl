@@ -264,7 +264,11 @@ The UI renders presets and options generically; it needs no other change.
   filter (no `libvmaf` in Ubuntu's build), on 10-second 4K pieces, to at
   least 42 dB on the hardest clip; `tool/calibrate_archive.dart` repeats
   the measurement on any clips. One number cannot give the same score on
-  calm and busy footage, so the hardest clip decides.
+  calm and busy footage, so the hardest clip decides. The tool pairs frames
+  by order: paired by time, as `xpsnr` does by itself, the piece's MKV
+  (times rounded to milliseconds) and the MP4 encode disagree at 29.97
+  frames a second, every other frame was compared with its neighbour, and
+  the scores came out up to 19 dB too low.
 - **Tone mapping** needs the `zscale` and `tonemap` filters, which not every
   build has; `Capabilities.hasFilter` is checked first.
 - **Cancel kills FFmpeg.** `q` on stdin makes FFmpeg finish the file first,

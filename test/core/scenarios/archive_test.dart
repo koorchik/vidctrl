@@ -24,9 +24,9 @@ void main() {
       expect(result.kind, PlanKind.encode);
       expect(video(result).encoder, 'libsvtav1');
       expect(video(result).pixFmt, 'yuv420p10le');
-      expect(video(result).args, containsAllInOrder(['-crf', '24']));
+      expect(video(result).args, containsAllInOrder(['-crf', '35']));
       expect(result.muxer, 'mp4');
-      expect(result.nameSuffix, '_av1-crf24');
+      expect(result.nameSuffix, '_av1-crf35');
     });
 
     test('uses the encoder parameters this SVT-AV1 version accepts', () {
@@ -77,10 +77,10 @@ void main() {
       final result = plan(clip(), {'codec': 'hevc'});
 
       expect(video(result).encoder, 'libx265');
-      expect(video(result).args, containsAllInOrder(['-crf', '21']));
+      expect(video(result).args, containsAllInOrder(['-crf', '24']));
       expect(video(result).args, containsAllInOrder(['-profile:v', 'main10']));
       expect(result.outputArgs, containsAllInOrder(['-tag:v', 'hvc1']));
-      expect(result.nameSuffix, '_hevc-crf21');
+      expect(result.nameSuffix, '_hevc-crf24');
     });
   });
 
@@ -111,7 +111,7 @@ void main() {
       final result = plan(clip(), fast, caps);
 
       expect(video(result).encoder, 'av1_nvenc');
-      expect(video(result).args, containsAllInOrder(['-cq', '28']));
+      expect(video(result).args, containsAllInOrder(['-cq', '32']));
       expect(result.cost.usesGpuEncoder, isTrue);
     });
 
@@ -121,7 +121,7 @@ void main() {
 
       expect(video(result).encoder, 'hevc_nvenc');
       expect(video(result).pixFmt, 'p010le');
-      expect(video(result).args, containsAllInOrder(['-cq', '24']));
+      expect(video(result).args, containsAllInOrder(['-cq', '26']));
       expect(result.outputArgs, containsAllInOrder(['-tag:v', 'hvc1']));
     });
 

@@ -8,9 +8,9 @@ import '../../support/fake_media.dart';
 /// video with different settings can be told apart.
 void main() {
   const cases = [
-    ('archive.master', <String, String>{}, '_av1-crf24'),
-    ('archive.master', {'codec': 'hevc'}, '_hevc-crf21'),
-    ('archive.master', {'speed': 'gpu'}, '_av1-nvenc-cq28'),
+    ('archive.master', <String, String>{}, '_av1-crf35'),
+    ('archive.master', {'codec': 'hevc'}, '_hevc-crf24'),
+    ('archive.master', {'speed': 'gpu'}, '_av1-nvenc-cq32'),
     ('resolve.studio', <String, String>{}, '_resolve'),
     ('resolve.studio', {'convertVideo': 'yes'}, '_prores422'),
     ('resolve.free', <String, String>{}, '_prores422'),

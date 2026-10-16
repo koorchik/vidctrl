@@ -109,8 +109,8 @@ void main() {
       await settle();
 
       expect(jobs().map((j) => j.outputPath), [
-        converted('a_av1-crf24.mp4'),
-        converted('b_av1-crf24.mp4'),
+        converted('a_av1-crf35.mp4'),
+        converted('b_av1-crf35.mp4'),
       ]);
       expect(jobs().first.status, JobStatus.running);
       expect(env.executor.started, hasLength(1));
@@ -136,7 +136,7 @@ void main() {
       recipe().selectPreset('share.phone');
 
       expect(jobs().single.recipe.presetId, 'archive.master');
-      expect(jobs().single.plan.nameSuffix, '_av1-crf24');
+      expect(jobs().single.plan.nameSuffix, '_av1-crf35');
     });
 
     test(
@@ -149,8 +149,8 @@ void main() {
         queue().addSelected();
 
         expect(jobs().map((j) => p.basename(j.outputPath)), [
-          'a_av1-crf24.mp4',
-          'a_hevc-crf21.mp4',
+          'a_av1-crf35.mp4',
+          'a_hevc-crf24.mp4',
         ]);
       },
     );
@@ -174,7 +174,7 @@ void main() {
 
       queue().addSelected();
 
-      expect(jobs().last.outputPath, converted('a_av1-crf24 (2).mp4'));
+      expect(jobs().last.outputPath, converted('a_av1-crf35 (2).mp4'));
     });
 
     test('a video that is already right is skipped, not converted', () async {
@@ -332,7 +332,7 @@ void main() {
       final job = jobs().single;
       expect(
         job.outputPath,
-        p.join('/videos', 'Converted', 'Samples', 'a_av1-crf24_sample10s.mp4'),
+        p.join('/videos', 'Converted', 'Samples', 'a_av1-crf35_sample10s.mp4'),
       );
       expect(job.sample!.length, sampleLength);
       expect(env.executor.last.job.sample!.start, Duration.zero);
@@ -358,8 +358,8 @@ void main() {
       queue().addSelected();
 
       expect(jobs().map((j) => p.basename(j.outputPath)), [
-        'a_av1-crf24_sample10s.mp4',
-        'a_hevc-crf21_sample10s.mp4',
+        'a_av1-crf35_sample10s.mp4',
+        'a_hevc-crf24_sample10s.mp4',
       ]);
     });
 
@@ -403,7 +403,7 @@ void main() {
         queue().convertWhole(jobs().single.id);
 
         expect(jobs().last.isSample, isFalse);
-        expect(jobs().last.outputPath, converted('a_av1-crf24.mp4'));
+        expect(jobs().last.outputPath, converted('a_av1-crf35.mp4'));
         expect(jobs().last.recipe.presetId, 'archive.master');
       },
     );

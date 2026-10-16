@@ -706,7 +706,7 @@ void main() {
           media!.dir.path,
           'Converted',
           'Samples',
-          'queued_sample_av1-crf24_sample10s.mp4',
+          'queued_sample_av1-crf35_sample10s.mp4',
         ),
       );
       final sample = await ffprobe.probe(job.outputPath);
@@ -728,7 +728,7 @@ void main() {
       expect(job.status, JobStatus.done);
       expect(
         File(
-          p.join(media!.dir.path, 'Converted', 'queued_whole_hevc-crf21.mp4'),
+          p.join(media!.dir.path, 'Converted', 'queued_whole_hevc-crf24.mp4'),
         ).existsSync(),
         isTrue,
       );

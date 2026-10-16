@@ -103,7 +103,7 @@ void main() {
 
       expect(env.executor.started, hasLength(1));
       expect(find.textContaining('Starting…'), findsOneWidget);
-      expect(find.textContaining('→ holiday_av1-crf24.mp4'), findsOneWidget);
+      expect(find.textContaining('→ holiday_av1-crf35.mp4'), findsOneWidget);
     });
 
     testWidgets('each selected video previews what will happen to it', (
@@ -178,8 +178,8 @@ void main() {
       await tester.tap(find.text('Add all (2)'));
       await tester.pump();
 
-      expect(find.textContaining('holiday_av1-crf24.mp4'), findsOneWidget);
-      expect(find.textContaining('second_av1-crf24.mp4'), findsOneWidget);
+      expect(find.textContaining('holiday_av1-crf35.mp4'), findsOneWidget);
+      expect(find.textContaining('second_av1-crf35.mp4'), findsOneWidget);
     });
 
     testWidgets('one video, two settings: two jobs with different names', (
@@ -193,8 +193,8 @@ void main() {
       await tester.pump();
       await addToQueue(tester);
 
-      expect(find.textContaining('holiday_av1-crf24.mp4'), findsOneWidget);
-      expect(find.textContaining('holiday_hevc-crf21.mp4'), findsOneWidget);
+      expect(find.textContaining('holiday_av1-crf35.mp4'), findsOneWidget);
+      expect(find.textContaining('holiday_hevc-crf24.mp4'), findsOneWidget);
       // Each job says what was changed, in the words of the panel.
       expect(
         find.text('For the archive · Format: Works everywhere'),
@@ -419,7 +419,7 @@ void main() {
         expect(
           find.widgetWithText(
             TechnicalText,
-            'HEVC 10-bit, CRF 21 · sound copied as is · MP4',
+            'HEVC 10-bit, CRF 24 · sound copied as is · MP4',
           ),
           findsOneWidget,
         );
@@ -452,7 +452,7 @@ void main() {
       expect(
         find.widgetWithText(
           TechnicalText,
-          'AV1 10-bit, CRF 24 · AAC 320k · MP4',
+          'AV1 10-bit, CRF 35 · AAC 320k · MP4',
         ),
         findsOneWidget,
       );
@@ -463,7 +463,7 @@ void main() {
       expect(
         find.widgetWithText(
           TechnicalText,
-          'AV1 10-bit, CRF 24 · sound copied as is · MP4',
+          'AV1 10-bit, CRF 35 · sound copied as is · MP4',
         ),
         findsOneWidget,
       );
