@@ -87,6 +87,16 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+# FFmpeg with its licence, when tool/fetch_ffmpeg.sh has put it in
+# third_party/ffmpeg/windows. The app looks next to its .exe first
+# (lib/core/ffmpeg/locator.dart); a build without it uses the PATH.
+set(BUNDLED_FFMPEG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/ffmpeg/windows")
+if(EXISTS "${BUNDLED_FFMPEG_DIR}/ffmpeg.exe")
+  install(DIRECTORY "${BUNDLED_FFMPEG_DIR}/"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    COMPONENT Runtime)
+endif()
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"

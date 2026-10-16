@@ -93,7 +93,8 @@ Also:
 
 Early but working on Linux. Not done yet:
 
-- FFmpeg is **not bundled**; it must be installed (see below).
+- The macOS download is signed and notarized only once the Apple
+  credentials are in the repository's secrets (see Releases).
 - Windows and macOS builds compile in CI but have not been tried on real
   machines. On macOS the conversion tests pass in CI. On Windows, keeping
   the computer awake and pausing are not implemented, and the tests of
@@ -109,12 +110,15 @@ See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Requirements
 
-- FFmpeg 8 or newer with `ffprobe`, on the `PATH`, built with `libx265`,
-  `libsvtav1`, `prores_ks` and `dnxhd`. Linux distribution packages and
-  Homebrew include these. On Windows take a "full" build (Chocolatey's
-  `ffmpeg-full`): the "essentials" builds lack `libsvtav1`, so "For the
-  archive" makes the larger HEVC files, and "Smallest" for the free Resolve
-  fails.
+- The released app brings its own FFmpeg (8.1, with `ffprobe`); nothing else
+  needs installing. Someone who wants another FFmpeg can choose its folder
+  in the app: About VidCtrl (the "i" button), "Use FFmpeg from a folder…".
+- To develop: FFmpeg 8 or newer with `ffprobe`, built with `libx265`,
+  `libsvtav1`, `prores_ks` and `dnxhd`, either on the `PATH` (Linux
+  distribution packages and Homebrew have these) or the pinned one that
+  `tool/fetch_ffmpeg.sh linux|windows|macos` puts in `third_party/ffmpeg/`,
+  which a build then includes. On Windows a "full" build is needed: the
+  "essentials" builds lack `libsvtav1`.
 - To build: [Flutter](https://docs.flutter.dev/get-started/install) 3.47 or
   newer with desktop support. On Linux also `ninja-build` and `libgtk-3-dev`.
 
@@ -152,10 +156,24 @@ git push origin v0.2.0
 ```
 
 The app is given the tag's version, and the files are named after it
-(`vidctrl-0.2.0-linux-x64.tar.gz`). A tag with a hyphen, such as
-`v0.2.0-beta.1`, is published as a pre-release. The notes explain how to get
-the app going and list the commits since the release before
-(`tool/release_notes.sh`).
+(`vidctrl-0.2.0-linux-x64.tar.gz`, `vidctrl-0.2.0-macos.dmg`). A tag with a
+hyphen, such as `v0.2.0-beta.1`, is published as a pre-release. The notes
+explain how to get the app going and list the commits since the release
+before (`tool/release_notes.sh`).
+
+Each download has FFmpeg inside, fetched by `tool/fetch_ffmpeg.sh`. The
+macOS one is a disk image with the app signed with a Developer ID and
+notarized by Apple (`tool/package_macos.sh`), so that it opens without a
+warning. That takes these repository secrets, and a version tag fails
+without them:
+
+| Secret | What it is |
+|---|---|
+| `MACOS_CERT_P12` | The "Developer ID Application" certificate with its private key, exported as .p12, in base64 |
+| `MACOS_CERT_PASSWORD` | The password of that .p12 |
+| `NOTARY_KEY_P8` | An App Store Connect API key (the .p8 file's text), for `notarytool` |
+| `NOTARY_KEY_ID` | That key's ID |
+| `NOTARY_ISSUER_ID` | The issuer ID shown with App Store Connect's API keys |
 
 ## Command-line tool for development
 
@@ -190,7 +208,9 @@ Adding a goal means one file in `lib/core/scenarios/`, one line in
 
 ## Licence
 
-Not chosen yet. FFmpeg is a separate program under its own licence (LGPL or
-GPL, depending on the build). The bundled fonts are Roboto (Apache License
-2.0) and JetBrains Mono (SIL Open Font License); their licence texts are in
-`assets/fonts/`.
+Not chosen yet for the app's own code. FFmpeg comes with the app as
+separate programs, unmodified builds under the GNU GPL version 3;
+`assets/licenses/ffmpeg.txt` says whose builds they are and where their
+source code is, and the app shows it under About VidCtrl → Licences. The
+bundled fonts are Roboto (Apache License 2.0) and JetBrains Mono (SIL Open
+Font License); their licence texts are in `assets/fonts/`.

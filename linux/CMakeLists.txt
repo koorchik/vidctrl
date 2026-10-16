@@ -107,6 +107,17 @@ install(DIRECTORY "runner/resources/"
   COMPONENT Runtime
   FILES_MATCHING PATTERN "app_icon_*.png")
 
+# FFmpeg with its licence, when tool/fetch_ffmpeg.sh has put it in
+# third_party/ffmpeg/linux. The app looks in lib/ffmpeg first
+# (lib/core/ffmpeg/locator.dart); a build without it uses the PATH.
+set(BUNDLED_FFMPEG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/ffmpeg/linux")
+if(EXISTS "${BUNDLED_FFMPEG_DIR}/ffmpeg")
+  install(DIRECTORY "${BUNDLED_FFMPEG_DIR}/"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/ffmpeg"
+    USE_SOURCE_PERMISSIONS
+    COMPONENT Runtime)
+endif()
+
 foreach(bundled_library ${PLUGIN_BUNDLED_LIBRARIES})
   install(FILES "${bundled_library}"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"

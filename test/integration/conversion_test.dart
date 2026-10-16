@@ -662,6 +662,7 @@ void main() {
         overrides: [
           environmentProvider.overrideWith(
             (ref) async => AppEnvironment(
+              ffmpeg: media!.paths,
               ffprobe: ffprobe,
               executor: executor,
               capabilities: capabilities,

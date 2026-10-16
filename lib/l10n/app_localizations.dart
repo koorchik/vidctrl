@@ -527,8 +527,62 @@ abstract class AppLocalizations {
   /// No description provided for @engineMissingBody.
   ///
   /// In en, this message translates to:
-  /// **'This app needs FFmpeg to convert videos, and could not find it. Install FFmpeg and start the app again.'**
+  /// **'This app needs FFmpeg to convert videos, and could not find it. Install FFmpeg 8 or newer and start the app again, or show it the folder FFmpeg is in.'**
   String get engineMissingBody;
+
+  /// No description provided for @engineChooseFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Use FFmpeg from a folder…'**
+  String get engineChooseFolder;
+
+  /// No description provided for @engineUseBuiltIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the built-in FFmpeg'**
+  String get engineUseBuiltIn;
+
+  /// No description provided for @engineBuiltIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Video engine: built in'**
+  String get engineBuiltIn;
+
+  /// No description provided for @engineChosen.
+  ///
+  /// In en, this message translates to:
+  /// **'Video engine: your own'**
+  String get engineChosen;
+
+  /// No description provided for @engineSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Video engine: the computer\'s'**
+  String get engineSystem;
+
+  /// No description provided for @engineNextStart.
+  ///
+  /// In en, this message translates to:
+  /// **'VidCtrl will use it from its next start.'**
+  String get engineNextStart;
+
+  /// No description provided for @engineFolderWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder has no ffmpeg and ffprobe in it.'**
+  String get engineFolderWrong;
+
+  /// No description provided for @aboutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'About VidCtrl'**
+  String get aboutTitle;
+
+  /// No description provided for @licences.
+  ///
+  /// In en, this message translates to:
+  /// **'Licences'**
+  String get licences;
 
   /// No description provided for @startingUp.
   ///

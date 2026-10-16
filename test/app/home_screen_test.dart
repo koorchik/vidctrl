@@ -599,6 +599,7 @@ void main() {
       'Same as the computer',
     );
     await expectInside(find.byTooltip('Look'), 'Professional');
+    await expectInside(find.byTooltip('About VidCtrl'), 'Licences');
   });
 
   testWidgets('the look can be switched and is remembered', (tester) async {
@@ -638,5 +639,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('The video engine is missing'), findsOneWidget);
+    // Someone with FFmpeg elsewhere can point the app at it.
+    expect(find.text('Use FFmpeg from a folder…'), findsOneWidget);
   });
 }

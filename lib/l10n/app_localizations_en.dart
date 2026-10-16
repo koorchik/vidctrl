@@ -260,7 +260,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get engineMissingBody =>
-      'This app needs FFmpeg to convert videos, and could not find it. Install FFmpeg and start the app again.';
+      'This app needs FFmpeg to convert videos, and could not find it. Install FFmpeg 8 or newer and start the app again, or show it the folder FFmpeg is in.';
+
+  @override
+  String get engineChooseFolder => 'Use FFmpeg from a folder…';
+
+  @override
+  String get engineUseBuiltIn => 'Use the built-in FFmpeg';
+
+  @override
+  String get engineBuiltIn => 'Video engine: built in';
+
+  @override
+  String get engineChosen => 'Video engine: your own';
+
+  @override
+  String get engineSystem => 'Video engine: the computer\'s';
+
+  @override
+  String get engineNextStart => 'VidCtrl will use it from its next start.';
+
+  @override
+  String get engineFolderWrong =>
+      'This folder has no ffmpeg and ffprobe in it.';
+
+  @override
+  String get aboutTitle => 'About VidCtrl';
+
+  @override
+  String get licences => 'Licences';
 
   @override
   String get startingUp => 'Getting ready…';

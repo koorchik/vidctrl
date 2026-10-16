@@ -23,7 +23,12 @@
 - **App icon** for the three platforms, drawn by `tool/make_icons.dart`.
 - **CI:** analysis, tests, a quick check of FFmpeg and release builds for
   Linux, Windows and macOS; a version tag publishes a GitHub release with the
-  three archives.
+  three downloads.
+- **FFmpeg inside:** each download carries a pinned FFmpeg 8.1
+  (`tool/fetch_ffmpeg.sh`), with its licence and a notice of where its
+  source is, also shown in the app; another FFmpeg can be chosen in the
+  app. The macOS download is a disk image, signed and notarized when the
+  Apple secrets are set (`tool/package_macos.sh`).
 
 ## Next
 
@@ -51,13 +56,13 @@
 6. **Comfort.** Settings (speed, output naming), finish notification,
    taskbar progress.
 7. **Ship.**
-   - Bundle a pinned FFmpeg per platform, with licence notices and source.
+   - Set the Apple secrets and try the notarized disk image on a Mac
+     (Apple Silicon and Intel).
    - Windows: keep-awake, pause, and ending FFmpeg when the app ends.
      Stopping a conversion part-way fails there: of the conversion tests,
      run once in CI on 2026-10-03, the three that cancel, shut down or stop
      a measurement did not pass.
-   - Installers (AppImage/deb, Windows installer, dmg) and release notes with
-     the first-run security prompts explained.
+   - Installers (AppImage/deb, Windows installer) and signing on Windows.
    - Linux: a desktop entry named after the application identifier, with the
      icons installed beside it. Wayland desktops take the window icon from
      there; until then `tool/desktop_entry.dart` registers one by hand.
@@ -69,7 +74,7 @@
 
 Automatic quality per video, "fit into N MB", user-defined goals, lossless
 trimming, an in-app before/after comparison for samples, watch folders,
-signing and notarization, automatic updates.
+automatic updates.
 
 ## Open decisions
 

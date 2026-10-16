@@ -44,5 +44,10 @@ flutter:
           weight: 500
         - asset: assets/fonts/Roboto-Bold.ttf
           weight: 700
+  # Licence texts for the licences page (lib/app/licenses.dart).
+  assets:
+    - assets/licenses/
+    - assets/fonts/Roboto-LICENSE.txt
+    - assets/fonts/JetBrainsMono-OFL.txt
   # Generates lib/l10n/app_localizations*.dart from the ARB files (see l10n.yaml).
   generate: true

@@ -8,11 +8,13 @@ import '../core/media/ffprobe.dart';
 import '../core/media/thumbnail.dart';
 import '../core/platform/sleep_inhibitor.dart';
 import '../core/queue/job_executor.dart';
+import 'settings.dart';
 
 /// Everything the app needs from the machine it runs on, found once at
 /// startup. Tests replace this with fakes.
 class AppEnvironment {
   const AppEnvironment({
+    required this.ffmpeg,
     required this.ffprobe,
     required this.executor,
     required this.capabilities,
@@ -21,6 +23,8 @@ class AppEnvironment {
     this.thumbnailer,
   });
 
+  /// The FFmpeg in use and where it was found.
+  final FfmpegPaths ffmpeg;
   final Ffprobe ffprobe;
   final JobExecutor executor;
   final Capabilities capabilities;
@@ -40,9 +44,14 @@ class FfmpegMissing implements Exception {
 
 final environmentProvider = FutureProvider<AppEnvironment>(
   (ref) async {
-    final paths = FfmpegLocator().locate();
+    // Read, not watched: everything the app holds is built on this, so a
+    // newly chosen folder is used from the next start.
+    final paths = FfmpegLocator().locate(
+      overrideDir: ref.read(ffmpegFolderProvider),
+    );
     if (paths == null) throw const FfmpegMissing();
     return AppEnvironment(
+      ffmpeg: paths,
       ffprobe: Ffprobe(paths.ffprobe),
       executor: JobExecutor(FfmpegRunner(paths.ffmpeg)),
       capabilities: await CapabilityProbe(paths.ffmpeg).detect(),

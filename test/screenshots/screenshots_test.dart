@@ -200,6 +200,13 @@ void main() {
         await tester.pump();
         await save(tester, '6_smallest_window');
       });
+
+      testWidgets('the about menu', (tester) async {
+        await pumpApp(tester, environment(), look: look);
+        await tester.tap(find.byTooltip('About VidCtrl'));
+        await tester.pumpAndSettle();
+        await save(tester, '8_about_menu');
+      });
     });
   }
 }

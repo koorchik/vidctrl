@@ -20,6 +20,7 @@ import '../headings.dart';
 import '../scenario_texts.dart';
 import '../size_change_text.dart';
 import '../technical_text.dart';
+import 'about_button.dart';
 import 'command_dialog.dart';
 import 'language_button.dart';
 import 'look_button.dart';
@@ -104,19 +105,26 @@ class RecipePane extends ConsumerWidget {
                         Row(
                           children: [
                             PaneTitle(l10n.recipeTitleNone),
-                            const SizedBox(width: 10),
+                            // The gap is inside, so that it gives way too
+                            // when the title and buttons take the row.
                             Expanded(
-                              child: Text(
-                                selectedVideos.isEmpty
-                                    ? ''
-                                    : l10n.selectedCount(selectedVideos.length),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: muted,
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 10),
+                                child: Text(
+                                  selectedVideos.isEmpty
+                                      ? ''
+                                      : l10n.selectedCount(
+                                          selectedVideos.length,
+                                        ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: muted,
+                                  ),
                                 ),
                               ),
                             ),
+                            const AboutButton(),
                             const LookButton(),
                             const LanguageButton(),
                           ],

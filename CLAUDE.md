@@ -7,8 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Flutter desktop app (Linux, Windows, macOS) that converts batches of videos
 by goal ("For the archive", "Edit in DaVinci Resolve", "Send to a phone", …). It
 drives the `ffmpeg` and `ffprobe` executables as separate processes; it does
-not link FFmpeg libraries. FFmpeg is not bundled yet: it is found on `PATH`
-(FFmpeg 8 or newer, with `libx265`, `libsvtav1`, `prores_ks`, `dnxhd`).
+not link FFmpeg libraries. Each release carries a pinned FFmpeg 8.1 (see
+"Bundled FFmpeg"); in development it is found on `PATH` (FFmpeg 8 or newer,
+with `libx265`, `libsvtav1`, `prores_ks`, `dnxhd`).
 
 What is built and what is not: `docs/ROADMAP.md`.
 
@@ -33,6 +34,7 @@ flutter gen-l10n                                      # after editing lib/l10n/*
 flutter test tool/make_icons.dart                     # redraws the app icon files
 flutter test tool/make_screenshots.dart               # redraws the README's pictures (docs/screenshots/)
 dart run tool/desktop_entry.dart                      # Linux: registers the icon with the desktop
+tool/fetch_ffmpeg.sh linux                            # the pinned FFmpeg into third_party/ffmpeg/ (or windows, macos)
 
 dart run tool/convert.dart --list                     # the engine without the UI
 dart run tool/convert.dart archive.master clip.mov --dry-run
@@ -48,16 +50,43 @@ dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for "For
   long) is: FFmpeg found, the needed encoders there, one short clip
   converted. The real conversions (`--tags ffmpeg`, minutes of encoding) are
   not run in CI: run them here before a change to the engine goes out.
-- CI's Linux has Ubuntu's FFmpeg 6.1, older than the app supports. The check
-  passes with it, but one real conversion test does not (irregular frame
-  timing comes out at 23.976 instead of 30), so a result from CI's Linux says
-  nothing about FFmpeg 8.
+- CI tests the FFmpeg the app ships: it fetches the pinned one first and
+  puts it first on the `PATH`, then checks that the built app carries it.
 - A pushed version tag (`v1.2.0`, or `v1.2.0-beta.1` for a pre-release) makes
   the same workflow publish a GitHub release once all three builds pass. The
-  tag gives the app its version (`--build-name`) and the archives their
+  tag gives the app its version (`--build-name`) and the downloads their
   names; `pubspec.yaml`'s version is not used. `tool/release_notes.sh v1.2.0`
   prints the notes: fixed instructions, then the commit subjects since the
-  previous tag, so commit subjects are what users read.
+  previous tag, so commit subjects are what users read. A tag fails on macOS
+  without the signing secrets listed in the README.
+
+## Bundled FFmpeg
+
+- `tool/fetch_ffmpeg.sh` pins other people's builds by checksum: Martin
+  Riedl's for macOS (arm64 and x86_64 joined with `lipo` into one universal
+  binary), BtbN's "gpl" builds for Linux and Windows. Martin Riedl's Linux
+  builds are configured with `--enable-nonfree` (DeckLink) and may not be
+  passed on; check `-buildconf` of any new build for it.
+- They are GPL v3 (`--enable-version3`). Instead of hosting the source, the
+  notice `assets/licenses/ffmpeg.txt` points at each builder's source and
+  build scripts; it goes beside the binaries, into the app's licences page
+  (`lib/app/licenses.dart`) and the release notes. The fetch script refuses
+  pins that the notice does not name, so change the two together.
+- Where each build puts it, and where `FfmpegLocator` looks: Linux
+  `bundle/lib/ffmpeg/` (`linux/CMakeLists.txt`), Windows beside the `.exe`
+  (`windows/CMakeLists.txt`), macOS `Contents/MacOS/`
+  (`tool/package_macos.sh`, which also signs inside out, makes the disk
+  image and notarizes). The CMake rules add it only when
+  `third_party/ffmpeg/<system>/` exists, so a development build uses the
+  `PATH`.
+- To move to a newer FFmpeg: change the pins and the notice, run
+  `tool/fetch_ffmpeg.sh linux`, then `flutter test --tags ffmpeg` with
+  `third_party/ffmpeg/linux` first on the `PATH`.
+- A folder chosen in the app ("Use FFmpeg from a folder…",
+  `ffmpegFolderProvider`) comes first, but only from the next start:
+  `environmentProvider` is found once and the videos, queue and estimates
+  are built on it, so it is read, not watched. On the "engine missing"
+  screen nothing is built yet, so a chosen folder is used at once.
 
 ## Architecture
 
@@ -133,8 +162,8 @@ and option ids to words; the engine knows them only by id.
 ### The seam for tests
 
 Everything that touches the machine is reached through `environmentProvider`
-(`providers.dart`): ffprobe, the job executor, capabilities, the sleep
-inhibitor, the estimator, the thumbnailer. Tests replace it with
+(`providers.dart`): the FFmpeg found and where, ffprobe, the job executor,
+capabilities, the sleep inhibitor, the estimator, the thumbnailer. Tests replace it with
 `FakeEnvironment` (`test/support/fakes.dart`), whose fake jobs finish only when
 the test says so. `test/support/pump_app.dart` is the widget-test harness;
 `test/support/test_media.dart` generates real clips for the `ffmpeg` tests, so
@@ -314,6 +343,13 @@ The UI renders presets and options generically; it needs no other change.
   developer's computer: run it again after the icon changes, and with
   `--remove` before changing the identifier. A window already open keeps the
   icon it opened with, so restart the app to see a change.
+- **PATH on macOS:** an app opened from the Finder gets
+  `/usr/bin:/bin:/usr/sbin:/sbin`, without Homebrew's folders, so
+  `FfmpegLocator` looks in `/opt/homebrew/bin` and `/usr/local/bin` itself.
+- **The panel's title row** holds the title and three buttons. In the
+  widget tests' placeholder font they fill nearly all of its 404 px, so the
+  round buttons are compact and the gap before "N selected" sits inside its
+  `Expanded`, where it can give way. A fourth button needs another place.
 - **Menus near the window's edge:** `MenuAnchor` opens a menu from its
   button's left side, and one that would run past the window is moved back
   only until it touches the edge, where its side and shadow are cut off. The

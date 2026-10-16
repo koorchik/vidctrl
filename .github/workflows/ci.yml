@@ -58,23 +58,20 @@ jobs:
           flutter-version: 3.47.6
           cache: true
 
-      # FFmpeg here is only for the FFmpeg check. The app does not bundle
-      # FFmpeg yet; see docs/ROADMAP.md.
-      - name: Install build tools and FFmpeg (Linux)
+      - name: Install build tools (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libgtk-3-dev ffmpeg
+          sudo apt-get install -y ninja-build libgtk-3-dev
 
-      - name: Install FFmpeg (macOS)
-        if: runner.os == 'macOS'
-        run: brew install ffmpeg
-
-      # The full build: the smaller "ffmpeg" package has no AV1 encoder
-      # (libsvtav1), which the FFmpeg check asks for.
-      - name: Install FFmpeg (Windows)
-        if: runner.os == 'Windows'
-        run: choco install ffmpeg-full -y --no-progress
+      # The FFmpeg the app ships with, pinned in the script. The build puts
+      # it inside the app, and it goes first on the PATH, so the FFmpeg
+      # check below tests it rather than the runner's own.
+      - name: Fetch FFmpeg
+        shell: bash
+        run: |
+          tool/fetch_ffmpeg.sh ${{ matrix.target }}
+          echo "${{ github.workspace }}/third_party/ffmpeg/${{ matrix.target }}" >> "$GITHUB_PATH"
 
       - run: flutter pub get
 
@@ -87,7 +84,7 @@ jobs:
       - name: Unit and widget tests
         run: flutter test --exclude-tags "ffmpeg || screenshots"
 
-      # A quick check that this system's FFmpeg can do what the app asks of
+      # A quick check that the bundled FFmpeg can do what the app asks of
       # it: found, the needed encoders there, one short clip converted. The
       # real conversions of every goal (flutter test --tags ffmpeg) are
       # minutes of encoding and are run on a developer's machine, not here.
@@ -111,9 +108,68 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath vidctrl-${{ steps.version.outputs.version }}-windows-x64.zip
 
+      # The Developer ID certificate and the App Store Connect API key for
+      # notarization, from the repository's secrets. Without them (a fork, a
+      # pull request) the app is signed ad hoc, which is not enough for a
+      # release: a version tag fails here instead.
+      - name: Signing keys (macOS)
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          if [[ -z "$MACOS_CERT_P12" || -z "$NOTARY_KEY_P8" ]]; then
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              echo "::error::A release needs the secrets MACOS_CERT_P12, MACOS_CERT_PASSWORD, NOTARY_KEY_P8, NOTARY_KEY_ID and NOTARY_ISSUER_ID."
+              exit 1
+            fi
+            echo "No signing keys: the app is signed ad hoc and not notarized."
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(uuidgen)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          identity="$(security find-identity -v -p codesigning "$keychain" \
+            | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
+          if [[ -z "$identity" ]]; then
+            echo "::error::MACOS_CERT_P12 holds no Developer ID Application certificate."
+            exit 1
+          fi
+          echo "$NOTARY_KEY_P8" > "$RUNNER_TEMP/notary.p8"
+          {
+            echo "MACOS_SIGN_IDENTITY=$identity"
+            echo "NOTARY_KEY_PATH=$RUNNER_TEMP/notary.p8"
+            echo "NOTARY_KEY_ID=$NOTARY_KEY_ID"
+            echo "NOTARY_ISSUER_ID=$NOTARY_ISSUER_ID"
+          } >> "$GITHUB_ENV"
+
       - name: Package (macOS)
         if: runner.os == 'macOS'
-        run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/VidCtrl.app vidctrl-${{ steps.version.outputs.version }}-macos.zip
+        run: tool/package_macos.sh vidctrl-${{ steps.version.outputs.version }}-macos.dmg
+
+      # The packed app runs the FFmpeg inside it, not the PATH's.
+      - name: Check the FFmpeg inside the app
+        shell: bash
+        run: |
+          case "${{ matrix.target }}" in
+            linux) bin=build/linux/x64/release/bundle/lib/ffmpeg ;;
+            windows) bin=build/windows/x64/runner/Release ;;
+            macos) bin=build/macos/Build/Products/Release/VidCtrl.app/Contents/MacOS ;;
+          esac
+          "$bin/ffmpeg" -hide_banner -version | head -1
+          "$bin/ffprobe" -hide_banner -version | head -1
 
       - uses: actions/upload-artifact@v4
         with:
@@ -121,6 +177,7 @@ jobs:
           path: |
             vidctrl-*.tar.gz
             vidctrl-*.zip
+            vidctrl-*.dmg
           if-no-files-found: error
 
   # Pushing a version tag publishes a release with the three archives, once

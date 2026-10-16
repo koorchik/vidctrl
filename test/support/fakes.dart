@@ -5,6 +5,7 @@ import 'package:vidctrl/app/providers.dart';
 import 'package:vidctrl/core/estimate/progress_estimator.dart';
 import 'package:vidctrl/core/estimate/size_estimator.dart';
 import 'package:vidctrl/core/ffmpeg/capabilities.dart';
+import 'package:vidctrl/core/ffmpeg/locator.dart';
 import 'package:vidctrl/core/media/ffprobe.dart';
 
 import 'dart:typed_data';
@@ -231,9 +232,20 @@ class FakeThumbnailer implements Thumbnailer {
 
 /// A complete stand-in for the machine: no FFmpeg, no real files.
 class FakeEnvironment {
-  FakeEnvironment({this.capabilities = softwareOnly, this.thumbnail});
+  FakeEnvironment({
+    this.capabilities = softwareOnly,
+    this.ffmpegPaths = const FfmpegPaths(
+      ffmpeg: '/opt/vidctrl/lib/ffmpeg/ffmpeg',
+      ffprobe: '/opt/vidctrl/lib/ffmpeg/ffprobe',
+      source: FfmpegSource.bundled,
+    ),
+    this.thumbnail,
+  });
 
   final Capabilities capabilities;
+
+  /// Where the FFmpeg in use was found; the copy inside the app by default.
+  final FfmpegPaths ffmpegPaths;
 
   /// The picture shown for every video; none by default.
   final Uint8List? thumbnail;
@@ -243,6 +255,7 @@ class FakeEnvironment {
   final estimator = FakeEstimator();
 
   late final environment = AppEnvironment(
+    ffmpeg: ffmpegPaths,
     ffprobe: ffprobe,
     executor: executor,
     capabilities: capabilities,

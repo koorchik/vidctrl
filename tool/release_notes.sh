@@ -11,6 +11,13 @@ version="${tag#v}"
 # The nearest earlier version tag; none for the first release, which then
 # lists everything.
 previous="$(git describe --tags --abbrev=0 --match 'v*' "$tag^" 2>/dev/null || true)"
+# Where FFmpeg's notice is: a link in CI, which knows the repository.
+notice="assets/licenses/ffmpeg.txt"
+if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+  notice="[$notice](${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY/blob/$tag/$notice)"
+else
+  notice="\`$notice\`"
+fi
 
 cat <<EOF
 ## Getting it going
@@ -19,20 +26,15 @@ cat <<EOF
 |---|---|---|
 | Linux (x64) | \`vidctrl-$version-linux-x64.tar.gz\` | Unpack it and run \`vidctrl\` in the folder |
 | Windows (x64) | \`vidctrl-$version-windows-x64.zip\` | Unpack it and run \`vidctrl.exe\` |
-| macOS | \`vidctrl-$version-macos.zip\` | Unpack it and open the app |
+| macOS (Apple Silicon and Intel) | \`vidctrl-$version-macos.dmg\` | Open it and drag VidCtrl to Applications |
 
-**FFmpeg is not included.** Install FFmpeg 8 or newer, so that \`ffmpeg\` and
-\`ffprobe\` are found on the \`PATH\`. Linux distribution packages and Homebrew
-have everything the app uses. On Windows take a "full" build: the smaller
-"essentials" builds have no AV1 encoder, so "For the archive" makes larger
-HEVC files with them, and "Smallest" for the free Resolve fails.
+**FFmpeg is included**, so nothing else needs installing. It is FFmpeg 8.1,
+unmodified builds under the GNU GPL version 3; $notice says whose builds
+they are and where their source code is.
 
-The app is not signed, so Windows and macOS ask before running it for the
-first time:
-
-- **Windows:** "Windows protected your PC" → More info → Run anyway.
-- **macOS:** after it refuses, System Settings → Privacy & Security → Open
-  Anyway. On older versions, right-click the app and choose Open.
+The Windows app is not signed, so Windows asks before running it for the
+first time: "Windows protected your PC" → More info → Run anyway. The macOS
+app is signed and notarized by Apple and opens without asking.
 
 So far only the Linux build has been tried on a real machine; the Windows and
 macOS builds come straight from the build servers. On Windows, stopping a

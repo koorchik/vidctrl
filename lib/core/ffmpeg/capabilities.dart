@@ -184,6 +184,12 @@ String parseFfmpegVersion(String firstLine) {
   return match?.group(1) ?? 'unknown';
 }
 
+/// The release number in a version as builders write it ("8.1.3" from
+/// "n8.1.3-9-g29e619e767-20260930"), or the whole of it when there is none,
+/// as in a build of the development branch.
+String shortFfmpegVersion(String version) =>
+    RegExp(r'\d+(\.\d+)+').firstMatch(version)?.group(0) ?? version;
+
 final _encoderLine = RegExp(r'^\s[VAS][A-Z.]{5}\s+(\S+)');
 
 /// Parses `ffmpeg -encoders` into the set of encoder names.
