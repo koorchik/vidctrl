@@ -110,8 +110,8 @@ jobs:
 
       # The Developer ID certificate and the App Store Connect API key for
       # notarization, from the repository's secrets. Without them (a fork, a
-      # pull request) the app is signed ad hoc, which is not enough for a
-      # release: a version tag fails here instead.
+      # pull request, or until the Apple account is set up) the app is signed
+      # ad hoc and not notarized, and the release notes say how to open it.
       - name: Signing keys (macOS)
         if: runner.os == 'macOS'
         env:
@@ -122,10 +122,6 @@ jobs:
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
           if [[ -z "$MACOS_CERT_P12" || -z "$NOTARY_KEY_P8" ]]; then
-            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-              echo "::error::A release needs the secrets MACOS_CERT_P12, MACOS_CERT_PASSWORD, NOTARY_KEY_P8, NOTARY_KEY_ID and NOTARY_ISSUER_ID."
-              exit 1
-            fi
             echo "No signing keys: the app is signed ad hoc and not notarized."
             exit 0
           fi
@@ -205,7 +201,11 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # The macOS build is notarized exactly when the signing secrets are
+      # there (it fails if they are there and notarization does not pass).
       - name: Write the release notes
+        env:
+          MACOS_NOTARIZED: ${{ secrets.MACOS_CERT_P12 != '' && secrets.NOTARY_KEY_P8 != '' }}
         run: tool/release_notes.sh "$GITHUB_REF_NAME" > notes.md
 
       # Running the job again for the same tag replaces the files of the

@@ -164,8 +164,9 @@ before (`tool/release_notes.sh`).
 Each download has FFmpeg inside, fetched by `tool/fetch_ffmpeg.sh`. The
 macOS one is a disk image with the app signed with a Developer ID and
 notarized by Apple (`tool/package_macos.sh`), so that it opens without a
-warning. That takes these repository secrets, and a version tag fails
-without them:
+warning. That takes these repository secrets. Without them the app is signed
+ad hoc and not notarized, and the release notes tell Mac users how to open
+it anyway:
 
 | Secret | What it is |
 |---|---|

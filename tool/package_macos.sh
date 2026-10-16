@@ -7,8 +7,9 @@
 #
 #   tool/package_macos.sh vidctrl-1.2.0-macos.dmg
 #
-# Environment, all optional; without them the app is signed ad hoc (it then
-# runs only after System Settings → Privacy & Security → Open Anyway):
+# Environment, all optional; without them the app is signed ad hoc and macOS
+# refuses it once downloaded, until its quarantine mark is removed (the
+# release notes say how, tool/release_notes.sh):
 #   MACOS_SIGN_IDENTITY  a "Developer ID Application: …" identity in the keychain
 #   NOTARY_KEY_PATH, NOTARY_KEY_ID, NOTARY_ISSUER_ID
 #                        an App Store Connect API key, for notarytool

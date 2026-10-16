@@ -57,8 +57,9 @@ dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for "For
   tag gives the app its version (`--build-name`) and the downloads their
   names; `pubspec.yaml`'s version is not used. `tool/release_notes.sh v1.2.0`
   prints the notes: fixed instructions, then the commit subjects since the
-  previous tag, so commit subjects are what users read. A tag fails on macOS
-  without the signing secrets listed in the README.
+  previous tag, so commit subjects are what users read. Without the signing
+  secrets listed in the README the macOS app is signed ad hoc, not
+  notarized, and the notes say how to open it.
 
 ## Bundled FFmpeg
 

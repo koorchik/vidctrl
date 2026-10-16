@@ -4,6 +4,9 @@
 # release (.github/workflows/ci.yml).
 #
 #   tool/release_notes.sh v1.2.0
+#
+# MACOS_NOTARIZED=true when the macOS app was signed and notarized; without
+# it the notes say how to open an app that macOS refuses.
 set -euo pipefail
 
 tag="$1"
@@ -17,6 +20,20 @@ if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
   notice="[$notice](${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY/blob/$tag/$notice)"
 else
   notice="\`$notice\`"
+fi
+if [[ "${MACOS_NOTARIZED:-}" == true ]]; then
+  macos="The macOS app is signed and notarized by Apple and opens without asking."
+else
+  # Downloaded files carry a quarantine mark, and macOS refuses an app that
+  # Apple has not notarized while it has one. Removing it from the whole app
+  # also covers the FFmpeg inside, which the app starts by itself.
+  macos="The macOS app is not notarized by Apple yet, so macOS refuses to open
+it. After dragging it to Applications, open Terminal and run this once; then
+VidCtrl opens like any other app:
+
+\`\`\`sh
+xattr -dr com.apple.quarantine /Applications/VidCtrl.app
+\`\`\`"
 fi
 
 cat <<EOF
@@ -33,8 +50,9 @@ unmodified builds under the GNU GPL version 3; $notice says whose builds
 they are and where their source code is.
 
 The Windows app is not signed, so Windows asks before running it for the
-first time: "Windows protected your PC" → More info → Run anyway. The macOS
-app is signed and notarized by Apple and opens without asking.
+first time: "Windows protected your PC" → More info → Run anyway.
+
+$macos
 
 So far only the Linux build has been tried on a real machine; the Windows and
 macOS builds come straight from the build servers. On Windows, stopping a
