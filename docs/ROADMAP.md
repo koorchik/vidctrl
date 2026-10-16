@@ -38,9 +38,11 @@
    FFmpeg with `libvmaf`), Intel, AMD and Apple graphics, and the other
    goals' quality levels. A fixed number cannot suit both calm and busy
    footage; choosing it per video from a measured sample would.
-3. **Check in Resolve.** Import converted files into Resolve to confirm picture
-   and sound decode. The free edition and the AV1 "Smallest" variant still need
-   a test on a machine with the free edition.
+3. **Check in Resolve.** Studio 21.1.1 on Linux is checked: every codec the
+   goal keeps, every sound format, sync after a rewrap, and the outputs of
+   each variant, also with hardware decoding off (the findings are at the
+   top of `resolve_linux.dart`). Still to do: the free edition, and how
+   smoothly H.265 4:2:2 plays without a recent NVIDIA card.
 4. **Use the whole machine.** One encode often leaves most cores idle.
    Run several conversions at once according to CPU, memory and graphics-card
    capacity; lower process priority so the desktop stays responsive; consider

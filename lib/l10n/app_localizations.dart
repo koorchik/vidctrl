@@ -281,7 +281,7 @@ abstract class AppLocalizations {
   /// No description provided for @convertVideoHint.
   ///
   /// In en, this message translates to:
-  /// **'Turn on if videos play choppily or show no picture. Needed without an NVIDIA graphics card.'**
+  /// **'Turn on if videos play choppily, as they can without an NVIDIA graphics card.'**
   String get convertVideoHint;
 
   /// No description provided for @saveTitle.
@@ -1469,7 +1469,7 @@ abstract class AppLocalizations {
   /// No description provided for @noteHevc422.
   ///
   /// In en, this message translates to:
-  /// **'This recording format only plays in Resolve with a recent NVIDIA card.'**
+  /// **'Without a recent NVIDIA card, this recording format may play choppily in Resolve.'**
   String get noteHevc422;
 
   /// No description provided for @noteExperimentalAv1.

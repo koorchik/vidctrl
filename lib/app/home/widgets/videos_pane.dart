@@ -402,7 +402,7 @@ class _PreviewLine extends StatelessWidget {
       for (final note in preview.plan.notes)
         ?switch (note) {
           PlanNote.variableFrameRateFixed => l10n.noteVariableFrameRate,
-          PlanNote.hevc422NeedsRecentNvidia => l10n.noteHevc422,
+          PlanNote.hevc422MayPlayChoppily => l10n.noteHevc422,
           PlanNote.experimentalAv1Intermediate => l10n.noteExperimentalAv1,
           PlanNote.hdrToneMapped => l10n.noteHdrToneMapped,
           PlanNote.hdrNotConverted => l10n.noteHdrNotConverted,

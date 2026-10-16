@@ -30,7 +30,7 @@
   "sizeBalanced": "Recommended",
   "sizeBest": "Best quality",
   "convertVideoTitle": "Also convert the picture",
-  "convertVideoHint": "Turn on if videos play choppily or show no picture. Needed without an NVIDIA graphics card.",
+  "convertVideoHint": "Turn on if videos play choppily, as they can without an NVIDIA graphics card.",
   "saveTitle": "Where to save",
   "saveNextToOriginals": "Next to the originals, in a “Converted” folder",
   "saveChooseFolder": "Change…",
@@ -428,7 +428,7 @@
     "description": "Application name shown in the window title."
   },
   "noteVariableFrameRate": "Uneven frame timing will be fixed.",
-  "noteHevc422": "This recording format only plays in Resolve with a recent NVIDIA card.",
+  "noteHevc422": "Without a recent NVIDIA card, this recording format may play choppily in Resolve.",
   "noteExperimentalAv1": "Smallest files are harder to edit smoothly.",
   "noteHdrToneMapped": "Very bright colours will be adjusted to look right on any screen.",
   "noteHdrNotConverted": "This video uses extra-bright colours that may look washed out on a phone.",

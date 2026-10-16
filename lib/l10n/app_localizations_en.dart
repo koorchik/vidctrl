@@ -109,7 +109,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get convertVideoHint =>
-      'Turn on if videos play choppily or show no picture. Needed without an NVIDIA graphics card.';
+      'Turn on if videos play choppily, as they can without an NVIDIA graphics card.';
 
   @override
   String get saveTitle => 'Where to save';
@@ -793,7 +793,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noteHevc422 =>
-      'This recording format only plays in Resolve with a recent NVIDIA card.';
+      'Without a recent NVIDIA card, this recording format may play choppily in Resolve.';
 
   @override
   String get noteExperimentalAv1 =>

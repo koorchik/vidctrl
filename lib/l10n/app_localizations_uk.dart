@@ -109,7 +109,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get convertVideoHint =>
-      'Увімкніть, якщо відео гальмує або немає зображення. Потрібно без відеокарти NVIDIA.';
+      'Увімкніть, якщо відео гальмує, як буває без відеокарти NVIDIA.';
 
   @override
   String get saveTitle => 'Куди зберегти';
@@ -798,7 +798,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get noteHevc422 =>
-      'Цей формат запису відтворюється в Resolve лише з новою відеокартою NVIDIA.';
+      'Без нової відеокарти NVIDIA цей формат запису може гальмувати в Resolve.';
 
   @override
   String get noteExperimentalAv1 => 'Найменші файли важче плавно монтувати.';

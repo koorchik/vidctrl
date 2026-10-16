@@ -173,6 +173,25 @@ void main() {
       expect(plan.kind, PlanKind.skip);
     });
 
+    test('a camcorder MPEG-TS keeps its sync: no B-frame delay after the '
+        'start delay, which Resolve would apply twice', () async {
+      if (unavailable()) return;
+      final source = await media!.clip(
+        'avchd_like.m2ts',
+        video: ['-c:v', 'libx264', '-preset', 'fast'],
+        audio: ['-c:a', 'ac3'],
+        extra: ['-f', 'mpegts'],
+      );
+
+      final output = await convert(ResolveLinuxPreset.studio, source);
+      final mediaTimes = await media!.editListMediaTimes(output.path);
+
+      expect(output.video!.codec, 'h264');
+      expect(output.audio.single.codec, 'pcm_s24le');
+      expect(mediaTimes, contains(-1), reason: 'the fixture has no delay');
+      expect(mediaTimes.where((t) => t > 0), isEmpty);
+    });
+
     test('AV1 with AAC lands in an MP4 with lossless audio', () async {
       if (unavailable()) return;
       final source = await media!.clip(

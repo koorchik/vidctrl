@@ -314,5 +314,18 @@ The UI renders presets and options generically; it needs no other change.
   (`home/widgets/button_menu.dart`) instead, which lines the menu up with the
   button's right side. A test opens both at the smallest window.
 - **Resolve on Linux** (Blackmagic's codec list for 21.1): no AAC in either
-  edition, no H.264/H.265 in the free edition. Details in the header of
+  edition, no H.264/H.265 in the free edition. Checked in Studio 21.1.1:
+  AC-3 does not play (silent from MOV and MP4, distorted from MKV), Opus
+  plays only from MP4, and AVI does not import. With hardware decoding off
+  (Preferences, Decode Options), Studio still decodes H.264, H.265 4:2:2,
+  AV1 and VP9 on the processor: an NVIDIA card makes playback smooth, it
+  is not what makes the picture appear. Details in the header of
   `resolve_linux.dart`.
+- **Resolve shows a copied picture early** when the MOV's edit list holds an
+  empty edit (the picture starts after the sound, as from MPEG-TS or MKV)
+  followed by the B-frame delay: it applies the delay twice, up to two
+  frames, out of sync with the sound. `-movflags +negative_cts_offsets`
+  leaves no delay to double. Not for AVI sources, which have no
+  presentation times: there it moves the picture by a second. Measured with
+  a white frame and a beep at the same moment;
+  `editListMediaTimes` (`test_media.dart`) guards it.

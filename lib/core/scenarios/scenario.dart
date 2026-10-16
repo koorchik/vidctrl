@@ -137,8 +137,9 @@ enum PlanNote {
   noVideoStream,
   variableFrameRateFixed,
 
-  /// H.265 4:2:2 only decodes in Resolve Studio on recent NVIDIA cards.
-  hevc422NeedsRecentNvidia,
+  /// Resolve Studio decodes H.265 4:2:2 in hardware only on recent NVIDIA
+  /// cards; elsewhere on the processor, which can be too slow to play.
+  hevc422MayPlayChoppily,
 
   /// Compact but harder to edit than ProRes; not yet confirmed in Resolve Free.
   experimentalAv1Intermediate,

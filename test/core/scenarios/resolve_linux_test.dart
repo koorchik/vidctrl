@@ -54,6 +54,87 @@ void main() {
       );
     });
 
+    test('AC-3 audio is converted: Resolve plays it silent or distorted', () {
+      for (final container in [movContainer, mkvContainer]) {
+        final result = plan(
+          studio,
+          clip(container: container, audio: [track('ac3')]),
+        );
+
+        expect(result.kind, PlanKind.audioOnly, reason: container);
+        expect((result.audio as AudioEncode).codec, 'pcm_s24le');
+      }
+    });
+
+    test('Opus in an MP4 is read as is', () {
+      expect(plan(studio, clip(audio: [track('opus')])).kind, PlanKind.skip);
+    });
+
+    test('Opus in an MKV is silent in Resolve, so it becomes PCM', () {
+      final result = plan(
+        studio,
+        clip(container: mkvContainer, audio: [track('opus')]),
+      );
+
+      expect(result.kind, PlanKind.audioOnly);
+      expect(result.muxer, 'mov');
+    });
+
+    test('VP9 with Opus from a WebM moves to an MP4, the Opus copied', () {
+      final result = plan(
+        studio,
+        clip(container: mkvContainer, video: 'vp9', audio: [track('opus')]),
+      );
+
+      expect(result.kind, PlanKind.remux);
+      expect(result.muxer, 'mp4');
+      expect(result.audio, isA<AudioCopy>());
+    });
+
+    test(
+      'a copied picture keeps its sync: no B-frame delay in the edit list',
+      () {
+        for (final input in [
+          clip(),
+          clip(container: 'mpegts', audio: [track('pcm_s16le')]),
+          clip(video: 'av1'),
+        ]) {
+          expect(plan(studio, input).outputArgs, [
+            '-movflags',
+            '+negative_cts_offsets',
+          ], reason: input.formatName);
+        }
+      },
+    );
+
+    test('a picture from an AVI is copied without time offsets', () {
+      final result = plan(
+        studio,
+        clip(container: 'avi', audio: [track('pcm_s16le')]),
+      );
+
+      expect(result.kind, PlanKind.remux);
+      expect(result.outputArgs, isEmpty);
+    });
+
+    test('MPEG-4 Part 2 from an AVI is re-encoded, as moved it does not '
+        'decode', () {
+      final result = plan(
+        studio,
+        clip(container: 'avi', video: 'mpeg4', audio: [track('mp3')]),
+      );
+
+      expect(result.kind, PlanKind.encode);
+      expect((result.video as VideoEncode).encoder, 'prores_ks');
+    });
+
+    test('MPEG-4 Part 2 in a MOV is kept', () {
+      expect(
+        plan(studio, clip(video: 'mpeg4', audio: [track('pcm_s16le')])).kind,
+        PlanKind.skip,
+      );
+    });
+
     test('a file with no audio at all is ready as is', () {
       expect(plan(studio, clip(audio: [])).kind, PlanKind.skip);
     });
@@ -83,7 +164,7 @@ void main() {
       );
 
       expect(result.kind, PlanKind.skip);
-      expect(result.notes, contains(PlanNote.hevc422NeedsRecentNvidia));
+      expect(result.notes, contains(PlanNote.hevc422MayPlayChoppily));
     });
 
     test('variable frame rate forces a constant-rate re-encode', () {

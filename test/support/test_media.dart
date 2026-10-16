@@ -94,6 +94,19 @@ class TestMedia {
     ];
   }
 
+  /// The media time of each entry in the first track's edit list, as
+  /// FFmpeg's MOV reader logs them: -1 for an empty edit (a delay), otherwise
+  /// where in the track playback starts.
+  Future<List<int>> editListMediaTimes(String path) async {
+    final result = await Process.run(paths.ffprobe, ['-v', 'trace', path]);
+    return [
+      for (final m in RegExp(
+        r'Processing st: 0, edit list \d+ - media time: (-?\d+)',
+      ).allMatches(result.stderr as String))
+        int.parse(m.group(1)!),
+    ];
+  }
+
   /// A fingerprint of the video stream's compressed data. Equal fingerprints
   /// mean the picture was copied bit for bit, not re-encoded.
   Future<String> videoFingerprint(String path) async {

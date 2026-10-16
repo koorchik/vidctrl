@@ -32,6 +32,7 @@ class MediaInfo {
   bool get isMovFamily => _formats.contains('mov');
   bool get isMatroska => _formats.contains('matroska');
   bool get isMxf => _formats.contains('mxf');
+  bool get isAvi => _formats.contains('avi');
 
   List<String> get _formats => formatName.split(',');
 }
