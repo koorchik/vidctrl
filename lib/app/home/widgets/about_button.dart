@@ -6,16 +6,20 @@ import 'package:path/path.dart' as p;
 import '../../../core/ffmpeg/capabilities.dart';
 import '../../../core/ffmpeg/locator.dart';
 import '../../../core/platform/open_external.dart';
+import '../../../core/updates/releases.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../build_info.dart';
 import '../../providers.dart';
 import '../../settings.dart';
 import '../../theme.dart';
 import '../technical_text.dart';
 import 'button_menu.dart';
+import 'update_dialog.dart';
 import 'web_links.dart';
 
-/// Which FFmpeg the app uses, a way to use another, the website, and the
-/// licences of everything that comes with the app.
+/// Which FFmpeg the app uses and a way to use another; then the app's
+/// version, a check for a newer one, the website, and the licences of
+/// everything that comes with the app.
 class AboutButton extends ConsumerWidget {
   const AboutButton({super.key});
 
@@ -25,11 +29,14 @@ class AboutButton extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final environment = ref.watch(environmentProvider).value;
     final chosenFolder = ref.watch(ffmpegFolderProvider);
+    final build = ref.watch(buildInfoProvider);
+    final releases = ref.watch(releaseSourceProvider);
+    final current = Version.tryParse(build.version);
 
     // The Builder gives the menu the button's own place on screen.
     return Builder(
       builder: (context) => IconButton(
-        // Compact, so that the panel's title row has room for its buttons.
+        // Compact, to keep the header low.
         visualDensity: VisualDensity.compact,
         tooltip: l10n.aboutTitle,
         icon: Icon(
@@ -72,12 +79,31 @@ class AboutButton extends ConsumerWidget {
             ),
           const PopupMenuDivider(height: 1),
           PopupMenuItem<void>(
+            enabled: false,
+            child: Text(
+              current == null ? l10n.developmentBuild : 'VidCtrl $current',
+              style: TextStyle(color: scheme.onSurface),
+            ),
+          ),
+          if (releases != null && current != null)
+            PopupMenuItem<void>(
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (_) =>
+                    UpdateDialog(current: current, source: releases),
+              ),
+              child: Text(l10n.checkForUpdates),
+            ),
+          PopupMenuItem<void>(
             onTap: () => openWithDefaultApp(websiteUrl),
             child: Text(l10n.website),
           ),
           PopupMenuItem<void>(
-            onTap: () =>
-                showLicensePage(context: context, applicationName: 'VidCtrl'),
+            onTap: () => showLicensePage(
+              context: context,
+              applicationName: 'VidCtrl',
+              applicationVersion: current?.toString(),
+            ),
             child: Text(l10n.licences),
           ),
         ]),

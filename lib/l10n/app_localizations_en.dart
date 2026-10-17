@@ -300,6 +300,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get camctrlLink => 'Control the camera with CamCtrl';
 
   @override
+  String get developmentBuild => 'VidCtrl, development build';
+
+  @override
+  String get checkForUpdates => 'Check for updates…';
+
+  @override
+  String get updateChecking => 'Looking for a new version…';
+
+  @override
+  String get updateAvailableTitle => 'A new version is out';
+
+  @override
+  String updateAvailableBody(String latest, String current) {
+    return 'VidCtrl $latest is available. You have $current.';
+  }
+
+  @override
+  String get updateDownload => 'Download';
+
+  @override
+  String get updateLater => 'Not now';
+
+  @override
+  String get updateNoneTitle => 'VidCtrl is up to date';
+
+  @override
+  String updateNoneBody(String current) {
+    return '$current is the newest version.';
+  }
+
+  @override
+  String get updateFailedTitle => 'Could not check for updates';
+
+  @override
+  String get updateFailedBody => 'Check the internet connection and try again.';
+
+  @override
   String get startingUp => 'Getting ready…';
 
   @override

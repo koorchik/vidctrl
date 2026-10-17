@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vidctrl/app/build_info.dart';
 import 'package:vidctrl/app/theme.dart';
 import 'package:vidctrl/app/window.dart';
 import 'package:vidctrl/core/ffmpeg/locator.dart';
@@ -52,6 +53,9 @@ void main() {
     final env = FakeEnvironment(
       capabilities: withGpu({'av1_nvenc'}),
       thumbnail: frame,
+      // A released build, as people get it: its menu has the version.
+      build: const BuildInfo(version: '0.3.0', repository: 'owner/vidctrl'),
+      releases: FakeReleaseSource(),
     );
     env.ffprobe.add('/videos/DSC_0412.MOV');
     env.ffprobe.add(

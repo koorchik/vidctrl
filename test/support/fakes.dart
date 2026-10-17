@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:vidctrl/app/build_info.dart';
 import 'package:vidctrl/app/providers.dart';
 import 'package:vidctrl/core/estimate/progress_estimator.dart';
 import 'package:vidctrl/core/estimate/size_estimator.dart';
@@ -15,6 +16,7 @@ import 'package:vidctrl/core/media/thumbnail.dart';
 import 'package:vidctrl/core/platform/sleep_inhibitor.dart';
 import 'package:vidctrl/core/queue/job_executor.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
+import 'package:vidctrl/core/updates/releases.dart';
 
 import 'fake_media.dart';
 
@@ -240,9 +242,18 @@ class FakeEnvironment {
       source: FfmpegSource.bundled,
     ),
     this.thumbnail,
+    this.build = const BuildInfo(),
+    this.releases,
   });
 
   final Capabilities capabilities;
+
+  /// What the app was built as; a development build by default.
+  final BuildInfo build;
+
+  /// Where newer versions are looked for; nowhere by default, so no test
+  /// goes on the internet.
+  final ReleaseSource? releases;
 
   /// Where the FFmpeg in use was found; the copy inside the app by default.
   final FfmpegPaths ffmpegPaths;
@@ -267,5 +278,25 @@ class FakeEnvironment {
   /// Overrides that make the app use this environment.
   List<Override> get overrides => [
     environmentProvider.overrideWith((ref) async => environment),
+    buildInfoProvider.overrideWithValue(build),
+    releaseSourceProvider.overrideWithValue(releases),
   ];
+}
+
+/// Answers the check for a newer version when the test says, with a release
+/// or by failing.
+class FakeReleaseSource implements ReleaseSource {
+  final _answer = Completer<Release>();
+
+  void answer(String version) => _answer.complete(
+    Release(
+      version: Version.tryParse(version)!,
+      page: Uri.parse('https://example.com/releases/v$version'),
+    ),
+  );
+
+  void fail() => _answer.completeError(const ReleaseCheckFailed('offline'));
+
+  @override
+  Future<Release> latest() => _answer.future;
 }

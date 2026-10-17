@@ -300,6 +300,44 @@ class AppLocalizationsUk extends AppLocalizations {
   String get camctrlLink => 'Керуйте камерою з CamCtrl';
 
   @override
+  String get developmentBuild => 'VidCtrl, збірка для розробки';
+
+  @override
+  String get checkForUpdates => 'Перевірити оновлення…';
+
+  @override
+  String get updateChecking => 'Шукаємо нову версію…';
+
+  @override
+  String get updateAvailableTitle => 'Вийшла нова версія';
+
+  @override
+  String updateAvailableBody(String latest, String current) {
+    return 'Доступна VidCtrl $latest. У вас $current.';
+  }
+
+  @override
+  String get updateDownload => 'Завантажити';
+
+  @override
+  String get updateLater => 'Не зараз';
+
+  @override
+  String get updateNoneTitle => 'Оновлень немає';
+
+  @override
+  String updateNoneBody(String current) {
+    return '$current — найновіша версія.';
+  }
+
+  @override
+  String get updateFailedTitle => 'Не вдалося перевірити оновлення';
+
+  @override
+  String get updateFailedBody =>
+      'Перевірте з\'єднання з інтернетом і спробуйте ще раз.';
+
+  @override
   String get startingUp => 'Підготовка…';
 
   @override

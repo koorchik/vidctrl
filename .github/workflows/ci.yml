@@ -48,8 +48,10 @@ jobs:
               exit 1
             fi
             # The app's own version takes numbers only; the part after a
-            # hyphen stays in the tag and the file names.
-            echo "build_args=--build-name=${version%%-*} --build-number=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+            # hyphen stays in the tag and the file names. The whole version
+            # and the repository go in too, for the app to show and to look
+            # for a newer release with (lib/app/build_info.dart).
+            echo "build_args=--build-name=${version%%-*} --build-number=$GITHUB_RUN_NUMBER --dart-define=VIDCTRL_VERSION=$version --dart-define=VIDCTRL_REPOSITORY=$GITHUB_REPOSITORY" >> "$GITHUB_OUTPUT"
           else
             version=dev
           fi

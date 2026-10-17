@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vidctrl/app/build_info.dart';
 import 'package:vidctrl/app/licenses.dart';
 import 'package:vidctrl/app/home/technical_text.dart';
 import 'package:vidctrl/core/ffmpeg/capabilities.dart';
@@ -99,6 +101,83 @@ void main() {
 
     // Not tapped: that would open the browser.
     expect(find.text('Website'), findsOneWidget);
+  });
+
+  group('the version', () {
+    const release = BuildInfo(version: '0.3.0', repository: 'owner/vidctrl');
+
+    Future<FakeReleaseSource> openUpdateCheck(WidgetTester tester) async {
+      final releases = FakeReleaseSource();
+      await pumpApp(
+        tester,
+        FakeEnvironment(build: release, releases: releases),
+      );
+      await _openMenu(tester);
+      await tester.tap(find.text('Check for updates…'));
+      await tester.pump();
+      await tester.pump();
+      return releases;
+    }
+
+    testWidgets('a release names its version, and can look for a newer one', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        FakeEnvironment(build: release, releases: FakeReleaseSource()),
+      );
+      await _openMenu(tester);
+
+      expect(find.text('VidCtrl 0.3.0'), findsOneWidget);
+      expect(find.text('Check for updates…'), findsOneWidget);
+    });
+
+    testWidgets('a development build says so, and does not look for updates', (
+      tester,
+    ) async {
+      await pumpApp(tester, FakeEnvironment());
+      await _openMenu(tester);
+
+      expect(find.text('VidCtrl, development build'), findsOneWidget);
+      expect(find.text('Check for updates…'), findsNothing);
+    });
+
+    testWidgets('a newer release is offered for download', (tester) async {
+      final releases = await openUpdateCheck(tester);
+      expect(find.text('Looking for a new version…'), findsOneWidget);
+
+      releases.answer('0.4.0');
+      await tester.pump();
+
+      expect(find.text('A new version is out'), findsOneWidget);
+      expect(
+        find.text('VidCtrl 0.4.0 is available. You have 0.3.0.'),
+        findsOneWidget,
+      );
+      // Not tapped: that would open the browser.
+      expect(find.widgetWithText(FilledButton, 'Download'), findsOneWidget);
+    });
+
+    testWidgets('the same version is up to date', (tester) async {
+      final releases = await openUpdateCheck(tester);
+      releases.answer('0.3.0');
+      await tester.pump();
+
+      expect(find.text('VidCtrl is up to date'), findsOneWidget);
+      expect(find.text('0.3.0 is the newest version.'), findsOneWidget);
+      expect(find.text('Download'), findsNothing);
+    });
+
+    testWidgets('a check that cannot be made says so', (tester) async {
+      final releases = await openUpdateCheck(tester);
+      releases.fail();
+      await tester.pump();
+
+      expect(find.text('Could not check for updates'), findsOneWidget);
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('Could not check for updates'), findsNothing);
+    });
   });
 
   testWidgets('the licences include FFmpeg\'s', (tester) async {

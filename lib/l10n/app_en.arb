@@ -163,6 +163,17 @@
   "website": "Website",
   "camctrlQuestion": "Shooting on Blackmagic?",
   "camctrlLink": "Control the camera with CamCtrl",
+  "developmentBuild": "VidCtrl, development build",
+  "checkForUpdates": "Check for updates…",
+  "updateChecking": "Looking for a new version…",
+  "updateAvailableTitle": "A new version is out",
+  "updateAvailableBody": "VidCtrl {latest} is available. You have {current}.",
+  "updateDownload": "Download",
+  "updateLater": "Not now",
+  "updateNoneTitle": "VidCtrl is up to date",
+  "updateNoneBody": "{current} is the newest version.",
+  "updateFailedTitle": "Could not check for updates",
+  "updateFailedBody": "Check the internet connection and try again.",
   "startingUp": "Getting ready…",
   "quitTitle": "Stop converting and quit?",
   "quitBody": "The video being converted will be discarded. Finished videos are kept.",
@@ -451,6 +462,23 @@
   "convertSampleShort": "Sample",
   "sampleFirst": "first 10 s",
   "sampleMiddle": "middle 10 s",
+  "@updateAvailableBody": {
+    "placeholders": {
+      "latest": {
+        "type": "String"
+      },
+      "current": {
+        "type": "String"
+      }
+    }
+  },
+  "@updateNoneBody": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      }
+    }
+  },
   "@selectedCount": {
     "placeholders": {
       "count": {

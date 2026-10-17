@@ -19,7 +19,7 @@ class LookButton extends ConsumerWidget {
     // The Builder gives the menu the button's own place on screen.
     return Builder(
       builder: (context) => IconButton(
-        // Compact, so that the panel's title row has room for its buttons.
+        // Compact, to keep the header low.
         visualDensity: VisualDensity.compact,
         tooltip: l10n.lookTitle,
         icon: Icon(

@@ -602,6 +602,72 @@ abstract class AppLocalizations {
   /// **'Control the camera with CamCtrl'**
   String get camctrlLink;
 
+  /// No description provided for @developmentBuild.
+  ///
+  /// In en, this message translates to:
+  /// **'VidCtrl, development build'**
+  String get developmentBuild;
+
+  /// No description provided for @checkForUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates…'**
+  String get checkForUpdates;
+
+  /// No description provided for @updateChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for a new version…'**
+  String get updateChecking;
+
+  /// No description provided for @updateAvailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A new version is out'**
+  String get updateAvailableTitle;
+
+  /// No description provided for @updateAvailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'VidCtrl {latest} is available. You have {current}.'**
+  String updateAvailableBody(String latest, String current);
+
+  /// No description provided for @updateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get updateDownload;
+
+  /// No description provided for @updateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get updateLater;
+
+  /// No description provided for @updateNoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'VidCtrl is up to date'**
+  String get updateNoneTitle;
+
+  /// No description provided for @updateNoneBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} is the newest version.'**
+  String updateNoneBody(String current);
+
+  /// No description provided for @updateFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not check for updates'**
+  String get updateFailedTitle;
+
+  /// No description provided for @updateFailedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the internet connection and try again.'**
+  String get updateFailedBody;
+
   /// No description provided for @startingUp.
   ///
   /// In en, this message translates to:
