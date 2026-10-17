@@ -7,6 +7,22 @@ for [FFmpeg](https://ffmpeg.org/).
 Drop videos in, pick what you want, press **Add to queue**. Converting starts
 by itself.
 
+## Download
+
+**[Download the latest version](../../releases/latest)** for Linux, Windows
+or macOS. FFmpeg is inside, so there is nothing else to install.
+
+On that page, under **Assets**, take the file for your computer:
+
+| Your computer | The file | Then |
+|---|---|---|
+| Linux (x64) | the one ending in `-linux-x64.tar.gz` | Unpack it and run `vidctrl` in the folder |
+| Windows (x64) | the one ending in `-windows-x64.zip` | Unpack it and run `vidctrl.exe` |
+| macOS (Apple Silicon and Intel) | the one ending in `-macos.dmg` | Open it and drag VidCtrl to Applications |
+
+Windows and macOS may refuse to open it the first time; the page says how to
+open it anyway.
+
 ![The app: videos and the queue on the left, what to do with them on the right](docs/screenshots/cozy.png)
 
 It comes in two looks. The one above is the one it starts with; this is the
@@ -94,7 +110,7 @@ Also:
 Early but working on Linux. Not done yet:
 
 - The macOS download is signed and notarized only once the Apple
-  credentials are in the repository's secrets (see Releases).
+  credentials are in the repository's secrets (see Publishing a release).
 - Windows and macOS builds compile in CI but have not been tried on real
   machines. On macOS the conversion tests pass in CI. On Windows, keeping
   the computer awake and pausing are not implemented, and the tests of
@@ -145,7 +161,7 @@ the repository. They take minutes of encoding, so CI runs only the quick
 check: FFmpeg is found, has the encoders the app needs, and converts one
 short clip.
 
-## Releases
+## Publishing a release
 
 Pushing a version tag publishes a release on GitHub with the app for Linux,
 Windows and macOS, once all three have passed their checks and built:
