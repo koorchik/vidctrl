@@ -1,6 +1,6 @@
 // Draws the application icon and writes it in the form each platform wants.
 // The drawing in this file is the only source of the icon; the files it
-// writes are committed.
+// writes are committed, including the copy the app shows in its header.
 //
 //   flutter test tool/make_icons.dart
 //
@@ -18,6 +18,10 @@ import 'package:flutter_test/flutter_test.dart';
 const _macosIcons = 'macos/Runner/Assets.xcassets/AppIcon.appiconset';
 const _windowsIcon = 'windows/runner/resources/app_icon.ico';
 const _linuxIcons = 'linux/runner/resources';
+
+/// The copy the app shows beside its name, at four times its size on screen.
+const _appIcon = 'assets/app_icon.png';
+const _appIconSize = 96;
 const _preview = 'build/icon_preview/icon.png';
 
 /// The sizes `Contents.json` in the macOS icon set names.
@@ -294,6 +298,7 @@ void main() {
       final image = await _render(size, _Frame.filled);
       _write('$_linuxIcons/app_icon_$size.png', await _png(image));
     }
+    _write(_appIcon, await _png(await _render(_appIconSize, _Frame.filled)));
     _write(_preview, await _previewSheet());
   });
 }

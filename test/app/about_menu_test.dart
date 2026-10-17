@@ -93,6 +93,14 @@ void main() {
     );
   });
 
+  testWidgets('the menu has the website', (tester) async {
+    await pumpApp(tester, FakeEnvironment(capabilities: _ffmpeg81));
+    await _openMenu(tester);
+
+    // Not tapped: that would open the browser.
+    expect(find.text('Website'), findsOneWidget);
+  });
+
   testWidgets('the licences include FFmpeg\'s', (tester) async {
     registerLicenses();
     addTearDown(LicenseRegistry.reset);

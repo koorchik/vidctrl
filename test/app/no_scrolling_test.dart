@@ -70,7 +70,7 @@ void main() {
   // the size the window opens at.
   const sizes = {
     'smallest window': minimumWindowSize,
-    'where the spacing gets roomier': Size(960, 772),
+    'where the spacing gets roomier': Size(960, 790),
     'default window': defaultWindowSize,
   };
 

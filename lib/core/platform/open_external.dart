@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
-/// Opens a file with the system's default application, e.g. a converted
-/// sample in the video player.
+/// Opens a file or a web address with the system's default application,
+/// e.g. a converted sample in the video player or a page in the browser.
 Future<void> openWithDefaultApp(String path) async {
   if (Platform.isWindows) {
     // `start` is a shell built-in; the empty string is the window title.

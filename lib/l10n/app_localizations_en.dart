@@ -291,6 +291,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get licences => 'Licences';
 
   @override
+  String get website => 'Website';
+
+  @override
+  String get camctrlQuestion => 'Shooting on Blackmagic?';
+
+  @override
+  String get camctrlLink => 'Control the camera with CamCtrl';
+
+  @override
   String get startingUp => 'Getting ready…';
 
   @override

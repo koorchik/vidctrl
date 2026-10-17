@@ -156,8 +156,8 @@ Output names carry the settings through each preset's `nameSuffix`
 (`_hevc-crf20`); samples add `_sample10s` and go to `Samples/`.
 `test/core/scenarios/file_names_test.dart` lists them all.
 
-The screen (`home/`) is three panes over those providers: `videos_pane`,
-`queue_pane`, `recipe_pane`. `home/scenario_texts.dart` maps scenario, preset
+The screen (`home/`) is a header (`app_header`) and three panes over those
+providers: `videos_pane`, `queue_pane`, `recipe_pane`. `home/scenario_texts.dart` maps scenario, preset
 and option ids to words; the engine knows them only by id.
 
 ### The seam for tests
@@ -344,8 +344,8 @@ The UI renders presets and options generically; it needs no other change.
   Flutter's does. It runs after the plugin's handler, which can still keep
   the window open.
 - **App icon:** the drawing in `tool/make_icons.dart` is the source; it
-  writes the macOS, Windows and Linux files, so change the drawing and never
-  the files. On Linux the runner sets the window icon, which only X11
+  writes the macOS, Windows and Linux files and the copy the header shows
+  (`assets/app_icon.png`), so change the drawing and never the files. On Linux the runner sets the window icon, which only X11
   desktops show. Wayland desktops take it from a desktop entry named after
   the application identifier and show a generic icon without one. There is
   no installer yet, so `tool/desktop_entry.dart` registers the entry on a
@@ -355,14 +355,19 @@ The UI renders presets and options generically; it needs no other change.
 - **PATH on macOS:** an app opened from the Finder gets
   `/usr/bin:/bin:/usr/sbin:/sbin`, without Homebrew's folders, so
   `FfmpegLocator` looks in `/opt/homebrew/bin` and `/usr/local/bin` itself.
-- **The panel's title row** holds the title and three buttons. In the
-  widget tests' placeholder font they fill nearly all of its 404 px, so the
-  round buttons are compact and the gap before "N selected" sits inside its
-  `Expanded`, where it can give way. A fourth button needs another place.
+- **The header** (`home/widgets/app_header.dart`) is on every screen, the
+  "engine missing" one included: the app's name and website on the left,
+  the About, look and language buttons at the right, ending where the panel
+  does. It takes the place of the margin above the panes, so the panel is
+  20 px shorter than the window's margins alone would make it, and the
+  roomier spacing starts at a 790 px window (`no_scrolling_test.dart`
+  checks that height). CamCtrl, a camera remote from the same maker, is
+  offered under Resolve's explanation only in the roomier panel: the
+  smallest one has no line to spare.
 - **Menus near the window's edge:** `MenuAnchor` opens a menu from its
   button's left side, and one that would run past the window is moved back
   only until it touches the edge, where its side and shadow are cut off. The
-  buttons in the panel's corner use `showMenuUnder`
+  buttons in the header's corner use `showMenuUnder`
   (`home/widgets/button_menu.dart`) instead, which lines the menu up with the
   button's right side. A test opens both at the smallest window.
 - **File dialog on Linux:** GTK matches the filter's patterns

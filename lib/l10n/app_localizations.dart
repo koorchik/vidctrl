@@ -584,6 +584,24 @@ abstract class AppLocalizations {
   /// **'Licences'**
   String get licences;
 
+  /// No description provided for @website.
+  ///
+  /// In en, this message translates to:
+  /// **'Website'**
+  String get website;
+
+  /// No description provided for @camctrlQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Shooting on Blackmagic?'**
+  String get camctrlQuestion;
+
+  /// No description provided for @camctrlLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Control the camera with CamCtrl'**
+  String get camctrlLink;
+
   /// No description provided for @startingUp.
   ///
   /// In en, this message translates to:

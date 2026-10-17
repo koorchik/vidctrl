@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import '../../../core/ffmpeg/capabilities.dart';
 import '../../../core/output/output_namer.dart';
 import '../../../core/scenarios/registry.dart';
+import '../../../core/scenarios/resolve_linux.dart';
 import '../../../core/scenarios/scenario.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../format.dart';
@@ -20,10 +21,8 @@ import '../headings.dart';
 import '../scenario_texts.dart';
 import '../size_change_text.dart';
 import '../technical_text.dart';
-import 'about_button.dart';
 import 'command_dialog.dart';
-import 'language_button.dart';
-import 'look_button.dart';
+import 'web_links.dart';
 
 /// The right-hand panel: what to do with the selected videos, and the
 /// buttons that queue them.
@@ -105,28 +104,19 @@ class RecipePane extends ConsumerWidget {
                         Row(
                           children: [
                             PaneTitle(l10n.recipeTitleNone),
-                            // The gap is inside, so that it gives way too
-                            // when the title and buttons take the row.
+                            const SizedBox(width: 10),
                             Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 10),
-                                child: Text(
-                                  selectedVideos.isEmpty
-                                      ? ''
-                                      : l10n.selectedCount(
-                                          selectedVideos.length,
-                                        ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: muted,
-                                  ),
+                              child: Text(
+                                selectedVideos.isEmpty
+                                    ? ''
+                                    : l10n.selectedCount(selectedVideos.length),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: muted,
                                 ),
                               ),
                             ),
-                            const AboutButton(),
-                            const LookButton(),
-                            const LanguageButton(),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -170,6 +160,12 @@ class RecipePane extends ConsumerWidget {
                         else if (explainedOptions.isEmpty ||
                             constraints.maxHeight >= _Spacing.roomyFrom)
                           _Hint(scenarioHint(l10n, scenario.id)),
+                        // People who edit in Resolve often shoot on
+                        // Blackmagic cameras, which CamCtrl controls. Only
+                        // where there is room: the smallest window has none.
+                        if (scenario == resolveLinuxScenario &&
+                            constraints.maxHeight >= _Spacing.roomyFrom)
+                          const _CamctrlHint(),
                         for (final option in selected.options)
                           if (optionVisible(
                             selected,
@@ -462,6 +458,27 @@ class _Hint extends StatelessWidget {
           fontSize: 13,
           color: theme.colorScheme.onSurfaceVariant,
         ),
+      ),
+    );
+  }
+}
+
+/// "Shooting on Blackmagic? Control the camera with CamCtrl", in the style of
+/// the explanations, with the second half a link. It follows Resolve's
+/// explanation as its next line, closer than a new explanation would be.
+class _CamctrlHint extends StatelessWidget {
+  const _CamctrlHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, left: 2, right: 2),
+      child: WebLink(
+        l10n.camctrlLink,
+        url: camctrlUrl,
+        lead: l10n.camctrlQuestion,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13),
       ),
     );
   }

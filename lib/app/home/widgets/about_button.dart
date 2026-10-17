@@ -5,15 +5,17 @@ import 'package:path/path.dart' as p;
 
 import '../../../core/ffmpeg/capabilities.dart';
 import '../../../core/ffmpeg/locator.dart';
+import '../../../core/platform/open_external.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../providers.dart';
 import '../../settings.dart';
 import '../../theme.dart';
 import '../technical_text.dart';
 import 'button_menu.dart';
+import 'web_links.dart';
 
-/// Which FFmpeg the app uses, a way to use another, and the licences of
-/// everything that comes with the app.
+/// Which FFmpeg the app uses, a way to use another, the website, and the
+/// licences of everything that comes with the app.
 class AboutButton extends ConsumerWidget {
   const AboutButton({super.key});
 
@@ -55,7 +57,7 @@ class AboutButton extends ConsumerWidget {
           PopupMenuItem<void>(
             onTap: () async {
               if (await chooseFfmpegFolder(context, ref) && context.mounted) {
-                await _tell(context, l10n.engineNextStart);
+                await _useFrom(context, ref, environment);
               }
             },
             child: Text(l10n.engineChooseFolder),
@@ -64,11 +66,15 @@ class AboutButton extends ConsumerWidget {
             PopupMenuItem<void>(
               onTap: () async {
                 await ref.read(ffmpegFolderProvider.notifier).select(null);
-                if (context.mounted) await _tell(context, l10n.engineNextStart);
+                if (context.mounted) await _useFrom(context, ref, environment);
               },
               child: Text(l10n.engineUseBuiltIn),
             ),
           const PopupMenuDivider(height: 1),
+          PopupMenuItem<void>(
+            onTap: () => openWithDefaultApp(websiteUrl),
+            child: Text(l10n.website),
+          ),
           PopupMenuItem<void>(
             onTap: () =>
                 showLicensePage(context: context, applicationName: 'VidCtrl'),
@@ -102,6 +108,22 @@ Future<bool> chooseFfmpegFolder(BuildContext context, WidgetRef ref) async {
   }
   await ref.read(ffmpegFolderProvider.notifier).select(folder);
   return true;
+}
+
+/// After another FFmpeg is chosen: everything the app holds is built on the
+/// one in [environment], so the new one is used from the next start. Without
+/// one (still starting, or none found) nothing is built yet, and the app
+/// looks again at once.
+Future<void> _useFrom(
+  BuildContext context,
+  WidgetRef ref,
+  AppEnvironment? environment,
+) async {
+  if (environment == null) {
+    ref.invalidate(environmentProvider);
+    return;
+  }
+  await _tell(context, AppLocalizations.of(context)!.engineNextStart);
 }
 
 Future<void> _tell(BuildContext context, String message) {

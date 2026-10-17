@@ -291,6 +291,15 @@ class AppLocalizationsUk extends AppLocalizations {
   String get licences => 'Ліцензії';
 
   @override
+  String get website => 'Вебсайт';
+
+  @override
+  String get camctrlQuestion => 'Знімаєте на Blackmagic?';
+
+  @override
+  String get camctrlLink => 'Керуйте камерою з CamCtrl';
+
+  @override
   String get startingUp => 'Підготовка…';
 
   @override

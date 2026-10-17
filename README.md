@@ -7,6 +7,8 @@ for [FFmpeg](https://ffmpeg.org/).
 Drop videos in, pick what you want, press **Add to queue**. Converting starts
 by itself.
 
+Website: [camctrl.app/vidctrl](https://camctrl.app/vidctrl)
+
 ## Download
 
 **[Download the latest version](../../releases/latest)** for Linux, Windows

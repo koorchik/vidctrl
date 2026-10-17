@@ -46,6 +46,7 @@ flutter:
           weight: 700
   # Licence texts for the licences page (lib/app/licenses.dart).
   assets:
+    - assets/app_icon.png
     - assets/licenses/
     - assets/fonts/Roboto-LICENSE.txt
     - assets/fonts/JetBrainsMono-OFL.txt

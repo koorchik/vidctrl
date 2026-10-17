@@ -9,6 +9,7 @@ import '../queue/queue_controller.dart';
 import '../sources/sources_controller.dart';
 import '../theme.dart';
 import 'widgets/about_button.dart';
+import 'widgets/app_header.dart';
 import 'widgets/queue_pane.dart';
 import 'widgets/recipe_pane.dart';
 import 'widgets/videos_pane.dart';
@@ -28,32 +29,70 @@ class HomeScreen extends ConsumerWidget {
         decoration: BoxDecoration(gradient: AppLook.of(context).backdrop),
         child: SafeArea(
           child: environment.when(
-            loading: () => _Message(
-              icon: const CircularProgressIndicator(),
-              title: l10n.startingUp,
-            ),
-            error: (_, _) => _Message(
-              icon: Icon(
-                Icons.error_outline_rounded,
-                size: 56,
-                color: Theme.of(context).colorScheme.error,
+            loading: () => _WithHeader(
+              _Message(
+                icon: const CircularProgressIndicator(),
+                title: l10n.startingUp,
               ),
-              title: l10n.engineMissingTitle,
-              body: l10n.engineMissingBody,
-              // Nothing is built on the missing FFmpeg yet, so the app can
-              // look again at once.
-              action: OutlinedButton(
-                onPressed: () async {
-                  if (await chooseFfmpegFolder(context, ref)) {
-                    ref.invalidate(environmentProvider);
-                  }
-                },
-                child: Text(l10n.engineChooseFolder),
+            ),
+            error: (_, _) => _WithHeader(
+              _Message(
+                icon: Icon(
+                  Icons.error_outline_rounded,
+                  size: 56,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                title: l10n.engineMissingTitle,
+                body: l10n.engineMissingBody,
+                // Nothing is built on the missing FFmpeg yet, so the app can
+                // look again at once.
+                action: OutlinedButton(
+                  onPressed: () async {
+                    if (await chooseFfmpegFolder(context, ref)) {
+                      ref.invalidate(environmentProvider);
+                    }
+                  },
+                  child: Text(l10n.engineChooseFolder),
+                ),
               ),
             ),
             data: (_) => const _Workspace(),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Around the panes and between them; the header takes the place of the
+/// margin above them.
+const _margin = 20.0;
+
+/// The line around the window that lights up while files are dragged over.
+const _dropBorder = 2.0;
+
+/// A screen other than the workspace, under the header, which sits where it
+/// does over the workspace.
+class _WithHeader extends StatelessWidget {
+  const _WithHeader(this.child);
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        _margin + _dropBorder,
+        _dropBorder,
+        _margin + _dropBorder,
+        _margin + _dropBorder,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AppHeader(),
+          Expanded(child: child),
+        ],
       ),
     );
   }
@@ -65,6 +104,9 @@ class _Workspace extends ConsumerStatefulWidget {
   @override
   ConsumerState<_Workspace> createState() => _WorkspaceState();
 }
+
+/// Width of the "What to do" panel.
+const _panelWidth = 440.0;
 
 class _WorkspaceState extends ConsumerState<_Workspace> {
   bool _dragging = false;
@@ -97,36 +139,44 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(_margin, 0, _margin, _margin),
             decoration: BoxDecoration(
               color: _dragging
                   ? scheme.primaryContainer.withValues(alpha: 0.3)
                   : Colors.transparent,
               border: Border.all(
                 color: _dragging ? scheme.primary : Colors.transparent,
-                width: 2,
+                width: _dropBorder,
               ),
             ),
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const AppHeader(),
                 Expanded(
-                  child: Column(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // An empty queue shrinks to its one line of
-                      // explanation and the videos take the room.
-                      Expanded(flex: 9, child: const VideosPane()),
-                      const SizedBox(height: 16),
-                      if (queueEmpty)
-                        const QueuePane()
-                      else
-                        const Expanded(flex: 11, child: QueuePane()),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // An empty queue shrinks to its one line of
+                            // explanation and the videos take the room.
+                            Expanded(flex: 9, child: const VideosPane()),
+                            const SizedBox(height: 16),
+                            if (queueEmpty)
+                              const QueuePane()
+                            else
+                              const Expanded(flex: 11, child: QueuePane()),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: _margin),
+                      const SizedBox(width: _panelWidth, child: RecipePane()),
                     ],
                   ),
                 ),
-                const SizedBox(width: 20),
-                const SizedBox(width: 440, child: RecipePane()),
               ],
             ),
           ),

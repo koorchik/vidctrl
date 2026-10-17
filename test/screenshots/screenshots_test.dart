@@ -201,6 +201,14 @@ void main() {
         await save(tester, '6_smallest_window');
       });
 
+      testWidgets('Resolve, with CamCtrl offered', (tester) async {
+        final sources = await pumpApp(tester, environment(), look: look);
+        await addVideos(tester, sources, files.take(2));
+        await tester.tap(find.byIcon(Icons.movie_edit));
+        await tester.pump();
+        await save(tester, '9_resolve');
+      });
+
       testWidgets('the about menu', (tester) async {
         await pumpApp(tester, environment(), look: look);
         await tester.tap(find.byTooltip('About VidCtrl'));
