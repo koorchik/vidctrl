@@ -34,7 +34,9 @@ other:
 
 - **For the archive.** Turns camera videos into a master copy for keeping:
   a fraction of the size, looking the same as the original. One quality, the
-  highest; the defaults need no thought. Shooting dates, place, timecode and
+  highest; the defaults need no thought. That quality was measured, not
+  guessed ([how](#how-the-archive-quality-was-measured)): the smallest file
+  that still looks the same. Shooting dates, place, timecode and
   the camera's make and model are kept. Two choices, each saying what it
   trades away:
   - *Format:* *Smallest file* (AV1, the default) or *Works everywhere*
@@ -62,6 +64,40 @@ other:
 It does the least work that reaches the goal. A file that is already fine is
 left alone; a file that only needs its sound converted is done in seconds with
 the picture copied untouched; only what must be re-encoded is re-encoded.
+
+### How the archive quality was measured
+
+A master copy is kept instead of the original, so it has to look the same,
+and it is made to save space, so it should be no larger than that needs.
+Getting both right was one of the main aims of the app. Each way "For the
+archive" can encode was set to the smallest file that still looks the same
+as the original:
+
+- **The measure:** XPSNR (FFmpeg's `xpsnr` filter), a comparison of the
+  copy with the original that weighs each difference by how visible it is.
+  42 dB or more is the level reported as visually lossless: no difference
+  the eye can see.
+- **The footage:** 10-second 4K pieces of different kinds: handheld video
+  from a Nikon camera, the hardest to compress; a phone video of a moving
+  car; a photo slideshow.
+- **The encoders:** every one the goal uses: AV1 and HEVC on the processor
+  (SVT-AV1, x265) and on an NVIDIA graphics card (NVENC).
+- **The setting:** for each encoder, the quality number that gives the
+  smallest file while every piece still reaches 42 dB. On the hardest piece
+  all four land at 42.0 to 42.1 dB; calmer footage scores higher.
+
+At the same quality the files differ a lot in size, which is why the
+default is AV1 on the processor:
+
+| Format and speed | Size on the hardest piece | On calm footage |
+|---|---|---|
+| Smallest file (AV1), Thorough | 1× | 1× |
+| Works everywhere (HEVC), Thorough | 1.15× | 1.5× |
+| Smallest file (AV1), Fast | 1.7× | 2.4× |
+| Works everywhere (HEVC), Fast | 2× | 3× |
+
+`tool/calibrate_archive.dart` repeats the measurement on any clips, so other
+cameras and graphics cards can be checked the same way.
 
 ### How it works
 
@@ -116,11 +152,11 @@ Early but working on Linux. Not done yet:
   the computer awake and pausing are not implemented, and the tests of
   stopping a conversion part-way fail.
 - Only one video is converted at a time.
-- "For the archive" is set so that every format and encoder reaches an
-  XPSNR of at least 42 dB, reported as visually lossless, on the hardest of
-  the 4K clips measured (from a Nikon camera, a phone and a slideshow).
-  Other cameras, and Intel, AMD and Apple graphics, are not measured yet.
-  The other goals' quality levels are starting values.
+- "For the archive" is measured on footage from a Nikon camera, a phone and
+  a slideshow, on the processor and NVIDIA graphics
+  ([how](#how-the-archive-quality-was-measured)). Other cameras, and Intel,
+  AMD and Apple graphics, are not measured yet. The other goals' quality
+  levels are starting values.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).
 
