@@ -1,11 +1,11 @@
 /// Building blocks shared by presets: frame rates, audio targets and size
 /// estimates.
 ///
-/// Colour tags need no block. FFmpeg 8 carries primaries, transfer, matrix and
-/// range from the decoded frames to the encoder by itself, and ignores the
-/// `-color_primaries` family of output options for encodes. The conversion
-/// tests check that tags survive, so a build that behaves differently fails
-/// them.
+/// Colour tags need no block, but for where the colour samples sit. FFmpeg 8
+/// carries primaries, transfer, matrix and range from the decoded frames to
+/// the encoder by itself, and ignores the `-color_primaries` family of
+/// output options for encodes. The conversion tests check that tags
+/// survive, so a build that behaves differently fails them.
 library;
 
 import '../media/media_info.dart';
@@ -30,6 +30,39 @@ String nearestStandardFrameRate(double fps) {
     if ((entry.value - fps).abs() < (best.value - fps).abs()) best = entry;
   }
   return best.key;
+}
+
+/// Filters that make a 4:2:2 or 4:4:4 picture 4:2:0 in [pixFmt]; none for
+/// one that is 4:2:0 already, whose colour samples stay as they are. A
+/// plain `-pix_fmt` would subsample with the default bilinear scaler, and
+/// put each colour sample elsewhere than MPEG does; Lanczos keeps colour
+/// edges cleaner, and "left" is the place players assume and the one
+/// [av1ChromaPositionArgs] then names.
+List<String> to420Filters(VideoStream video, String pixFmt) {
+  if (video.chroma == ChromaSubsampling.yuv420) return const [];
+  return [
+    'scale=flags=lanczos+accurate_rnd:out_chroma_loc=left',
+    'format=$pixFmt',
+  ];
+}
+
+/// Output arguments that name, in an AV1 stream, where its colour samples
+/// sit: as in [video], or "left" after [to420Filters]. Without them AV1
+/// says "unknown" and a player may draw the colour half a sample off. FFmpeg
+/// loses the place when it changes the bit depth and gives it to no
+/// hardware encoder, so the stream is marked after encoding. AV1 can name
+/// only MPEG's "left" and "top left".
+List<String> av1ChromaPositionArgs(VideoStream video) {
+  final location = video.chroma == ChromaSubsampling.yuv420
+      ? video.chromaLocation
+      : 'left';
+  final position = switch (location) {
+    'left' => 'vertical',
+    'topleft' => 'colocated',
+    _ => null,
+  };
+  if (position == null) return const [];
+  return ['-bsf:v', 'av1_metadata=chroma_sample_position=$position'];
 }
 
 /// Arguments that turn irregular frame timing into a constant rate.

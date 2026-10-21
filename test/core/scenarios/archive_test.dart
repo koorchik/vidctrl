@@ -61,7 +61,7 @@ void main() {
       final result = plan(clip(pixFmt: 'yuv422p10le'));
 
       expect(video(result).filters, [
-        'scale=flags=lanczos+accurate_rnd',
+        'scale=flags=lanczos+accurate_rnd:out_chroma_loc=left',
         'format=yuv420p10le',
       ]);
       expect(result.notes, contains(PlanNote.chromaReduced));
@@ -69,6 +69,56 @@ void main() {
 
     test('4:2:0 sources need no filter', () {
       expect(video(plan(clip())).filters, isEmpty);
+    });
+  });
+
+  group('where the colour samples sit', () {
+    List<String> marks(ConversionPlan plan) {
+      final args = video(plan).args;
+      final at = args.indexOf('-bsf:v');
+      return at < 0 ? const [] : args.sublist(at, at + 2);
+    }
+
+    // A camera's 8-bit video loses the place on its way to 10 bits, so AV1
+    // is told it after encoding.
+    for (final (location, mark) in [
+      ('left', ['-bsf:v', 'av1_metadata=chroma_sample_position=vertical']),
+      ('topleft', ['-bsf:v', 'av1_metadata=chroma_sample_position=colocated']),
+      // AV1 has no name for these.
+      ('center', <String>[]),
+      (null, <String>[]),
+    ]) {
+      test(
+        'AV1 of a video with "$location" says ${mark.isEmpty ? 'nothing' : mark.last}',
+        () {
+          expect(marks(plan(clip(chromaLocation: location))), mark);
+        },
+      );
+    }
+
+    test('a 4:2:2 video made 4:2:0 gets the MPEG place, and says so', () {
+      final result = plan(clip(pixFmt: 'yuv422p10le'));
+
+      expect(video(result).filters.first, contains('out_chroma_loc=left'));
+      expect(marks(result), [
+        '-bsf:v',
+        'av1_metadata=chroma_sample_position=vertical',
+      ]);
+    });
+
+    test('AV1 from the graphics card says it too', () {
+      final result = plan(clip(chromaLocation: 'left'), {
+        'speed': 'gpu',
+      }, withGpu({'av1_nvenc'}));
+
+      expect(video(result).encoder, 'av1_nvenc');
+      expect(marks(result), contains(endsWith('=vertical')));
+    });
+
+    test('HEVC needs no mark: it says "left" when it says nothing', () {
+      final result = plan(clip(chromaLocation: 'left'), {'codec': 'hevc'});
+
+      expect(marks(result), isEmpty);
     });
   });
 

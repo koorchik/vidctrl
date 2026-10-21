@@ -234,6 +234,7 @@ class ResolveLinuxPreset implements Preset {
         ? VideoEncode(
             encoder: 'av1_nvenc',
             pixFmt: 'p010le',
+            filters: to420Filters(video, 'p010le'),
             args: [
               '-preset',
               'p6',
@@ -247,12 +248,22 @@ class ResolveLinuxPreset implements Preset {
               '0',
               '-g',
               gop,
+              ...av1ChromaPositionArgs(video),
             ],
           )
         : VideoEncode(
             encoder: 'libsvtav1',
             pixFmt: 'yuv420p10le',
-            args: ['-preset', '8', '-crf', '22', '-g', gop],
+            filters: to420Filters(video, 'yuv420p10le'),
+            args: [
+              '-preset',
+              '8',
+              '-crf',
+              '22',
+              '-g',
+              gop,
+              ...av1ChromaPositionArgs(video),
+            ],
           );
     return ConversionPlan(
       kind: PlanKind.encode,

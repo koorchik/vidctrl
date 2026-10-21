@@ -290,6 +290,28 @@ void main() {
       expect((result.video as VideoEncode).encoder, 'libsvtav1');
     });
 
+    test('"smallest" AV1 says where its colour samples sit', () {
+      for (final capabilities in [
+        softwareOnly,
+        withGpu({'av1_nvenc'}),
+      ]) {
+        final video =
+            plan(free, clip(chromaLocation: 'left'), {
+                  'quality': 'smallest',
+                }, capabilities).video
+                as VideoEncode;
+
+        expect(
+          video.args,
+          containsAllInOrder([
+            '-bsf:v',
+            'av1_metadata=chroma_sample_position=vertical',
+          ]),
+          reason: video.encoder,
+        );
+      }
+    });
+
     test('an unknown option value falls back to the default', () {
       final video =
           plan(free, clip(), {'quality': 'nonsense'}).video as VideoEncode;

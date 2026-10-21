@@ -142,6 +142,7 @@ void main() {
             'codec_type': 'video',
             'codec_name': 'h264',
             'color_transfer': 'unknown',
+            'chroma_location': 'unspecified',
             'r_frame_rate': '0/0',
           },
         ],
@@ -149,7 +150,28 @@ void main() {
       final video = parseFfprobeJson('/videos/a.mov', untagged).video!;
 
       expect(video.color.transfer, isNull);
+      expect(video.chromaLocation, isNull);
       expect(video.nominalFrameRate, isNull);
+    });
+
+    test('where the colour samples sit is read', () {
+      final camera = <String, dynamic>{
+        'format': {'format_name': 'mov', 'duration': '1'},
+        'streams': [
+          {
+            'index': 0,
+            'codec_type': 'video',
+            'codec_name': 'h264',
+            'pix_fmt': 'yuvj420p',
+            'chroma_location': 'left',
+          },
+        ],
+      };
+
+      expect(
+        parseFfprobeJson('/videos/a.mov', camera).video!.chromaLocation,
+        'left',
+      );
     });
   });
 }

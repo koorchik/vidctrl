@@ -17,6 +17,7 @@ MediaInfo clip({
   double? nominalFps,
   int? videoBitRate = 100000000,
   ColorInfo color = const ColorInfo(),
+  String? chromaLocation,
   List<AudioStream>? audio,
   Duration duration = const Duration(minutes: 1),
 }) {
@@ -37,6 +38,7 @@ MediaInfo clip({
             nominalFrameRate: nominalFps ?? fps,
             bitRate: videoBitRate,
             color: color,
+            chromaLocation: chromaLocation,
           ),
     audio: audio ?? [track('aac')],
   );

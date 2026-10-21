@@ -112,6 +112,10 @@ VideoStream _parseVideo(Map<String, dynamic> s) {
       space: _known(s['color_space']),
       range: _known(s['color_range']),
     ),
+    chromaLocation: switch (_known(s['chroma_location'])) {
+      'unspecified' => null,
+      final location => location,
+    },
     rotation: _rotation(s),
   );
 }

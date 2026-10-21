@@ -51,6 +51,7 @@ class VideoStream {
     this.nominalFrameRate,
     this.bitRate,
     this.color = const ColorInfo(),
+    this.chromaLocation,
     this.rotation = 0,
   });
 
@@ -68,6 +69,10 @@ class VideoStream {
   final double? nominalFrameRate;
   final int? bitRate;
   final ColorInfo color;
+
+  /// Where each colour sample sits among the picture's (`left`, `topleft`,
+  /// `center`, …), as ffprobe names it; null when the file does not say.
+  final String? chromaLocation;
 
   /// Display rotation in degrees, as stored by phones.
   final int rotation;

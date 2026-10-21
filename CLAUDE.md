@@ -280,6 +280,14 @@ The UI renders presets and options generically; it needs no other change.
   source to output by itself and ignores `-color_primaries`, `-color_trc` and
   `-colorspace` for encodes. Presets pass no colour arguments; the HLG tests
   in `conversion_test.dart` are what guards this.
+- **Where the colour samples sit** (chroma location): FFmpeg forgets it
+  when it makes a picture 10-bit and gives it to no hardware AV1 encoder,
+  so a camera's 8-bit video came out as AV1 saying "unknown", and a player
+  may draw the colour half a sample off. HEVC needs nothing: saying nothing
+  means "left" there. AV1 encodes are marked after encoding
+  (`av1ChromaPositionArgs` in `blocks.dart`, the `av1_metadata` filter);
+  4:2:2 and 4:4:4 are made 4:2:0 with `out_chroma_loc=left`, as FFmpeg's
+  own conversion puts the samples elsewhere. The conversion tests check it.
 - **XPSNR 42 dB is strict for grainy footage.** On a 4K Nikon clip the
   archive's AV1 gave 41.4 dB and VMAF 96.0, with nothing to see; 42 dB took
   1.5 times the size (crf 27). The blocky Arm build gave 39.5 dB and VMAF

@@ -287,9 +287,32 @@ void main() {
 
       expect(output.video!.codec, 'av1');
       expect(output.video!.pixFmt, 'yuv420p10le');
+      // Made 4:2:0 with each colour sample where MPEG puts it, and said so.
+      expect(output.video!.chromaLocation, 'left');
       expect(output.audio.single.codec, 'aac');
       expect(output.sizeBytes, lessThan(File(source).lengthSync()));
     });
+
+    // An 8-bit camera video in the full range, as a Nikon writes: FFmpeg
+    // forgets where its colour samples sit when it makes the picture 10-bit.
+    for (final (name, values) in [
+      ('AV1', const <String, String>{}),
+      ('HEVC', hevc),
+    ]) {
+      test('$name output says where the colour samples sit, as the camera '
+          'did', () async {
+        if (unavailable()) return;
+        final source = await media!.clip(
+          'camera_$name.mov',
+          pixFmt: 'yuvj420p',
+        );
+        expect((await ffprobe.probe(source)).video!.chromaLocation, 'left');
+
+        final output = await convert(archive, source, values: values);
+
+        expect(output.video!.chromaLocation, 'left');
+      });
+    }
 
     // The presets pass no colour arguments: FFmpeg is relied on to carry the
     // tags through. These tests are what holds it to that.

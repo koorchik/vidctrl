@@ -172,7 +172,7 @@ class ArchivePreset implements Preset {
     return VideoEncode(
       encoder: 'libsvtav1',
       pixFmt: 'yuv420p10le',
-      filters: _chromaFilters(video, 'yuv420p10le'),
+      filters: to420Filters(video, 'yuv420p10le'),
       args: [
         '-preset',
         '5',
@@ -182,6 +182,7 @@ class ArchivePreset implements Preset {
           '-svtav1-params',
           capabilities.svtAv1Params,
         ],
+        ...av1ChromaPositionArgs(video),
       ],
     );
   }
@@ -190,7 +191,7 @@ class ArchivePreset implements Preset {
     return VideoEncode(
       encoder: 'libx265',
       pixFmt: 'yuv420p10le',
-      filters: _chromaFilters(video, 'yuv420p10le'),
+      filters: to420Filters(video, 'yuv420p10le'),
       args: [
         '-preset',
         'slow',
@@ -257,9 +258,10 @@ class ArchivePreset implements Preset {
     return VideoEncode(
       encoder: encoder,
       pixFmt: 'p010le',
-      filters: _chromaFilters(video, 'p010le'),
+      filters: to420Filters(video, 'p010le'),
       args: [
         ...rateControl,
+        if (isAv1) ...av1ChromaPositionArgs(video),
         if (!isAv1) ...['-profile:v', 'main10'],
       ],
     );
@@ -282,13 +284,6 @@ class ArchivePreset implements Preset {
       '-tier',
       isAv1 ? '0' : 'main',
     ];
-  }
-
-  /// A plain `-pix_fmt` would subsample chroma with the default bilinear
-  /// scaler; an explicit Lanczos step keeps colour edges cleaner.
-  List<String> _chromaFilters(VideoStream video, String pixFmt) {
-    if (video.chroma == ChromaSubsampling.yuv420) return const [];
-    return ['scale=flags=lanczos+accurate_rnd', 'format=$pixFmt'];
   }
 
   /// AAC that is already reasonably small is kept as is: re-encoding lossy
