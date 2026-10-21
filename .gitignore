@@ -39,7 +39,7 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Downloaded FFmpeg builds (fetched by tool/fetch_ffmpeg.dart, never committed)
+# Downloaded FFmpeg builds (fetched by tool/fetch_ffmpeg.sh, never committed)
 /third_party/ffmpeg/
 
 # Widget Preview related

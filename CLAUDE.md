@@ -46,10 +46,11 @@ dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for "For
   screen looks different, redraw the README's pictures too; they are committed.
 - CI (`.github/workflows/ci.yml`) runs the format check, `flutter analyze`,
   the fast tests, the quick FFmpeg check and a release build on Linux, Windows
-  and macOS. The check (`test/integration/ffmpeg_check_test.dart`, a second
+  and macOS. The check (`test/integration/ffmpeg_check_test.dart`, seconds
   long) is: FFmpeg found, the needed encoders there, one short clip
-  converted. The real conversions (`--tags ffmpeg`, minutes of encoding) are
-  not run in CI: run them here before a change to the engine goes out.
+  converted, the archive's AV1 close enough to its original. The real
+  conversions (`--tags ffmpeg`, minutes of encoding) are not run in CI: run
+  them here before a change to the engine goes out.
 - CI tests the FFmpeg the app ships: it fetches the pinned one first and
   puts it first on the `PATH`, then checks that the built app carries it.
 - A pushed version tag (`v1.2.0`, or `v1.2.0-beta.1` for a pre-release) makes
@@ -69,14 +70,22 @@ dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for "For
 
 ## Bundled FFmpeg
 
-- `tool/fetch_ffmpeg.sh` pins other people's builds by checksum: Martin
-  Riedl's for macOS (arm64 and x86_64 joined with `lipo` into one universal
-  binary), BtbN's "gpl" builds for Linux and Windows. Martin Riedl's Linux
-  builds are configured with `--enable-nonfree` (DeckLink) and may not be
-  passed on; check `-buildconf` of any new build for it.
-- They are GPL v3 (`--enable-version3`). Instead of hosting the source, the
-  notice `assets/licenses/ffmpeg.txt` points at each builder's source and
-  build scripts; it goes beside the binaries, into the app's licences page
+- `tool/fetch_ffmpeg.sh` pins VidCtrl's own builds by checksum, one per
+  system, from the separate `vidctrl-ffmpeg` repository: the same library
+  versions everywhere, so what was measured is what ships. The ready-made
+  builds used before differed by system, and the macOS one carried SVT-AV1
+  3.1.2 (see "SVT-AV1 on Apple chips"). Its `build.sh` builds for macOS
+  (universal), Linux and Windows (cross-compiled on Ubuntu), pinning every
+  library by version and checksum and taking only what the app uses; its
+  `check.sh` must pass for each before a release (linked only to what every
+  computer of that kind has, not nonfree, the encoders, hardware ones too,
+  and filters the app uses, the archive's AV1 "looks the same"). The
+  workflow there, run by hand with Publish, builds and checks the three and
+  makes one release with the zips and a tar of every source; then pin the
+  zips here.
+- They are GPL v3 (`--enable-version3`). The notice
+  `assets/licenses/ffmpeg.txt` points at each build's source and build
+  scripts; it goes beside the binaries, into the app's licences page
   (`lib/app/licenses.dart`) and the release notes. The fetch script refuses
   pins that the notice does not name, so change the two together.
 - Where each build puts it, and where `FfmpegLocator` looks: Linux
@@ -86,9 +95,10 @@ dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for "For
   image and notarizes). The CMake rules add it only when
   `third_party/ffmpeg/<system>/` exists, so a development build uses the
   `PATH`.
-- To move to a newer FFmpeg: change the pins and the notice, run
-  `tool/fetch_ffmpeg.sh linux`, then `flutter test --tags ffmpeg` with
-  `third_party/ffmpeg/linux` first on the `PATH`.
+- To move to a newer FFmpeg: publish it from `vidctrl-ffmpeg`, change the
+  release and checksums here and the notice, run `tool/fetch_ffmpeg.sh
+  linux`, then `flutter test --tags ffmpeg` with `third_party/ffmpeg/linux`
+  first on the `PATH`.
 - The app offers no way to use another FFmpeg: the quality numbers were
   measured with the bundled one. `FfmpegLocator` falls back to the `PATH`
   only for development, where nothing is bundled.
@@ -289,6 +299,16 @@ The UI renders presets and options generically; it needs no other change.
   (`av1ChromaPositionArgs` in `blocks.dart`, the `av1_metadata` filter);
   4:2:2 and 4:4:4 are made 4:2:0 with `out_chroma_loc=left`, as FFmpeg's
   own conversion puts the samples elsewhere. The conversion tests check it.
+- **SVT-AV1 on Apple chips:** SVT-AV1 3.1.2, in Martin Riedl's macOS builds
+  (built with Apple clang 14), encodes worse with its Arm code than with
+  its C code: at the same size, faces on a 4K camera clip got blocks (38.7
+  against 40.6 dB). SVT-AV1 4.2 (Homebrew) is right; its Arm build cannot
+  run its C code (`asm=c` fails there), so the check compares scores, not
+  files. The quick FFmpeg check encodes a test pattern with the archive's
+  AV1 and requires more than 44 dB: 45.1 to 46.2 with good builds, 42.5
+  with that one. Riedl's build script still pins 3.1.2, hence
+  VidCtrl's own builds (40.57 dB on that camera clip on an M1, like Linux;
+  the test pattern scores 45.20 dB on every system).
 - **XPSNR 42 dB is strict for grainy footage.** On a 4K Nikon clip the
   archive's AV1 gave 41.4 dB and VMAF 96.0, with nothing to see; 42 dB took
   1.5 times the size (crf 27). The blocky Arm build gave 39.5 dB and VMAF

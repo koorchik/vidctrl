@@ -6,13 +6,10 @@
 #
 #   tool/fetch_ffmpeg.sh linux|windows|macos
 #
-# The builds are other people's, unmodified, and pinned by checksum here.
-# assets/licenses/ffmpeg.txt says where each one and its source come from;
-# change the two together (this script checks that the notice names the
-# builds pinned here). macOS gets Martin Riedl's builds, made into one
-# universal binary; Linux and Windows get BtbN's "gpl" builds. Martin Riedl's
-# Linux builds are not used: they are configured with --enable-nonfree, which
-# may not be passed on.
+# Every system gets VidCtrl's own build of the same FFmpeg and libraries,
+# made and checked by the vidctrl-ffmpeg repository, pinned here by checksum.
+# assets/licenses/ffmpeg.txt says where it and its source come from; change
+# the two together (this script checks that the notice names the release).
 set -euo pipefail
 
 system="${1:-}"
@@ -20,12 +17,8 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/third_party/ffmpeg/$system"
 notice="$root/assets/licenses/ffmpeg.txt"
 
-btbn_release=autobuild-2026-09-30-13-08
-btbn_name=ffmpeg-n8.1.3-9-g29e619e767
-btbn="https://github.com/BtbN/FFmpeg-Builds/releases/download/$btbn_release/$btbn_name"
-riedl_arm64=1783011502_8.1.2
-riedl_amd64=1783018342_8.1.2
-riedl=https://ffmpeg.martin-riedl.de/download/macos
+release=8.1.3-3
+base="https://github.com/koorchik/vidctrl-ffmpeg/releases/download/$release/ffmpeg-$release"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -60,59 +53,37 @@ unpack_zip() {
   fi
 }
 
-for pin in "$btbn_release" "$btbn_name" "$riedl_arm64" "$riedl_amd64"; do
-  if ! grep -qF "${pin#ffmpeg-}" "$notice"; then
-    echo "error: $notice does not name $pin; update it with the pins" >&2
-    exit 1
-  fi
-done
+if ! grep -qF "release $release" "$notice"; then
+  echo "error: $notice does not name release $release; update it with the pin" >&2
+  exit 1
+fi
 
 case "$system" in
   linux)
-    fetch "$btbn-linux64-gpl-8.1.tar.xz" \
-      97ce978979194b5cf7e06a5e68020dbdaa7a4f3294c5452b6a1bc347100dbb79 ffmpeg.tar.xz
-    tar -xJf "$work/ffmpeg.tar.xz" -C "$work"
-    bin="$work/$btbn_name-linux64-gpl-8.1/bin"
-    files=("$bin/ffmpeg" "$bin/ffprobe")
+    fetch "$base-linux-x64.zip" \
+      9f2e383f6d5f9d14f3010282db693afd7128b2bbae257afa0a2984a6fc3d51f3 ffmpeg.zip
+    files=(ffmpeg ffprobe)
     ;;
   windows)
-    fetch "$btbn-win64-gpl-8.1.zip" \
-      7b801cdd3a1a0bb54ae6f572187e68b4ed54f52086cfee133fab2180bfb429fa ffmpeg.zip
-    unpack_zip "$work/ffmpeg.zip" "$work"
-    bin="$work/$btbn_name-win64-gpl-8.1/bin"
-    files=("$bin/ffmpeg.exe" "$bin/ffprobe.exe")
+    fetch "$base-windows-x64.zip" \
+      ac2e5b29957e24a00bab933e78fe69d7375979ed8a0ea3b4525344c7667161f5 ffmpeg.zip
+    files=(ffmpeg.exe ffprobe.exe)
     ;;
   macos)
-    fetch "$riedl/arm64/$riedl_arm64/ffmpeg.zip" \
-      ef1aa60006c7b77ce170c1608c08d8e4ba1c30c5746f2ac986ded932d0ac2c3c arm64-ffmpeg.zip
-    fetch "$riedl/arm64/$riedl_arm64/ffprobe.zip" \
-      c39787f4af7a3932502d2d48db6f6feaaa836b48a73ef78c32cc3285df61dfaf arm64-ffprobe.zip
-    fetch "$riedl/amd64/$riedl_amd64/ffmpeg.zip" \
-      a52ef43883f44c219766d4b3bdde4e635b35465d0b704c01c3a0566b59775df9 amd64-ffmpeg.zip
-    fetch "$riedl/amd64/$riedl_amd64/ffprobe.zip" \
-      5408ca588c8c72b0dde3afe676d0a7acf25ef97e55ae6eba5c7bede1cda42695 amd64-ffprobe.zip
-    for arch in arm64 amd64; do
-      for tool in ffmpeg ffprobe; do
-        unpack_zip "$work/$arch-$tool.zip" "$work/$arch"
-      done
-    done
-    # One binary for Apple Silicon and Intel; each part keeps its signature
-    # until tool/package_macos.sh signs the whole for the release.
-    mkdir -p "$work/universal"
-    for tool in ffmpeg ffprobe; do
-      lipo -create "$work/arm64/$tool" "$work/amd64/$tool" -output "$work/universal/$tool"
-    done
-    files=("$work/universal/ffmpeg" "$work/universal/ffprobe")
+    fetch "$base-macos.zip" \
+      9a544dba3cad36c24de5a8f6d3d406a5256c545d22692ec10aaa23eca08ef642 ffmpeg.zip
+    files=(ffmpeg ffprobe)
     ;;
   *)
     echo "usage: tool/fetch_ffmpeg.sh linux|windows|macos" >&2
     exit 2
     ;;
 esac
+unpack_zip "$work/ffmpeg.zip" "$work/bin"
 
 rm -rf "$out"
 mkdir -p "$out"
-cp "${files[@]}" "$out/"
+for file in "${files[@]}"; do cp "$work/bin/$file" "$out/"; done
 chmod +x "$out"/ff*
 cp "$notice" "$out/FFmpeg-NOTICE.txt"
 cp "$root/assets/licenses/gpl-3.0.txt" "$out/FFmpeg-LICENSE.txt"

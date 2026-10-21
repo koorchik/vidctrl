@@ -149,6 +149,7 @@ progress=continue
     test('the short version is the release number', () {
       expect(shortFfmpegVersion('n8.1.3-9-g29e619e767-20260930'), '8.1.3');
       expect(shortFfmpegVersion('8.1.2-https://www.martin-riedl.de'), '8.1.2');
+      expect(shortFfmpegVersion('8.1.3-vidctrl'), '8.1.3');
       expect(shortFfmpegVersion('8.0.1-3build2'), '8.0.1');
       expect(
         shortFfmpegVersion('N-127021-ge0c94b2d1c'),

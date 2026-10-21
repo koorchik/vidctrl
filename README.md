@@ -186,8 +186,11 @@ See [docs/ROADMAP.md](docs/ROADMAP.md).
 ## Requirements
 
 - The released app brings its own FFmpeg (8.1, with `ffprobe`); nothing else
-  needs installing. Someone who wants another FFmpeg can choose its folder
-  in the app: About VidCtrl (the "i" button), "Use FFmpeg from a folder…".
+  needs installing. It is VidCtrl's own build, the same on every system, and
+  checked before each release for the archive's quality: not every
+  ready-made build passes (one for macOS made blockier AV1 on Apple chips).
+  The app uses only the FFmpeg it brings: its quality numbers were measured
+  with it.
 - To develop: FFmpeg 8 or newer with `ffprobe`, built with `libx265`,
   `libsvtav1`, `prores_ks` and `dnxhd`, either on the `PATH` (Linux
   distribution packages and Homebrew have these) or the pinned one that
@@ -285,8 +288,9 @@ Adding a goal means one file in `lib/core/scenarios/`, one line in
 ## Licence
 
 Not chosen yet for the app's own code. FFmpeg comes with the app as
-separate programs, unmodified builds under the GNU GPL version 3;
-`assets/licenses/ffmpeg.txt` says whose builds they are and where their
+separate programs, built from its unmodified source, under the GNU GPL
+version 3;
+`assets/licenses/ffmpeg.txt` says where they are built and where their
 source code is, and the app shows it under About VidCtrl → Licences. The
 bundled fonts are Roboto (Apache License 2.0) and JetBrains Mono (SIL Open
 Font License); their licence texts are in `assets/fonts/`.

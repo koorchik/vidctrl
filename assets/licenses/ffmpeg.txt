@@ -1,23 +1,16 @@
 VidCtrl converts videos with FFmpeg (https://ffmpeg.org), which it runs as
 two separate programs, ffmpeg and ffprobe. The copies that come with VidCtrl
-are unmodified builds of FFmpeg 8.1 made by others. They include libraries
-such as x264, x265, SVT-AV1, LAME and zimg, and are licensed under the GNU
-General Public License, version 3, whose text follows. VidCtrl can use
-another FFmpeg instead: About VidCtrl (the "i" button), "Use FFmpeg from a
-folder…".
+are builds of FFmpeg 8.1 from its unmodified source. They include
+libraries such as x264, x265, SVT-AV1, LAME, zimg and libvmaf, and are
+licensed under the GNU General Public License, version 3, whose text
+follows.
 
-Where each copy and its source code come from:
+Where they and their source code come from:
 
-macOS: FFmpeg 8.1.2, built by Martin Riedl.
-  Builds, with the version of every library and the configure options:
-    https://ffmpeg.martin-riedl.de/info/detail/macos/arm64/1783011502_8.1.2
-    https://ffmpeg.martin-riedl.de/info/detail/macos/amd64/1783018342_8.1.2
-  The build script, which fetches the source of every library:
-    https://git.martin-riedl.de/ffmpeg/build-script
-  FFmpeg's source: https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz
-
-Windows and Linux: FFmpeg n8.1.3-9-g29e619e767, built by BtbN.
-  Builds: https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-09-30-13-08
-  The build scripts, which fetch the source of every library:
-    https://github.com/BtbN/FFmpeg-Builds
-  FFmpeg's source: https://github.com/FFmpeg/FFmpeg/tree/29e619e767
+FFmpeg 8.1.3, built for VidCtrl (release 8.1.3-3), the same for macOS,
+Linux and Windows.
+  The build script, which lists the version of every library:
+    https://github.com/koorchik/vidctrl-ffmpeg
+  The builds, and beside them the source of every part:
+    https://github.com/koorchik/vidctrl-ffmpeg/releases/tag/8.1.3-3
+  FFmpeg's source: https://ffmpeg.org/releases/ffmpeg-8.1.3.tar.xz

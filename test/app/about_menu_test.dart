@@ -174,7 +174,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Where this FFmpeg and its source come from, then the GPL itself.
-    expect(find.textContaining('unmodified builds of FFmpeg'), findsOneWidget);
+    expect(
+      find.textContaining('FFmpeg 8.1 from its unmodified source'),
+      findsOneWidget,
+    );
     expect(find.textContaining('GNU GENERAL PUBLIC LICENSE'), findsWidgets);
   });
 }

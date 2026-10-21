@@ -29,10 +29,12 @@
   Linux, Windows and macOS; a version tag publishes a GitHub release with the
   three downloads.
 - **FFmpeg inside:** each download carries a pinned FFmpeg 8.1
-  (`tool/fetch_ffmpeg.sh`), with its licence and a notice of where its
-  source is, also shown in the app; another FFmpeg can be chosen in the
-  app. The macOS download is a disk image, signed and notarized when the
-  Apple secrets are set (`tool/package_macos.sh`).
+  (`tool/fetch_ffmpeg.sh`), VidCtrl's own build (`vidctrl-ffmpeg`), the
+  same on every system, with its licence and a notice of where its source
+  is, also shown in the app, which uses no other FFmpeg. A ready-made
+  macOS build made blockier AV1 on Apple chips (its SVT-AV1 3.1.2).
+  The macOS download is a disk image, signed and notarized when the Apple
+  secrets are set (`tool/package_macos.sh`).
 
 ## Next
 
