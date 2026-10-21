@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/media/video_files.dart';
+import '../../../core/platform/open_external.dart';
 import '../../../core/scenarios/scenario.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../format.dart';
@@ -321,6 +322,16 @@ class _VideoTile extends ConsumerWidget {
                         _PreviewLine(preview: preview),
                     ],
                   ),
+                ),
+                // To see what a file is before deciding what to do with it,
+                // say among a folder's worth just added.
+                IconButton(
+                  tooltip: l10n.play,
+                  icon: Icon(
+                    Icons.play_arrow_rounded,
+                    color: look.hues?.green.deep,
+                  ),
+                  onPressed: () => openWithDefaultApp(video.path),
                 ),
                 if (info != null)
                   PopupMenuButton<void>(

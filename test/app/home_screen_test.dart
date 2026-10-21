@@ -282,6 +282,17 @@ void main() {
   });
 
   group('details', () {
+    testWidgets('each added video can be played from the list', (tester) async {
+      env.ffprobe
+        ..add('/videos/a.mov')
+        ..add('/videos/b.mov');
+      final sources = await pumpApp(tester, env);
+      await addVideos(tester, sources, ['/videos/a.mov', '/videos/b.mov']);
+
+      // Not tapped: that would open the system's player.
+      expect(find.byTooltip('Play'), findsNWidgets(2));
+    });
+
     testWidgets('video details: encoding, all metadata and the full report', (
       tester,
     ) async {
