@@ -190,4 +190,24 @@ void main() {
     expect(env.estimator.cancels, 1);
     expect(timesDestroyed(), 1);
   });
+
+  testWidgets('closing while comparing a result stops the comparison', (
+    tester,
+  ) async {
+    await startConverting(tester);
+    env.executor.last.finish();
+    await tester.pump();
+    await tester.tap(find.byTooltip('More').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Compare with the original'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    await closeWindow(tester);
+
+    expect(find.text(question), findsNothing);
+    expect(env.qualityMeter.last.cancelRequested, isTrue);
+    expect(timesDestroyed(), 1);
+  });
 }

@@ -353,6 +353,36 @@
   "convertWholeVideo": "Convert whole video",
   "originalDetails": "Details of the original",
   "resultDetails": "Details of the result",
+  "compareWithOriginal": "Compare with the original",
+  "comparingWithOriginal": "Comparing with the original… {percent}%",
+  "@comparingWithOriginal": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "stopComparing": "Stop comparing",
+  "closenessSame": "Looks the same as the original",
+  "closenessVeryClose": "Very close to the original",
+  "closenessDiffers": "Differences may be visible",
+  "compareFailed": "Could not compare",
+  "vmafScore": "VMAF {score}",
+  "@vmafScore": {
+    "placeholders": {
+      "score": {
+        "type": "String"
+      }
+    }
+  },
+  "xpsnrScore": "XPSNR {score} dB",
+  "@xpsnrScore": {
+    "placeholders": {
+      "score": {
+        "type": "String"
+      }
+    }
+  },
   "useSettings": "Use these settings",
   "removeFromList": "Remove from list",
   "detailsViewEncoding": "Encoding",

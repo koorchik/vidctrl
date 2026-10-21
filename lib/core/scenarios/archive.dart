@@ -33,6 +33,9 @@ const gpuEncoderPreference = [
 /// others. Measured in October 2026 on 10-second 4K pieces: two of handheld
 /// footage from a Nikon camera (the hardest), a phone video of a moving car
 /// and a photo slideshow. On the hardest piece all four give 42.0 to 42.1 dB.
+/// Those scores were taken with the copy as `xpsnr`'s first input, which
+/// reads 0.3 to 0.8 dB low (`quality_meter.dart`); in the right order the
+/// same files score higher, so every piece clears 42 dB.
 ///
 /// One number cannot give the same closeness on every kind of footage. On
 /// the hardest piece HEVC on the processor came out 15% larger than AV1, and

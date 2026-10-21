@@ -56,12 +56,14 @@ AudioStream track(String codec, {int channels = 2, int? bitRate = 160000}) {
 const softwareOnly = Capabilities(
   ffmpegVersion: 'test',
   encoders: {'libsvtav1', 'libx265', 'libx264', 'prores_ks', 'dnxhd', 'aac'},
+  filters: {'xpsnr'},
   svtAv1Params: 'tune=0',
 );
 
 Capabilities withGpu(Set<String> hardwareEncoders) => Capabilities(
   ffmpegVersion: 'test',
   encoders: {...softwareOnly.encoders, ...hardwareEncoders},
+  filters: softwareOnly.filters,
   hardwareEncoders: hardwareEncoders,
   svtAv1Params: 'tune=0',
 );

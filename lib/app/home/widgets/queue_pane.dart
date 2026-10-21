@@ -5,12 +5,14 @@ import 'package:path/path.dart' as p;
 import '../../../core/estimate/size_estimator.dart';
 import '../../../core/media/ffprobe.dart';
 import '../../../core/platform/open_external.dart';
+import '../../../core/quality/quality_meter.dart';
 import '../../../core/scenarios/registry.dart';
 import '../../../core/scenarios/scenario.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../estimates/estimate_cache.dart';
 import '../../format.dart';
 import '../../providers.dart';
+import '../../quality/quality_controller.dart';
 import '../../queue/queue_controller.dart';
 import '../../queue/queue_state.dart';
 import '../../theme.dart';
@@ -214,6 +216,8 @@ class _JobTile extends ConsumerWidget {
         estimateWithoutEncoding(job.info, job.plan) ??
         ref.watch(estimateCacheProvider.select((c) => c.estimates[key]));
     final result = job.result;
+    final quality = ref.read(qualityProvider.notifier);
+    final check = ref.watch(qualityProvider.select((checks) => checks[job.id]));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -275,6 +279,7 @@ class _JobTile extends ConsumerWidget {
                     color: _statusColor(context),
                   ),
                 ),
+                if (check != null) _QualityLine(check: check),
                 if (job.status == JobStatus.done && job.isSample)
                   Align(
                     alignment: AlignmentDirectional.centerStart,
@@ -324,6 +329,12 @@ class _JobTile extends ConsumerWidget {
                   onTap: () =>
                       _showResultDetails(context, ref, result!.outputPath!),
                   child: Text(l10n.resultDetails),
+                ),
+              if (quality.canCompare(job))
+                PopupMenuItem(
+                  enabled: !quality.busy,
+                  onTap: () => quality.compare(job),
+                  child: Text(l10n.compareWithOriginal),
                 ),
               PopupMenuItem(
                 onTap: () => openWithDefaultApp(job.path),
@@ -643,5 +654,96 @@ class _StatusIcon extends StatelessWidget {
       ),
       child: Icon(icon, size: 20, color: foreground),
     );
+  }
+}
+
+/// What comparing a result with its original has shown: how close it comes,
+/// in plain words, and the score in small type. While the comparison runs,
+/// how far it has got and a way to stop it.
+class _QualityLine extends ConsumerWidget {
+  const _QualityLine({required this.check});
+
+  final QualityCheck check;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final style = theme.textTheme.bodySmall;
+    final format = Formatter(l10n);
+    switch (check) {
+      case QualityComparing(:final fraction):
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 6),
+            LinearProgressIndicator(value: fraction > 0 ? fraction : null),
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    l10n.comparingWithOriginal((fraction * 100).floor()),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: style?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                IconButton(
+                  tooltip: l10n.stopComparing,
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 18,
+                  icon: const Icon(Icons.stop_rounded),
+                  onPressed: ref.read(qualityProvider.notifier).cancel,
+                ),
+              ],
+            ),
+          ],
+        );
+      case QualityMeasured(:final lumaDb, :final vmaf, :final closeness):
+        final (words, color) = switch (closeness) {
+          Closeness.same => (
+            l10n.closenessSame,
+            SuccessColors.of(context).text,
+          ),
+          Closeness.veryClose => (
+            l10n.closenessVeryClose,
+            scheme.onSurfaceVariant,
+          ),
+          Closeness.differs => (l10n.closenessDiffers, scheme.tertiary),
+        };
+        return Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  words,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: style?.copyWith(color: color),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: TechnicalText(
+                  [
+                    if (vmaf != null) l10n.vmafScore(format.score(vmaf)),
+                    l10n.xpsnrScore(format.score(lumaDb)),
+                  ].join('  ·  '),
+                ),
+              ),
+            ],
+          ),
+        );
+      case QualityFailed():
+        return Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            l10n.compareFailed,
+            style: style?.copyWith(color: scheme.error),
+          ),
+        );
+    }
   }
 }

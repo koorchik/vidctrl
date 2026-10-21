@@ -4,6 +4,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../l10n/app_localizations.dart';
 import 'estimates/estimate_cache.dart';
+import 'quality/quality_controller.dart';
 import 'queue/queue_controller.dart';
 
 /// Asks before closing the window while videos are being converted, so a
@@ -59,6 +60,9 @@ class _WindowCloseGuardState extends ConsumerState<WindowCloseGuard>
       }
       if (ref.exists(estimateCacheProvider)) {
         await ref.read(estimateCacheProvider.notifier).stopMeasuring();
+      }
+      if (ref.exists(qualityProvider)) {
+        await ref.read(qualityProvider.notifier).stop();
       }
     } finally {
       await windowManager.destroy();

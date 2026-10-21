@@ -85,8 +85,16 @@ as the original:
 - **The encoders:** every one the goal uses: AV1 and HEVC on the processor
   (SVT-AV1, x265) and on an NVIDIA graphics card (NVENC).
 - **The setting:** for each encoder, the quality number that gives the
-  smallest file while every piece still reaches 42 dB. On the hardest piece
-  all four land at 42.0 to 42.1 dB; calmer footage scores higher.
+  smallest file while every piece still reaches 42 dB. The hardest piece
+  decides; calmer footage scores higher.
+- **A second opinion:** VMAF, Netflix's measure built from viewing tests,
+  rates the copies we tested 96 and up; 95 is about where people stop
+  telling the two apart.
+- **Every video is different:** the setting is fixed, the footage is not.
+  Very grainy or HDR video can land a little under 42 dB (39 to 41 in our
+  tests), because grain cannot be copied exactly. VMAF stays at 95 or
+  above, and no difference shows. Reaching 42 dB on such footage would take
+  about one and a half times the file size.
 
 At the same quality the files differ a lot in size, which is why the
 default is AV1 on the processor:
@@ -99,7 +107,10 @@ default is AV1 on the processor:
 | Works everywhere (HEVC), Fast | 2× | 3× |
 
 `tool/calibrate_archive.dart` repeats the measurement on any clips, so other
-cameras and graphics cards can be checked the same way.
+cameras and graphics cards can be checked the same way. To check one video,
+choose ⋯ → "Compare with the original" on its finished job: the app
+measures the copy against the original (VMAF and XPSNR) and says in plain
+words whether it looks the same.
 
 ### How it works
 
@@ -134,6 +145,10 @@ Also:
   the original and, once converted, for the result.
 - **Show the command:** the exact FFmpeg command for any video or job, on one
   line or explained option by option, ready to paste into a terminal.
+- **Compare with the original:** for a finished job, on request. The copy is
+  measured against the original (VMAF and XPSNR, the score in small type)
+  and the row says in plain words how close it is: "Looks the same as the
+  original", "Very close to the original" or "Differences may be visible".
 - The computer is kept awake while converting (Linux and macOS).
 - Originals are never modified or overwritten. Unfinished outputs are removed.
 - Plain words first, with the technical detail beside them in smaller type

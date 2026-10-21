@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:vidctrl/app/estimates/estimate_cache.dart';
 import 'package:vidctrl/app/providers.dart';
+import 'package:vidctrl/app/quality/quality_controller.dart';
 import 'package:vidctrl/app/queue/queue_controller.dart';
 import 'package:vidctrl/app/queue/queue_state.dart';
 import 'package:vidctrl/app/recipe/recipe.dart';
@@ -10,7 +13,9 @@ import 'package:vidctrl/app/recipe/recipe_controller.dart';
 import 'package:vidctrl/app/settings.dart';
 import 'package:vidctrl/app/sources/preview_controller.dart';
 import 'package:vidctrl/app/sources/sources_controller.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
 import 'package:vidctrl/core/output/output_namer.dart';
+import 'package:vidctrl/core/quality/quality_meter.dart';
 import 'package:vidctrl/core/settings/settings_store.dart';
 
 import '../support/fake_media.dart';
@@ -318,6 +323,154 @@ void main() {
       sources().remove(video('a.mp4').id);
 
       expect(jobs(), hasLength(1));
+    });
+  });
+
+  group('comparing with the original', () {
+    QualityController quality() => container.read(qualityProvider.notifier);
+    QualityCheck? check(QueueJob job) =>
+        container.read(qualityProvider)[job.id];
+
+    /// The given videos, converted with the panel's settings.
+    Future<List<QueueJob>> convertedJobs(
+      List<String> names, {
+      SampleChoice? sample,
+    }) async {
+      await sources().addPaths([for (final name in names) '/videos/$name']);
+      if (sample != null) recipe().setSample(sample);
+      queue().addSelected();
+      await settle();
+      for (var i = 0; i < names.length; i++) {
+        env.executor.started[i].finish();
+        await settle();
+      }
+      return jobs();
+    }
+
+    test('a finished job is compared with its original', () async {
+      final job = (await convertedJobs(['a.mp4'])).single;
+
+      final comparing = quality().compare(job);
+      await settle();
+      final comparison = env.qualityMeter.last;
+      expect(comparison.original.path, '/videos/a.mp4');
+      expect(
+        comparison.resultPath,
+        p.join('/videos', 'Converted', 'a_av1-crf35.mp4'),
+      );
+      expect(comparison.range, isNull);
+
+      comparison.report(0.5);
+      await settle();
+      expect(
+        check(job),
+        isA<QualityComparing>().having((c) => c.fraction, 'fraction', 0.5),
+      );
+
+      comparison.finish(40.6);
+      await comparing;
+      expect(
+        check(job),
+        isA<QualityMeasured>().having(
+          (c) => c.closeness,
+          'closeness',
+          Closeness.veryClose,
+        ),
+      );
+    });
+
+    test('a sample is compared with the same piece of the original', () async {
+      final job = (await convertedJobs([
+        'a.mp4',
+      ], sample: SampleChoice.middle)).single;
+
+      unawaited(quality().compare(job));
+      await settle();
+
+      expect(env.qualityMeter.last.range!.start, const Duration(seconds: 25));
+      expect(env.qualityMeter.last.range!.length, sampleLength);
+    });
+
+    test('a job still converting cannot be compared yet', () async {
+      await sources().addPaths(['/videos/a.mp4']);
+      queue().addSelected();
+      await settle();
+
+      expect(quality().canCompare(jobs().single), isFalse);
+    });
+
+    test('one comparison runs at a time', () async {
+      final [first, second] = await convertedJobs(['a.mp4', 'b.mp4']);
+
+      unawaited(quality().compare(first));
+      await settle();
+      unawaited(quality().compare(second));
+      await settle();
+
+      expect(env.qualityMeter.started, hasLength(1));
+      expect(quality().busy, isTrue);
+    });
+
+    test('a stopped comparison leaves no result', () async {
+      final job = (await convertedJobs(['a.mp4'])).single;
+      unawaited(quality().compare(job));
+      await settle();
+
+      await quality().cancel();
+
+      expect(env.qualityMeter.last.cancelRequested, isTrue);
+      expect(check(job), isNull);
+      expect(quality().busy, isFalse);
+    });
+
+    test('a comparison that fails says so', () async {
+      final job = (await convertedJobs(['a.mp4'])).single;
+      final comparing = quality().compare(job);
+      await settle();
+
+      env.qualityMeter.last.fail();
+      await comparing;
+
+      expect(check(job), isA<QualityFailed>());
+    });
+
+    test('VMAF is measured where the FFmpeg can', () async {
+      final job = (await convertedJobs(['a.mp4'])).single;
+      unawaited(quality().compare(job));
+      await settle();
+      expect(env.qualityMeter.last.vmaf, isFalse);
+      await quality().cancel();
+
+      env = FakeEnvironment(
+        capabilities: Capabilities(
+          ffmpegVersion: 'test',
+          encoders: softwareOnly.encoders,
+          filters: {'xpsnr', 'libvmaf'},
+          svtAv1Params: 'tune=0',
+        ),
+      );
+      env.ffprobe.add('/videos/a.mp4');
+      container = await start();
+      final withVmaf = (await convertedJobs(['a.mp4'])).single;
+      unawaited(quality().compare(withVmaf));
+      await settle();
+
+      expect(env.qualityMeter.last.vmaf, isTrue);
+    });
+
+    test('nothing is compared without the filter that compares', () async {
+      env = FakeEnvironment(
+        capabilities: Capabilities(
+          ffmpegVersion: 'test',
+          encoders: softwareOnly.encoders,
+          svtAv1Params: 'tune=0',
+        ),
+      );
+      env.ffprobe.add('/videos/a.mp4');
+      container = await start();
+      final job = (await convertedJobs(['a.mp4'])).single;
+
+      expect(quality().canCompare(job), isFalse);
     });
   });
 

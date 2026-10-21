@@ -21,6 +21,12 @@ class Formatter {
     return '${NumberFormat(pattern, l10n.localeName).format(value)} $unit';
   }
 
+  /// A quality score with one decimal, `40.6`; identical pictures score `∞`
+  /// in decibels.
+  String score(double value) => value.isInfinite
+      ? '∞'
+      : NumberFormat('0.0', l10n.localeName).format(value);
+
   /// A length of video as a clock reading: `2:31`, `1:05:09`.
   String clock(Duration d) {
     final hours = d.inHours;

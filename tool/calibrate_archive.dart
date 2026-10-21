@@ -22,6 +22,7 @@ import 'package:path/path.dart' as p;
 import 'package:vidctrl/core/ffmpeg/capabilities.dart';
 import 'package:vidctrl/core/ffmpeg/locator.dart';
 import 'package:vidctrl/core/media/ffprobe.dart';
+import 'package:vidctrl/core/quality/quality_meter.dart';
 import 'package:vidctrl/core/scenarios/archive.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
 
@@ -201,20 +202,16 @@ Iterable<(_Point, _Point)> _pairs(List<_Point> points) sync* {
   }
 }
 
-/// Frames are paired by order, not by time: the piece's container rounds
-/// times to milliseconds and the encode's does not, and at 29.97 frames a
-/// second pairing by time compared every other frame with its neighbour.
+/// Compared as the app's "Compare with the original" compares, frames
+/// paired by order (`comparisonArgs`).
 Future<double> _xpsnr(String ffmpeg, String encoded, String original) async {
-  const byOrder = 'settb=1/30,setpts=N,format=yuv420p10le';
-  final result = await Process.run(ffmpeg, [
-    '-hide_banner', '-nostats', '-i', encoded, '-i', original, //
-    '-lavfi', '[0:v]$byOrder[d];[1:v]$byOrder[r];[d][r]xpsnr',
-    '-f', 'null', '-',
-  ]);
-  final scores = RegExp(r'XPSNR\s+y:\s*([\d.]+)')
-      .allMatches(result.stderr as String);
-  if (scores.isEmpty) throw StateError('no XPSNR for $encoded');
-  return double.parse(scores.last.group(1)!);
+  final result = await Process.run(
+    ffmpeg,
+    comparisonArgs(original: original, result: encoded),
+  );
+  final score = parseXpsnr((result.stderr as String).split('\n'));
+  if (score == null) throw StateError('no XPSNR for $encoded');
+  return score;
 }
 
 Future<void> _ffmpeg(String ffmpeg, List<String> args) async {

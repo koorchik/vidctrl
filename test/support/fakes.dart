@@ -6,6 +6,7 @@ import 'package:vidctrl/app/providers.dart';
 import 'package:vidctrl/core/estimate/progress_estimator.dart';
 import 'package:vidctrl/core/estimate/size_estimator.dart';
 import 'package:vidctrl/core/ffmpeg/capabilities.dart';
+import 'package:vidctrl/core/ffmpeg/command_builder.dart';
 import 'package:vidctrl/core/ffmpeg/locator.dart';
 import 'package:vidctrl/core/media/ffprobe.dart';
 
@@ -14,6 +15,7 @@ import 'dart:typed_data';
 import 'package:vidctrl/core/media/media_info.dart';
 import 'package:vidctrl/core/media/thumbnail.dart';
 import 'package:vidctrl/core/platform/sleep_inhibitor.dart';
+import 'package:vidctrl/core/quality/quality_meter.dart';
 import 'package:vidctrl/core/queue/job_executor.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
 import 'package:vidctrl/core/updates/releases.dart';
@@ -212,6 +214,72 @@ class FakeEstimator implements OutputEstimator {
   }
 }
 
+/// A comparison that finishes only when the test says so.
+class FakeComparison implements ComparisonHandle {
+  FakeComparison(this.original, this.resultPath, this.range, this.vmaf);
+
+  final MediaInfo original;
+  final String resultPath;
+  final SampleRange? range;
+
+  /// Whether VMAF was asked for.
+  final bool vmaf;
+  final _progress = StreamController<double>.broadcast();
+  final _result = Completer<ComparisonResult>();
+  bool cancelRequested = false;
+
+  @override
+  Stream<double> get progress => _progress.stream;
+
+  @override
+  Future<ComparisonResult> get result => _result.future;
+
+  void report(double fraction) => _progress.add(fraction);
+
+  void finish(double lumaDb, {double? vmaf}) => _complete(
+    ComparisonResult(status: ComparisonStatus.done, lumaDb: lumaDb, vmaf: vmaf),
+  );
+
+  void fail() => _complete(
+    const ComparisonResult(
+      status: ComparisonStatus.failed,
+      errorLines: ['Invalid data found when processing input'],
+    ),
+  );
+
+  @override
+  Future<void> cancel() async {
+    cancelRequested = true;
+    _complete(const ComparisonResult(status: ComparisonStatus.cancelled));
+  }
+
+  void _complete(ComparisonResult result) {
+    if (_result.isCompleted) return;
+    _progress.close();
+    _result.complete(result);
+  }
+}
+
+/// Records the comparisons that were started and hands out
+/// [FakeComparison]s.
+class FakeQualityMeter implements QualityMeter {
+  final started = <FakeComparison>[];
+
+  FakeComparison get last => started.last;
+
+  @override
+  Future<ComparisonHandle> start({
+    required MediaInfo original,
+    required String result,
+    SampleRange? range,
+    bool vmaf = false,
+  }) async {
+    final comparison = FakeComparison(original, result, range, vmaf);
+    started.add(comparison);
+    return comparison;
+  }
+}
+
 /// Hands out the same picture for every video.
 class FakeThumbnailer implements Thumbnailer {
   FakeThumbnailer(this.bytes);
@@ -264,6 +332,7 @@ class FakeEnvironment {
   final executor = FakeExecutor();
   final inhibitor = FakeSleepInhibitor();
   final estimator = FakeEstimator();
+  final qualityMeter = FakeQualityMeter();
 
   late final environment = AppEnvironment(
     ffmpeg: ffmpegPaths,
@@ -272,6 +341,7 @@ class FakeEnvironment {
     capabilities: capabilities,
     sleepInhibitor: inhibitor,
     estimator: estimator,
+    qualityMeter: qualityMeter,
     thumbnailer: FakeThumbnailer(thumbnail),
   );
 

@@ -14,6 +14,8 @@
   queued with different settings, and output names carry the settings;
   samples are an option and report the whole video's expected size; expected
   size and time before starting; video details for originals and results;
+  "Compare with the original" for a finished result, in plain words with
+  the VMAF and XPSNR scores beside;
   keep-awake on Linux and macOS; closing the window asks first while
   converting, and FFmpeg is stopped before the app goes; "Show the command";
   technical names beside plain labels; English and Ukrainian with a

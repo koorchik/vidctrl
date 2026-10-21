@@ -37,6 +37,10 @@ const jargon = [
   'remux',
   'MOV',
   'MP4',
+  'XPSNR',
+  'VMAF',
+  'dB',
+  'дБ',
 ];
 
 /// Fails when any of [seen] uses one of the [jargon] words.
@@ -537,6 +541,35 @@ void main() {
         );
       },
     );
+  }
+
+  for (final (locale, compare) in const [
+    (Locale('en'), 'Compare with the original'),
+    (Locale('uk'), 'Порівняти з оригіналом'),
+  ]) {
+    testWidgets('a comparison with the original shows its score only as '
+        'detail (${locale.languageCode})', (tester) async {
+      final sources = await pumpApp(tester, env, locale: locale);
+      await addVideos(tester, sources, ['/videos/holiday.mp4']);
+      await tester.tap(find.byType(FilledButton).last);
+      await tester.pump();
+      await tester.pump();
+      env.executor.last.finish();
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.more_horiz_rounded).last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text(compare));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      env.qualityMeter.last.finish(40.6);
+      await tester.pump();
+
+      expect(find.textContaining('XPSNR'), findsOneWidget);
+      expectNoJargon(
+        plainTexts(tester)..removeWhere((t) => t.startsWith('holiday.')),
+      );
+    });
   }
 
   testWidgets('the two buttons of the empty screen are the same height', (

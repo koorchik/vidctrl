@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vidctrl/app/providers.dart';
+import 'package:vidctrl/app/quality/quality_controller.dart';
 import 'package:vidctrl/app/queue/queue_controller.dart';
 import 'package:vidctrl/app/queue/queue_state.dart';
 import 'package:vidctrl/app/recipe/recipe.dart';
@@ -23,6 +24,7 @@ import 'package:vidctrl/core/ffmpeg/runner.dart';
 import 'package:vidctrl/core/media/ffprobe.dart';
 import 'package:vidctrl/core/media/media_info.dart';
 import 'package:vidctrl/core/output/output_namer.dart';
+import 'package:vidctrl/core/quality/quality_meter.dart';
 import 'package:vidctrl/core/queue/job_executor.dart';
 import 'package:vidctrl/core/scenarios/archive.dart';
 import 'package:vidctrl/core/scenarios/extract_audio.dart';
@@ -655,6 +657,106 @@ void main() {
     );
   });
 
+  group('Comparing with the original', () {
+    QualityMeter meter() => QualityMeter(FfmpegRunner(media!.paths.ffmpeg));
+    // Not every FFmpeg has VMAF; the ones VidCtrl ships do.
+    bool hasVmaf() => capabilities.hasFilter('libvmaf');
+
+    test('a file compared with itself looks the same', () async {
+      if (unavailable()) return;
+      final info = await ffprobe.probe(await media!.clip('itself.mp4'));
+
+      final comparison = await meter().start(
+        original: info,
+        result: info.path,
+        vmaf: hasVmaf(),
+      );
+      final result = await comparison.result;
+
+      expect(result.status, ComparisonStatus.done);
+      expect(result.lumaDb, double.infinity);
+      expect(
+        closenessOf(xpsnr: result.lumaDb!, vmaf: result.vmaf),
+        Closeness.same,
+      );
+    });
+
+    test('the comparison reports its progress to the end', () async {
+      if (unavailable()) return;
+      final source = await media!.clip('progress.mp4', seconds: 4);
+      final info = await ffprobe.probe(source);
+      final output = await convert(const ArchivePreset(), source);
+
+      final comparison = await meter().start(
+        original: info,
+        result: output.path,
+        vmaf: hasVmaf(),
+      );
+      final seen = <double>[];
+      comparison.progress.listen(seen.add);
+      final result = await comparison.result;
+
+      expect(result.status, ComparisonStatus.done);
+      expect(result.lumaDb, allOf(greaterThan(30), lessThan(double.infinity)));
+      if (hasVmaf()) {
+        expect(result.vmaf, allOf(greaterThan(50), lessThanOrEqualTo(100)));
+      } else {
+        expect(result.vmaf, isNull);
+      }
+      expect(seen, isNotEmpty);
+      expect(seen.last, closeTo(1, 0.05));
+    });
+
+    test('an upright phone video scores like a wide one', () async {
+      if (unavailable()) return;
+      // 1080 wide, 10-bit: FFmpeg's `xpsnr` alone gives about 7 dB here.
+      final source = await media!.clip(
+        'upright.mp4',
+        size: '1080x1920',
+        pixFmt: 'yuv420p10le',
+        video: const ['-c:v', 'libx265', '-preset', 'ultrafast'],
+      );
+      final info = await ffprobe.probe(source);
+      final output = await convert(const ArchivePreset(), source);
+
+      final comparison = await meter().start(
+        original: info,
+        result: output.path,
+      );
+      final result = await comparison.result;
+
+      expect(result.lumaDb, greaterThan(30));
+    });
+
+    test('a 10-bit upright video compared with itself is identical', () async {
+      if (unavailable()) return;
+      final source = await media!.clip(
+        'upright_itself.mp4',
+        size: '1080x1920',
+        pixFmt: 'yuv420p10le',
+        video: const ['-c:v', 'libx265', '-preset', 'ultrafast'],
+      );
+      final info = await ffprobe.probe(source);
+
+      final comparison = await meter().start(original: info, result: source);
+
+      expect((await comparison.result).lumaDb, double.infinity);
+    });
+
+    test('a result that is not a video fails with a reason', () async {
+      if (unavailable()) return;
+      final info = await ffprobe.probe(await media!.clip('original.mp4'));
+      final broken = media!.file('broken.mp4');
+      await File(broken).writeAsString('not a video');
+
+      final comparison = await meter().start(original: info, result: broken);
+      final result = await comparison.result;
+
+      expect(result.status, ComparisonStatus.failed);
+      expect(result.errorLines, isNotEmpty);
+    });
+  });
+
   group('The queue, with real FFmpeg', () {
     /// The app's state, wired to the real FFmpeg.
     Future<ProviderContainer> app() async {
@@ -668,6 +770,7 @@ void main() {
               capabilities: capabilities,
               sleepInhibitor: FakeSleepInhibitor(),
               estimator: SampleEstimator(FfmpegRunner(media!.paths.ffmpeg)),
+              qualityMeter: QualityMeter(FfmpegRunner(media!.paths.ffmpeg)),
             ),
           ),
         ],
@@ -732,6 +835,58 @@ void main() {
           p.join(media!.dir.path, 'Converted', 'queued_whole_hevc-crf24.mp4'),
         ).existsSync(),
         isTrue,
+      );
+    });
+
+    /// What comparing [job]'s result with its original gives.
+    Future<QualityCheck?> compared(
+      ProviderContainer container,
+      QueueJob job,
+    ) async {
+      await container.read(qualityProvider.notifier).compare(job);
+      return container.read(qualityProvider)[job.id];
+    }
+
+    test('a finished job is compared with its original', () async {
+      if (unavailable()) return;
+      final source = await media!.clip('to_compare.mp4', seconds: 4);
+      final container = await app();
+      await container.read(sourcesProvider.notifier).addPaths([source]);
+      container.read(queueProvider.notifier).addSelected();
+      final job = (await finished(container)).single;
+
+      final check = await compared(container, job);
+
+      expect(
+        check,
+        isA<QualityMeasured>().having(
+          (c) => c.lumaDb,
+          'score',
+          allOf(greaterThan(30), lessThan(double.infinity)),
+        ),
+      );
+    });
+
+    test('a sample from the middle is compared with the same piece', () async {
+      if (unavailable()) return;
+      final source = await media!.clip('sample_to_compare.mp4', seconds: 15);
+      final container = await app();
+      await container.read(sourcesProvider.notifier).addPaths([source]);
+      container.read(recipeProvider.notifier).setSample(SampleChoice.middle);
+      container.read(queueProvider.notifier).addSelected();
+      final job = (await finished(container)).single;
+      expect(job.sample!.start, greaterThan(Duration.zero));
+
+      final check = await compared(container, job);
+
+      // The moving test pattern a frame off would score far lower.
+      expect(
+        check,
+        isA<QualityMeasured>().having(
+          (c) => c.lumaDb,
+          'score',
+          greaterThan(35),
+        ),
       );
     });
 

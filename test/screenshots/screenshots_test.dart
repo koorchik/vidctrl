@@ -148,6 +148,34 @@ void main() {
         await save(tester, '3_queue');
       });
 
+      testWidgets('results compared with their originals', (tester) async {
+        final env = environment();
+        final sources = await pumpApp(tester, env, look: look);
+        await addVideos(tester, sources, files.take(3));
+        await addToQueue(tester);
+        for (final (i, score, vmaf) in [
+          (0, 38.7, 92.5),
+          (1, 40.6, 96.0),
+          (2, 43.2, 98.1),
+        ]) {
+          env.executor.started[i].finish(
+            bytes: 61000000,
+            elapsed: const Duration(minutes: 2),
+          );
+          await tester.pump();
+          await tester.pump();
+          await tester.tap(find.byTooltip('More').at(3 + i));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
+          await tester.tap(find.text('Compare with the original'));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
+          env.qualityMeter.last.finish(score, vmaf: vmaf);
+          await tester.pump();
+        }
+        await save(tester, '3b_compared');
+      });
+
       testWidgets('details', (tester) async {
         final sources = await pumpApp(tester, environment(), look: look);
         await addVideos(tester, sources, files);

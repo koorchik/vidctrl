@@ -122,6 +122,11 @@ Capabilities)` (`scenarios/scenario.dart`) looks at one file and returns a
   success, cleanup on failure.
 - `estimate/size_estimator.dart` predicts output size: calculated for copies
   and fixed-rate formats, measured by encoding short pieces otherwise.
+- `quality/quality_meter.dart` compares a result with its original in one
+  pass: XPSNR (`xpsnr`) always, VMAF (`libvmaf`, the 4K model above 1080p)
+  where the FFmpeg has it; frames paired by order, a sample against the same
+  piece. `closenessOf` turns the scores into words, by VMAF where measured.
+  "Compare with the original" and `tool/calibrate_archive.dart` both use it.
 - `scenarios/registry.dart` lists the scenarios in display order.
 
 Sound: lossless or unusual sound (the FLAC or PCM of an editor export) becomes
@@ -156,6 +161,11 @@ recipeProvider ──┤        │
 - **Estimates** (`estimates/`): expected sizes shared by the video list and
   the queue, keyed by file and goal; a finished sample overwrites a
   measurement with its better one.
+- **Quality** (`quality/`): "Compare with the original" in a finished job's
+  ⋯ menu, one comparison at a time, the result kept by job id. Offered only
+  where each output frame stands for one source frame (`canComparePlan`:
+  no resizing, retiming or tone mapping). Closing the window stops it, like
+  the queue and the estimates.
 
 Output names carry the settings through each preset's `nameSuffix`
 (`_hevc-crf20`); samples add `_sample10s` and go to `Samples/`.
@@ -272,6 +282,22 @@ The UI renders presets and options generically; it needs no other change.
   source to output by itself and ignores `-color_primaries`, `-color_trc` and
   `-colorspace` for encodes. Presets pass no colour arguments; the HLG tests
   in `conversion_test.dart` are what guards this.
+- **XPSNR 42 dB is strict for grainy footage.** On a 4K Nikon clip the
+  archive's AV1 gave 41.4 dB and VMAF 96.0, with nothing to see; 42 dB took
+  1.5 times the size (crf 27). The blocky Arm build gave 39.5 dB and VMAF
+  92.5. So the comparison's verdict follows VMAF (95 "looks the same", 93
+  "very close").
+- **`xpsnr` takes the original first.** It weighs each difference by how
+  busy the first picture is, so the first input must be the original (as
+  FFmpeg's documentation says); `libvmaf` is the other way round. The
+  calibration and the first comparisons had the copy first, which read 0.3
+  to 0.8 dB low; `comparisonArgs` now puts the original first.
+- **FFmpeg's `xpsnr` misreads 10-bit pictures** whose rows are not packed
+  in memory: it takes the second input's stride to be its width. Any width
+  that is not a multiple of 32 (every upright phone video) gave about 7 dB
+  where 40 was right, and a file against itself was far from `inf`; a crop
+  alone does not help, as it keeps the stride. `comparisonArgs` crops to a
+  multiple of 32 and copies into fresh frames (`crop=…,copy`).
 - **SVT-AV1 parameters:** an unknown `-svtav1-params` key only produces a
   warning ("Error parsing option") and exit code 0. `CapabilityProbe` checks
   the warning text, not just the exit code.

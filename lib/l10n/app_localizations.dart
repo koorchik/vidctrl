@@ -1286,6 +1286,60 @@ abstract class AppLocalizations {
   /// **'Details of the result'**
   String get resultDetails;
 
+  /// No description provided for @compareWithOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare with the original'**
+  String get compareWithOriginal;
+
+  /// No description provided for @comparingWithOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Comparing with the original… {percent}%'**
+  String comparingWithOriginal(int percent);
+
+  /// No description provided for @stopComparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop comparing'**
+  String get stopComparing;
+
+  /// No description provided for @closenessSame.
+  ///
+  /// In en, this message translates to:
+  /// **'Looks the same as the original'**
+  String get closenessSame;
+
+  /// No description provided for @closenessVeryClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Very close to the original'**
+  String get closenessVeryClose;
+
+  /// No description provided for @closenessDiffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Differences may be visible'**
+  String get closenessDiffers;
+
+  /// No description provided for @compareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not compare'**
+  String get compareFailed;
+
+  /// No description provided for @vmafScore.
+  ///
+  /// In en, this message translates to:
+  /// **'VMAF {score}'**
+  String vmafScore(String score);
+
+  /// No description provided for @xpsnrScore.
+  ///
+  /// In en, this message translates to:
+  /// **'XPSNR {score} dB'**
+  String xpsnrScore(String score);
+
   /// No description provided for @useSettings.
   ///
   /// In en, this message translates to:

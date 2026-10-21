@@ -699,6 +699,39 @@ class AppLocalizationsUk extends AppLocalizations {
   String get resultDetails => 'Відомості про результат';
 
   @override
+  String get compareWithOriginal => 'Порівняти з оригіналом';
+
+  @override
+  String comparingWithOriginal(int percent) {
+    return 'Порівняння з оригіналом… $percent%';
+  }
+
+  @override
+  String get stopComparing => 'Зупинити порівняння';
+
+  @override
+  String get closenessSame => 'Не відрізнити від оригіналу';
+
+  @override
+  String get closenessVeryClose => 'Майже як оригінал';
+
+  @override
+  String get closenessDiffers => 'Різницю може бути видно';
+
+  @override
+  String get compareFailed => 'Не вдалося порівняти';
+
+  @override
+  String vmafScore(String score) {
+    return 'VMAF $score';
+  }
+
+  @override
+  String xpsnrScore(String score) {
+    return 'XPSNR $score дБ';
+  }
+
+  @override
   String get useSettings => 'Використати ці налаштування';
 
   @override

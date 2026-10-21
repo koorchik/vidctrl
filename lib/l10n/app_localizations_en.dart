@@ -695,6 +695,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resultDetails => 'Details of the result';
 
   @override
+  String get compareWithOriginal => 'Compare with the original';
+
+  @override
+  String comparingWithOriginal(int percent) {
+    return 'Comparing with the original… $percent%';
+  }
+
+  @override
+  String get stopComparing => 'Stop comparing';
+
+  @override
+  String get closenessSame => 'Looks the same as the original';
+
+  @override
+  String get closenessVeryClose => 'Very close to the original';
+
+  @override
+  String get closenessDiffers => 'Differences may be visible';
+
+  @override
+  String get compareFailed => 'Could not compare';
+
+  @override
+  String vmafScore(String score) {
+    return 'VMAF $score';
+  }
+
+  @override
+  String xpsnrScore(String score) {
+    return 'XPSNR $score dB';
+  }
+
+  @override
   String get useSettings => 'Use these settings';
 
   @override
