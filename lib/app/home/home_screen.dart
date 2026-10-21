@@ -8,7 +8,6 @@ import '../providers.dart';
 import '../queue/queue_controller.dart';
 import '../sources/sources_controller.dart';
 import '../theme.dart';
-import 'widgets/about_button.dart';
 import 'widgets/app_header.dart';
 import 'widgets/queue_pane.dart';
 import 'widgets/recipe_pane.dart';
@@ -44,16 +43,6 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 title: l10n.engineMissingTitle,
                 body: l10n.engineMissingBody,
-                // Nothing is built on the missing FFmpeg yet, so the app can
-                // look again at once.
-                action: OutlinedButton(
-                  onPressed: () async {
-                    if (await chooseFfmpegFolder(context, ref)) {
-                      ref.invalidate(environmentProvider);
-                    }
-                  },
-                  child: Text(l10n.engineChooseFolder),
-                ),
               ),
             ),
             data: (_) => const _Workspace(),
@@ -187,17 +176,11 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
 }
 
 class _Message extends StatelessWidget {
-  const _Message({
-    required this.icon,
-    required this.title,
-    this.body,
-    this.action,
-  });
+  const _Message({required this.icon, required this.title, this.body});
 
   final Widget icon;
   final String title;
   final String? body;
-  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +208,6 @@ class _Message extends StatelessWidget {
                 ),
               ),
             ],
-            if (action != null) ...[const SizedBox(height: 20), action!],
           ],
         ),
       ),

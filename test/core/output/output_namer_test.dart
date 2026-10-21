@@ -111,17 +111,6 @@ void main() {
       expect(paths!.ffprobe, '/usr/bin/ffprobe');
     });
 
-    test('a folder chosen in settings wins', () {
-      final paths = locator({
-        '/custom/ffmpeg',
-        '/custom/ffprobe',
-        '/usr/bin/ffmpeg',
-        '/usr/bin/ffprobe',
-      }).locate(overrideDir: '/custom');
-
-      expect(paths!.ffmpeg, '/custom/ffmpeg');
-    });
-
     test('a folder with ffmpeg but no ffprobe does not count', () {
       expect(locator({'/usr/bin/ffmpeg'}).locate(), isNull);
     });

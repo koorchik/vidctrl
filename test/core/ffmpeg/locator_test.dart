@@ -43,23 +43,6 @@ void main() {
       expect(paths?.source, FfmpegSource.bundled);
     });
 
-    test('a chosen folder comes before the bundled copy', () {
-      final paths = _locator({
-        ..._both('/home/user/ffmpeg-9'),
-        ..._both('/opt/vidctrl/lib/ffmpeg'),
-      }).locate(overrideDir: '/home/user/ffmpeg-9');
-
-      expect(paths?.ffmpeg, '/home/user/ffmpeg-9/ffmpeg');
-      expect(paths?.source, FfmpegSource.chosen);
-    });
-
-    test('a chosen folder that no longer holds FFmpeg is passed over', () {
-      final paths = _locator(_both('/opt/vidctrl/lib/ffmpeg'))
-          .locate(overrideDir: '/home/user/gone');
-
-      expect(paths?.source, FfmpegSource.bundled);
-    });
-
     test('without a bundled copy the PATH is used, in its order', () {
       final paths = _locator({
         ..._both('/usr/local/bin'),
@@ -91,20 +74,6 @@ void main() {
 
     test('Homebrew is looked in only on macOS', () {
       expect(_locator(_both('/opt/homebrew/bin')).locate(), isNull);
-    });
-  });
-
-  group('Checking a folder', () {
-    test('a folder with both programs is accepted as chosen', () {
-      final paths = _locator(_both('/home/user/ffmpeg'))
-          .inFolder('/home/user/ffmpeg');
-
-      expect(paths?.ffprobe, '/home/user/ffmpeg/ffprobe');
-      expect(paths?.source, FfmpegSource.chosen);
-    });
-
-    test('a folder without them is refused', () {
-      expect(_locator({}).inFolder('/home/user/Videos'), isNull);
     });
   });
 }

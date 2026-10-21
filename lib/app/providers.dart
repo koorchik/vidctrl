@@ -9,7 +9,6 @@ import '../core/media/thumbnail.dart';
 import '../core/platform/sleep_inhibitor.dart';
 import '../core/quality/quality_meter.dart';
 import '../core/queue/job_executor.dart';
-import 'settings.dart';
 
 /// Everything the app needs from the machine it runs on, found once at
 /// startup. Tests replace this with fakes.
@@ -49,11 +48,7 @@ class FfmpegMissing implements Exception {
 
 final environmentProvider = FutureProvider<AppEnvironment>(
   (ref) async {
-    // Read, not watched: everything the app holds is built on this, so a
-    // newly chosen folder is used from the next start.
-    final paths = FfmpegLocator().locate(
-      overrideDir: ref.read(ffmpegFolderProvider),
-    );
+    final paths = FfmpegLocator().locate();
     if (paths == null) throw const FfmpegMissing();
     return AppEnvironment(
       ffmpeg: paths,

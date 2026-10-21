@@ -4,9 +4,6 @@ import 'package:path/path.dart' as p;
 
 /// Where the FFmpeg in use was found.
 enum FfmpegSource {
-  /// A folder the user chose.
-  chosen,
-
   /// The copy that comes inside the app.
   bundled,
 
@@ -28,10 +25,10 @@ class FfmpegPaths {
 
 /// Finds the FFmpeg and ffprobe executables to use.
 ///
-/// Order: a folder the user chose, then the copy shipped inside the app
-/// bundle, then the computer's own. The bundled copy is the supported one;
-/// the computer's is the fallback for development, where nothing is bundled.
-/// A chosen folder that no longer holds FFmpeg is passed over.
+/// Order: the copy shipped inside the app bundle, then the computer's own.
+/// The bundled copy is the supported one, the one the app's quality numbers
+/// were measured with; the computer's is the fallback for development, where
+/// nothing is bundled.
 class FfmpegLocator {
   FfmpegLocator({
     String? executableDir,
@@ -53,9 +50,8 @@ class FfmpegLocator {
 
   p.Context get _context => _isWindows ? p.windows : p.posix;
 
-  FfmpegPaths? locate({String? overrideDir}) {
+  FfmpegPaths? locate() {
     final candidates = [
-      if (overrideDir != null) (overrideDir, FfmpegSource.chosen),
       // Linux bundle: <bundle>/lib/ffmpeg next to the app binary.
       (_context.join(_executableDir, 'lib', 'ffmpeg'), FfmpegSource.bundled),
       // Windows: next to the .exe. macOS: Contents/MacOS.
@@ -71,17 +67,14 @@ class FfmpegLocator {
       ],
     ];
     for (final (dir, source) in candidates) {
-      final paths = inFolder(dir, source: source);
+      final paths = _inFolder(dir, source);
       if (paths != null) return paths;
     }
     return null;
   }
 
   /// The FFmpeg in [dir], or null when it does not hold both programs.
-  FfmpegPaths? inFolder(
-    String dir, {
-    FfmpegSource source = FfmpegSource.chosen,
-  }) {
+  FfmpegPaths? _inFolder(String dir, FfmpegSource source) {
     final suffix = _isWindows ? '.exe' : '';
     final ffmpeg = _context.join(dir, 'ffmpeg$suffix');
     final ffprobe = _context.join(dir, 'ffprobe$suffix');

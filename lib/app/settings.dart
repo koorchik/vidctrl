@@ -54,25 +54,3 @@ class LookController extends Notifier<Look> {
     await ref.read(settingsStoreProvider).write(_key, look.name);
   }
 }
-
-final ffmpegFolderProvider = NotifierProvider<FfmpegFolderController, String?>(
-  FfmpegFolderController.new,
-);
-
-/// The folder of the user's own FFmpeg, or null for the one inside the app.
-/// The app looks for FFmpeg once, when it starts, so a change takes effect
-/// at the next start.
-class FfmpegFolderController extends Notifier<String?> {
-  static const _key = 'ffmpegFolder';
-
-  @override
-  String? build() {
-    final folder = ref.read(settingsStoreProvider).read(_key);
-    return folder is String ? folder : null;
-  }
-
-  Future<void> select(String? folder) async {
-    state = folder;
-    await ref.read(settingsStoreProvider).write(_key, folder);
-  }
-}

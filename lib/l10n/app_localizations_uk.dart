@@ -261,28 +261,13 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get engineMissingBody =>
-      'Для конвертації потрібен FFmpeg, але його не знайдено. Встановіть FFmpeg 8 або новіший і запустіть програму знову, або вкажіть папку, де він лежить.';
-
-  @override
-  String get engineChooseFolder => 'Взяти FFmpeg з папки…';
-
-  @override
-  String get engineUseBuiltIn => 'Повернути вбудований FFmpeg';
+      'Для конвертації потрібен FFmpeg, який іде разом із програмою, але його не знайдено. Завантажте VidCtrl ще раз і встановіть.';
 
   @override
   String get engineBuiltIn => 'Відеорушій: вбудований';
 
   @override
-  String get engineChosen => 'Відеорушій: власний';
-
-  @override
   String get engineSystem => 'Відеорушій: з комп\'ютера';
-
-  @override
-  String get engineNextStart => 'VidCtrl візьме його з наступного запуску.';
-
-  @override
-  String get engineFolderWrong => 'У цій папці немає ffmpeg і ffprobe.';
 
   @override
   String get aboutTitle => 'Про VidCtrl';

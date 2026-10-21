@@ -88,11 +88,9 @@ dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for "For
 - To move to a newer FFmpeg: change the pins and the notice, run
   `tool/fetch_ffmpeg.sh linux`, then `flutter test --tags ffmpeg` with
   `third_party/ffmpeg/linux` first on the `PATH`.
-- A folder chosen in the app ("Use FFmpeg from a folder…",
-  `ffmpegFolderProvider`) comes first, but only from the next start:
-  `environmentProvider` is found once and the videos, queue and estimates
-  are built on it, so it is read, not watched. On the "engine missing"
-  screen nothing is built yet, so a chosen folder is used at once.
+- The app offers no way to use another FFmpeg: the quality numbers were
+  measured with the bundled one. `FfmpegLocator` falls back to the `PATH`
+  only for development, where nothing is bundled.
 
 ## Architecture
 

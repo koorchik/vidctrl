@@ -672,7 +672,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('The video engine is missing'), findsOneWidget);
-    // Someone with FFmpeg elsewhere can point the app at it.
-    expect(find.text('Use FFmpeg from a folder…'), findsOneWidget);
+    // The app works only with its own FFmpeg, so there is nothing to choose.
+    expect(find.byType(OutlinedButton), findsNothing);
   });
 }

@@ -6,7 +6,6 @@ import 'package:vidctrl/app/licenses.dart';
 import 'package:vidctrl/app/home/technical_text.dart';
 import 'package:vidctrl/core/ffmpeg/capabilities.dart';
 import 'package:vidctrl/core/ffmpeg/locator.dart';
-import 'package:vidctrl/core/settings/settings_store.dart';
 
 import '../support/fake_media.dart';
 import '../support/fakes.dart';
@@ -32,42 +31,19 @@ void main() {
 
     expect(find.text('Video engine: built in'), findsOneWidget);
     expect(find.widgetWithText(TechnicalText, 'FFmpeg 8.1.3'), findsOneWidget);
-    expect(find.text('Use FFmpeg from a folder…'), findsOneWidget);
-    // Nothing to go back to.
-    expect(find.text('Use the built-in FFmpeg'), findsNothing);
   });
 
-  testWidgets('with a chosen folder, the menu names it and offers the way '
-      'back', (tester) async {
-    final settings = MemorySettingsStore()
-      ..write('ffmpegFolder', '/home/user/ffmpeg-9');
-    await pumpApp(
-      tester,
-      FakeEnvironment(
-        capabilities: _ffmpeg81,
-        ffmpegPaths: const FfmpegPaths(
-          ffmpeg: '/home/user/ffmpeg-9/ffmpeg',
-          ffprobe: '/home/user/ffmpeg-9/ffprobe',
-          source: FfmpegSource.chosen,
-        ),
-      ),
-      settings: settings,
-    );
+  testWidgets('the menu offers no other FFmpeg: the quality numbers were '
+      'measured with the built-in one', (tester) async {
+    await pumpApp(tester, FakeEnvironment(capabilities: _ffmpeg81));
     await _openMenu(tester);
 
-    expect(find.text('Video engine: your own'), findsOneWidget);
+    // FFmpeg is named once, in the caption of the one in use.
     expect(
-      find.widgetWithText(TechnicalText, 'FFmpeg 8.1.3 · /home/user/ffmpeg-9'),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text('Use the built-in FFmpeg'));
-    await tester.pumpAndSettle();
-
-    // Taken at the next start, and said so.
-    expect(settings.read('ffmpegFolder'), isNull);
-    expect(
-      find.text('VidCtrl will use it from its next start.'),
+      find.descendant(
+        of: find.byType(PopupMenuItem<void>),
+        matching: find.textContaining('FFmpeg'),
+      ),
       findsOneWidget,
     );
   });
