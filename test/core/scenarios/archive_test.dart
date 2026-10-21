@@ -165,7 +165,7 @@ void main() {
       final caps = withGpu({'hevc_videotoolbox'});
       final result = plan(clip(), {...fast, 'codec': 'hevc'}, caps);
 
-      expect(video(result).args, containsAllInOrder(['-q:v', '75']));
+      expect(video(result).args, containsAllInOrder(['-q:v', '65']));
     });
   });
 

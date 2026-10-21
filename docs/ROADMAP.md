@@ -41,10 +41,11 @@
    - Get the sound: choose which track, or all of them.
 2. **Quality calibration.** "For the archive" is matched with XPSNR on 4K
    clips from a Nikon camera, a phone and a slideshow. Still to do: footage
-   from other cameras (Sony, Canon), a check with VMAF (needs an
-   FFmpeg with `libvmaf`), Intel, AMD and Apple graphics, and the other
-   goals' quality levels. A fixed number cannot suit both calm and busy
-   footage; choosing it per video from a measured sample would.
+   from other cameras (Sony, Canon), matching the numbers with VMAF too
+   (every shipped FFmpeg has `libvmaf`; the calibration tool reads only
+   XPSNR so far), Intel and AMD graphics, Apple's beyond the M1, and the
+   other goals' quality levels. A fixed number cannot suit both calm and
+   busy footage; choosing it per video from a measured sample would.
 3. **Check in Resolve.** Studio 21.1.1 on Linux is checked: every codec the
    goal keeps, every sound format, sync after a rewrap, and the outputs of
    each variant, also with hardware decoding off (the findings are at the

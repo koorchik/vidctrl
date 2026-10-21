@@ -49,6 +49,6 @@ void main() {
       'speed': 'gpu',
     }, withGpu({'hevc_videotoolbox'}));
 
-    expect(plan.nameSuffix, '_hevc-videotoolbox-q75');
+    expect(plan.nameSuffix, '_hevc-videotoolbox-q65');
   });
 }

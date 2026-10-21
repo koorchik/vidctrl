@@ -71,7 +71,7 @@ Future<void> main(List<String> arguments) async {
         {'codec': 'hevc', 'speed': 'gpu'},
         // Apple's scale runs 0-100, higher being better.
         encoder.endsWith('videotoolbox')
-            ? [55, 65, 75, 85, 95]
+            ? [55, 60, 65, 70, 75]
             : [16, 20, 24, 28, 32],
       ),
   ];

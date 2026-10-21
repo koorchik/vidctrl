@@ -83,7 +83,8 @@ as the original:
   from a Nikon camera, the hardest to compress; a phone video of a moving
   car; a photo slideshow.
 - **The encoders:** every one the goal uses: AV1 and HEVC on the processor
-  (SVT-AV1, x265) and on an NVIDIA graphics card (NVENC).
+  (SVT-AV1, x265), on an NVIDIA graphics card (NVENC) and HEVC on a Mac's
+  Apple chip (VideoToolbox).
 - **The setting:** for each encoder, the quality number that gives the
   smallest file while every piece still reaches 42 dB. The hardest piece
   decides; calmer footage scores higher.
@@ -105,6 +106,7 @@ default is AV1 on the processor:
 | Works everywhere (HEVC), Thorough | 1.15× | 1.5× |
 | Smallest file (AV1), Fast | 1.7× | 2.4× |
 | Works everywhere (HEVC), Fast | 2× | 3× |
+| Works everywhere (HEVC), Fast on a Mac (M1) | 2.5× | 4.5× |
 
 `tool/calibrate_archive.dart` repeats the measurement on any clips, so other
 cameras and graphics cards can be checked the same way. To check one video,
@@ -173,9 +175,9 @@ Early but working on Linux. Not done yet:
   stopping a conversion part-way fail.
 - Only one video is converted at a time.
 - "For the archive" is measured on footage from a Nikon camera, a phone and
-  a slideshow, on the processor and NVIDIA graphics
-  ([how](#how-the-archive-quality-was-measured)). Other cameras, and Intel,
-  AMD and Apple graphics, are not measured yet. The other goals' quality
+  a slideshow, on the processor, NVIDIA graphics and an M1 Mac
+  ([how](#how-the-archive-quality-was-measured)). Other cameras, and Intel
+  and AMD graphics, are not measured yet. The other goals' quality
   levels are starting values.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).

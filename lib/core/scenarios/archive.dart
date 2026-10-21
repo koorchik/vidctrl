@@ -46,6 +46,14 @@ const x265Crf = '24';
 const nvencAv1Cq = '32';
 const nvencHevcCq = '26';
 
+/// Apple's scale runs 0-100, higher being better, and saturates near the
+/// top. Measured on an M1 in October 2026, in the right order, with the
+/// pieces above and a grainy 4K clip harder than all of them: at 65 that
+/// clip comes as close as with AV1 (41.2 against 41.4 dB, VMAF 98 against
+/// 96) and the others score 43 dB or more. 75 gave 42.4 dB there at six
+/// times AV1's size, hardly smaller than the camera's own file.
+const videoToolboxQuality = '65';
+
 /// The level a player needs for a picture of this size and frame rate, and
 /// the most its main tier allows per second: 4.1 up to 1080p at 60 frames,
 /// 5.1 for 4K up to 60, and so on. 4K is given 5.1 even below 30 frames,
@@ -244,9 +252,7 @@ class ArchivePreset implements Preset {
         '-qvbr_quality_level',
         '$q',
       ],
-      // VideoToolbox quality runs 0-100 and, unlike the others, higher is
-      // better.
-      _ => ['-q:v', '75'],
+      _ => ['-q:v', videoToolboxQuality],
     };
     return VideoEncode(
       encoder: encoder,
