@@ -35,3 +35,23 @@ final releaseSourceProvider = Provider<ReleaseSource?>((ref) {
     userAgent: 'VidCtrl/${build.version}',
   );
 });
+
+/// The newest release when it is newer than this build, looked for once,
+/// when the app starts; null in a build that does not look for updates, when
+/// this one is the newest, or when the check fails (with no connection, say),
+/// which is not worth a word. The header shows it (`NewVersionTag`).
+final newerReleaseProvider = FutureProvider<Release?>(
+  (ref) async {
+    final source = ref.watch(releaseSourceProvider);
+    final current = Version.tryParse(ref.watch(buildInfoProvider).version);
+    if (source == null || current == null) return null;
+    try {
+      final latest = await source.latest();
+      return latest.version > current ? latest : null;
+    } on ReleaseCheckFailed {
+      return null;
+    }
+  },
+  // A failed check is not tried again until the next start.
+  retry: (_, _) => null,
+);

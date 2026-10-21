@@ -358,15 +358,17 @@ class FakeEnvironment {
 class FakeReleaseSource implements ReleaseSource {
   final _answer = Completer<Release>();
 
-  void answer(String version) => _answer.complete(
-    Release(
-      version: Version.tryParse(version)!,
-      page: Uri.parse('https://example.com/releases/v$version'),
-    ),
-  );
+  /// How many times the app has looked.
+  int asked = 0;
+
+  void answer(String version) =>
+      _answer.complete(Release(version: Version.tryParse(version)!));
 
   void fail() => _answer.completeError(const ReleaseCheckFailed('offline'));
 
   @override
-  Future<Release> latest() => _answer.future;
+  Future<Release> latest() {
+    asked++;
+    return _answer.future;
+  }
 }

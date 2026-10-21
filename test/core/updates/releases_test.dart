@@ -47,27 +47,22 @@ void main() {
   });
 
   group('GitHub\'s description of a release', () {
-    test('gives its version and page', () {
+    test('gives its version', () {
       final release = parseGitHubRelease({
         'tag_name': 'v0.4.0',
         'html_url': 'https://github.com/owner/vidctrl/releases/tag/v0.4.0',
         'draft': false,
       });
       expect(release.version, v('0.4.0'));
-      expect(
-        '${release.page}',
-        'https://github.com/owner/vidctrl/releases/tag/v0.4.0',
-      );
     });
 
-    test('is refused without a version tag or a page', () {
+    test('is refused without a version tag', () {
       for (final json in <Object?>[
         null,
         'Not Found',
         {'message': 'Not Found'},
         {'tag_name': 'nightly', 'html_url': 'https://example.com/r'},
-        {'tag_name': 'v1.0.0'},
-        {'tag_name': 'v1.0.0', 'html_url': 'javascript:alert(1)'},
+        {'html_url': 'https://example.com/r'},
       ]) {
         expect(
           () => parseGitHubRelease(json),

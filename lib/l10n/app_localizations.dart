@@ -638,6 +638,12 @@ abstract class AppLocalizations {
   /// **'Check the internet connection and try again.'**
   String get updateFailedBody;
 
+  /// No description provided for @newVersionTag.
+  ///
+  /// In en, this message translates to:
+  /// **'New version {version}'**
+  String newVersionTag(String version);
+
   /// No description provided for @startingUp.
   ///
   /// In en, this message translates to:

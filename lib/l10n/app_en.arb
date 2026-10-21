@@ -169,6 +169,7 @@
   "updateNoneBody": "{current} is the newest version.",
   "updateFailedTitle": "Could not check for updates",
   "updateFailedBody": "Check the internet connection and try again.",
+  "newVersionTag": "New version {version}",
   "startingUp": "Getting ready…",
   "quitTitle": "Stop converting and quit?",
   "quitBody": "The video being converted will be discarded. Finished videos are kept.",
@@ -495,6 +496,11 @@
       "current": {
         "type": "String"
       }
+    }
+  },
+  "@newVersionTag": {
+    "placeholders": {
+      "version": {"type": "String"}
     }
   },
   "@updateNoneBody": {

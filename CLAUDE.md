@@ -57,8 +57,9 @@ dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for "For
   tag gives the app its version (`--build-name`) and the downloads their
   names; `pubspec.yaml`'s version is not used. Through `--dart-define` it
   also gives the version the About menu shows and the repository whose
-  latest release "Check for updates…" compares it with
-  (`lib/app/build_info.dart`). Any other build is a development build,
+  latest release it is compared with (`lib/app/build_info.dart`): once at
+  the start, for the header's "New version" tag (`newerReleaseProvider`),
+  and on "Check for updates…". Any other build is a development build,
   which does not check; to try the check, run with
   `--dart-define=VIDCTRL_VERSION=0.1.0 --dart-define=VIDCTRL_REPOSITORY=<owner>/<repo>`.
   `tool/release_notes.sh v1.2.0` prints the notes: fixed instructions, then

@@ -6,6 +6,10 @@ import '../../../core/platform/open_external.dart';
 /// The app's page on the web.
 const websiteUrl = 'https://camctrl.app/vidctrl';
 
+/// Where the app is downloaded: the website's own section, which knows every
+/// way the app is offered, so the app need not.
+const downloadUrl = '$websiteUrl#download';
+
 /// CamCtrl, a remote control for Blackmagic cameras from the same maker.
 const camctrlUrl = 'https://camctrl.app';
 

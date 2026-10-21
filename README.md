@@ -159,9 +159,10 @@ Also:
 - Two looks, switchable in the app: a warm, light, rounded one and a dark,
   flat, professional one.
 - The language, look, last goal and output folder are remembered.
-- The version is in the About menu (the "i" button), with "Check for
-  updates…", which asks GitHub whether a newer release is out. Nothing is
-  sent anywhere unless you press it.
+- When a newer version is out, it says so beside its website's address at
+  the top. It asks GitHub once after it starts, and again on "Check for
+  updates…" in the About menu (the "i" button), which also shows the
+  version. Nothing else goes over the internet.
 
 ## Status
 

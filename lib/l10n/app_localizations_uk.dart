@@ -323,6 +323,11 @@ class AppLocalizationsUk extends AppLocalizations {
       'Перевірте з\'єднання з інтернетом і спробуйте ще раз.';
 
   @override
+  String newVersionTag(String version) {
+    return 'Нова версія $version';
+  }
+
+  @override
   String get startingUp => 'Підготовка…';
 
   @override

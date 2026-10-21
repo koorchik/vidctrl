@@ -3,27 +3,40 @@ import 'package:flutter/material.dart';
 import '../../../core/platform/open_external.dart';
 import '../../../core/updates/releases.dart';
 import '../../../l10n/app_localizations.dart';
+import 'web_links.dart';
 
 /// Looks for the newest release and says whether it is newer than this
-/// version, with a way to its downloads when it is.
+/// version, with a way to the website's downloads when it is.
 class UpdateDialog extends StatefulWidget {
-  const UpdateDialog({super.key, required this.current, required this.source});
+  const UpdateDialog({
+    super.key,
+    required this.current,
+    required this.source,
+    this.known,
+  });
 
   final Version current;
   final ReleaseSource source;
+
+  /// A newer release found already, shown at once instead of looking again.
+  final Release? known;
 
   @override
   State<UpdateDialog> createState() => _UpdateDialogState();
 }
 
 class _UpdateDialogState extends State<UpdateDialog> {
-  late final Future<Release> _latest = widget.source.latest();
+  late final Future<Release> _latest = switch (widget.known) {
+    final known? => Future.value(known),
+    null => widget.source.latest(),
+  };
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return FutureBuilder<Release>(
       future: _latest,
+      initialData: widget.known,
       builder: (context, snapshot) {
         final close = TextButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -71,7 +84,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
             ),
             FilledButton(
               onPressed: () {
-                openWithDefaultApp('${latest.page}');
+                openWithDefaultApp(downloadUrl);
                 Navigator.of(context).pop();
               },
               child: Text(l10n.updateDownload),

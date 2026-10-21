@@ -21,7 +21,9 @@
   technical names beside plain labels; English and Ukrainian with a
   switcher; two looks with a switcher, a warm light one and a dark
   professional one.
-  Language, look, last goal and output folder are remembered.
+  Language, look, last goal and output folder are remembered. A newer
+  release is looked for at the start and shown beside the website's
+  address; "Check for updates…" in the About menu.
 - **App icon** for the three platforms, drawn by `tool/make_icons.dart`.
 - **CI:** analysis, tests, a quick check of FFmpeg and release builds for
   Linux, Windows and macOS; a version tag publishes a GitHub release with the
@@ -77,7 +79,7 @@
 
 Automatic quality per video, "fit into N MB", user-defined goals, lossless
 trimming, an in-app before/after comparison for samples, watch folders,
-automatic updates.
+updating itself in place.
 
 ## Open decisions
 

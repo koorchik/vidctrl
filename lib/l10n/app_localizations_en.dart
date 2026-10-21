@@ -321,6 +321,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateFailedBody => 'Check the internet connection and try again.';
 
   @override
+  String newVersionTag(String version) {
+    return 'New version $version';
+  }
+
+  @override
   String get startingUp => 'Getting ready…';
 
   @override

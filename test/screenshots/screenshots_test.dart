@@ -120,6 +120,16 @@ void main() {
         await save(tester, '2_videos_added');
       });
 
+      testWidgets('a newer version out', (tester) async {
+        final env = environment();
+        final sources = await pumpApp(tester, env, look: look);
+        await addVideos(tester, sources, files.take(2));
+        (env.releases! as FakeReleaseSource).answer('0.4.0');
+        await tester.pump();
+        await tester.pump();
+        await save(tester, '2b_new_version');
+      });
+
       testWidgets('queue with a finished sample', (tester) async {
         final env = environment();
         final sources = await pumpApp(tester, env, look: look);

@@ -67,12 +67,12 @@ class Version implements Comparable<Version> {
   String toString() => _text;
 }
 
-/// The newest release, and the page that has its downloads.
+/// The newest release. Its downloads are on the app's website, which knows
+/// every way the app is offered.
 class Release {
-  const Release({required this.version, required this.page});
+  const Release({required this.version});
 
   final Version version;
-  final Uri page;
 }
 
 /// Thrown when the newest release cannot be found out: no connection, an
@@ -131,15 +131,11 @@ class GitHubReleases implements ReleaseSource {
   }
 }
 
-/// A release as GitHub's API describes it: the tag names the version, and
-/// the release's page has its notes and downloads.
+/// A release as GitHub's API describes it: the tag names the version.
 Release parseGitHubRelease(Object? json) {
-  if (json case {'tag_name': String tag, 'html_url': String page}) {
+  if (json case {'tag_name': String tag}) {
     final version = Version.tryParse(tag);
-    final uri = Uri.tryParse(page);
-    if (version != null && uri != null && uri.isScheme('https')) {
-      return Release(version: version, page: uri);
-    }
+    if (version != null) return Release(version: version);
   }
   throw const ReleaseCheckFailed('not a release with a version tag');
 }
