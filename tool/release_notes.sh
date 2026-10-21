@@ -45,9 +45,10 @@ cat <<EOF
 | Windows (x64) | \`vidctrl-$version-windows-x64.zip\` | Unpack it and run \`vidctrl.exe\` |
 | macOS (Apple Silicon and Intel) | \`vidctrl-$version-macos.dmg\` | Open it and drag VidCtrl to Applications |
 
-**FFmpeg is included**, so nothing else needs installing. It is FFmpeg 8.1,
-unmodified builds under the GNU GPL version 3; $notice says whose builds
-they are and where their source code is.
+**FFmpeg is included**, so nothing else needs installing. It is VidCtrl's
+own build of FFmpeg 8.1 from its unmodified source, the same on every system,
+under the GNU GPL version 3; $notice says where it is built and where its
+source code is.
 
 The Windows app is not signed, so Windows asks before running it for the
 first time: "Windows protected your PC" → More info → Run anyway.
