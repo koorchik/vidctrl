@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -555,85 +557,115 @@ class _MetadataView extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return _Cards(
-      cards: [
+    // One card under another: tag values are lines of text, which read
+    // best at the full width.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: _Cards._gap,
+      children: [
         for (final section in metadataDetails(raw))
-          (
-            wide: section.group == DetailGroup.file,
-            child: _Card(
-              group: section.group,
-              title: _tagTitle(l10n, section),
-              child: section.tags.isEmpty
-                  ? Text(
-                      l10n.noTags,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        for (final tag in section.tags.entries)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 5),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  width: 22,
-                                  child: isPersonalTag(tag.key)
-                                      ? Tooltip(
-                                          message: l10n.personalTag,
-                                          child: Icon(
-                                            Icons.person_pin_circle_outlined,
-                                            size: 16,
-                                            color: scheme.tertiary,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                SizedBox(
-                                  width: _keyColumnWidth(section.tags.keys),
-                                  child: Text(
-                                    tag.key,
-                                    softWrap: false,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontFamily: monoFontFamily,
-                                      fontSize: 12.5,
-                                      height: 1.5,
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: SelectableText(
-                                    tag.value,
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
+          _Card(
+            group: section.group,
+            title: _tagTitle(l10n, section),
+            child: section.tags.isEmpty
+                ? Text(
+                    l10n.noTags,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
                     ),
-            ),
+                  )
+                : _TagList(tags: section.tags),
           ),
       ],
     );
   }
 }
 
-/// Wide enough for the longest tag name of a card, so names stay on one line
-/// and values start right after them. A character of the fixed-width font
-/// at this size is 7.5 pixels wide.
-double _keyColumnWidth(Iterable<String> keys) {
-  final longest = keys.fold(
-    0,
-    (max, key) => key.length > max ? key.length : max,
+/// A card's tags, one to a line: the name, and its value beside it. A name
+/// too long to leave its value room has the value on the next line instead.
+class _TagList extends StatelessWidget {
+  const _TagList({required this.tags});
+
+  final Map<String, String> tags;
+
+  static const _markWidth = 22.0;
+  static const _gap = 12.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Names take at most two fifths of a line, so even a narrow card
+        // leaves its values a readable width.
+        final room = constraints.maxWidth - _markWidth - _gap;
+        final besideNames = [
+          for (final key in tags.keys)
+            if (_nameWidth(key) <= room * 0.4) key,
+        ];
+        final nameColumn = besideNames.map(_nameWidth).fold(60.0, max);
+        return Column(
+          children: [
+            for (final MapEntry(:key, :value) in tags.entries)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 5),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: _markWidth,
+                      child: isPersonalTag(key)
+                          ? Tooltip(
+                              message: l10n.personalTag,
+                              child: Icon(
+                                Icons.person_pin_circle_outlined,
+                                size: 16,
+                                color: scheme.tertiary,
+                              ),
+                            )
+                          : null,
+                    ),
+                    if (besideNames.contains(key)) ...[
+                      SizedBox(width: nameColumn, child: _name(key, scheme)),
+                      const SizedBox(width: _gap),
+                      Expanded(child: _value(value, theme)),
+                    ] else
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [_name(key, scheme), _value(value, theme)],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _name(String key, ColorScheme scheme) => Text(
+    key,
+    softWrap: false,
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      fontFamily: monoFontFamily,
+      fontSize: 12.5,
+      height: 1.5,
+      color: scheme.onSurfaceVariant,
+    ),
   );
-  return (longest * 7.6 + 6).clamp(60, 300).toDouble();
+
+  Widget _value(String value, ThemeData theme) =>
+      SelectableText(value, style: theme.textTheme.bodyMedium);
 }
+
+/// The room a tag name takes on one line. A character of the fixed-width
+/// font at this size is 7.5 pixels wide.
+double _nameWidth(String key) => key.length * 7.6 + 6;
 
 class _ReportView extends StatelessWidget {
   const _ReportView({required this.raw});
