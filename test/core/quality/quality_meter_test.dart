@@ -5,8 +5,8 @@ import 'package:vidctrl/core/quality/quality_meter.dart';
 import 'package:vidctrl/core/scenarios/archive.dart';
 import 'package:vidctrl/core/scenarios/remux.dart';
 import 'package:vidctrl/core/scenarios/resolve_linux.dart';
+import 'package:vidctrl/core/scenarios/save_space.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
-import 'package:vidctrl/core/scenarios/share_phone.dart';
 import 'package:vidctrl/core/scenarios/strip_metadata.dart';
 
 import '../../support/fake_media.dart';
@@ -230,13 +230,13 @@ void main() {
         true,
       ),
       (
-        'a phone copy made smaller',
-        const SharePhonePreset().plan(clip(), const {}, softwareOnly),
+        'a smaller copy at a smaller size',
+        const SaveSpacePreset().plan(clip(), const {}, softwareOnly),
         false,
       ),
       (
-        'a phone copy already small enough',
-        const SharePhonePreset().plan(
+        'a smaller copy already small enough',
+        const SaveSpacePreset().plan(
           clip(width: 1920, height: 1080),
           const {},
           softwareOnly,
@@ -244,8 +244,17 @@ void main() {
         true,
       ),
       (
-        'a phone copy of an HDR video, tone-mapped',
-        const SharePhonePreset().plan(
+        'a smaller copy at half the frame rate',
+        const SaveSpacePreset().plan(
+          clip(width: 1920, height: 1080, fps: 60),
+          const {},
+          softwareOnly,
+        ),
+        false,
+      ),
+      (
+        'a smaller copy of an HDR video, tone-mapped',
+        const SaveSpacePreset().plan(
           clip(width: 1920, height: 1080, pixFmt: 'yuv420p10le', color: hlg),
           const {},
           withToneMapping,

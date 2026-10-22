@@ -251,6 +251,37 @@ void main() {
         await save(tester, '9_resolve');
       });
 
+      testWidgets('how the archive quality was measured', (tester) async {
+        final sources = await pumpApp(tester, environment(), look: look);
+        await addVideos(tester, sources, files.take(2));
+        await tester.tap(find.byIcon(Icons.help_outline_rounded));
+        await tester.pumpAndSettle();
+        await save(tester, '11_archive_measured');
+      });
+
+      testWidgets('how the archive keeps the quality, in Ukrainian', (
+        tester,
+      ) async {
+        final sources = await pumpApp(
+          tester,
+          environment(),
+          look: look,
+          locale: const Locale('uk'),
+        );
+        await addVideos(tester, sources, files.take(2));
+        await tester.tap(find.byIcon(Icons.help_outline_rounded));
+        await tester.pumpAndSettle();
+        await save(tester, '11b_archive_measured_uk');
+      });
+
+      testWidgets('Save space, with the limits it sets', (tester) async {
+        final sources = await pumpApp(tester, environment(), look: look);
+        await addVideos(tester, sources, files.take(2));
+        await tester.tap(find.byIcon(Icons.compress_rounded));
+        await tester.pump();
+        await save(tester, '10_save_space');
+      });
+
       testWidgets('the about menu', (tester) async {
         await pumpApp(tester, environment(), look: look);
         await tester.tap(find.byTooltip('About VidCtrl'));

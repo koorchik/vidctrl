@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../core/ffmpeg/capabilities.dart';
+import '../../../core/scenarios/archive.dart';
 import '../../../core/output/output_namer.dart';
 import '../../../core/scenarios/registry.dart';
 import '../../../core/scenarios/resolve_linux.dart';
@@ -21,6 +22,7 @@ import '../headings.dart';
 import '../scenario_texts.dart';
 import '../size_change_text.dart';
 import '../technical_text.dart';
+import 'archive_quality_dialog.dart';
 import 'command_dialog.dart';
 import 'web_links.dart';
 
@@ -159,7 +161,22 @@ class RecipePane extends ConsumerWidget {
                           _Hint(presetHint(l10n, selected.id))
                         else if (explainedOptions.isEmpty ||
                             constraints.maxHeight >= _Spacing.roomyFrom)
-                          _Hint(scenarioHint(l10n, scenario.id)),
+                          _Hint(
+                            scenarioHint(l10n, scenario.id),
+                            // The archive's settings were measured, not
+                            // guessed; "?" tells how.
+                            help: scenario == archiveScenario
+                                ? (
+                                    l10n.archiveQualityHelp,
+                                    () => showDialog<void>(
+                                      context: context,
+                                      builder: (_) =>
+                                          const ArchiveQualityDialog(),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        _Hint(scenarioNotice(l10n, scenario.id), notice: true),
                         // People who edit in Resolve often shoot on
                         // Blackmagic cameras, which CamCtrl controls. Only
                         // where there is room: the smallest window has none.
@@ -392,6 +409,10 @@ class _ScenarioTile extends StatelessWidget {
           ? scheme.onPrimaryContainer
           : scheme.onSurfaceVariant;
     }
+    final subtitle = scenarioSubtitle(l10n, scenario.id);
+    final textColor = selected && hue == null
+        ? scheme.onPrimaryContainer
+        : null;
     return Tooltip(
       message: scenarioHint(l10n, scenario.id),
       child: Material(
@@ -415,18 +436,35 @@ class _ScenarioTile extends StatelessWidget {
                   Icon(scenarioIcon(scenario.id), size: 20, color: iconColor),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text(
-                      scenarioTitle(l10n, scenario.id),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontSize: 12.5,
-                        height: 1.15,
-                        fontWeight: FontWeight.w600,
-                        color: selected && hue == null
-                            ? scheme.onPrimaryContainer
-                            : null,
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          scenarioTitle(l10n, scenario.id),
+                          maxLines: subtitle.isEmpty ? 2 : 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontSize: 12.5,
+                            height: 1.15,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                          ),
+                        ),
+                        if (subtitle.isNotEmpty)
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 11.5,
+                              height: 1.2,
+                              letterSpacing: 0,
+                              fontWeight: FontWeight.w400,
+                              color: textColor ?? scheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],
@@ -440,23 +478,59 @@ class _ScenarioTile extends StatelessWidget {
 }
 
 class _Hint extends StatelessWidget {
-  const _Hint(this.text);
+  const _Hint(this.text, {this.notice = false, this.help});
 
   final String text;
+
+  /// A "?" at the end that explains more in a window of its own: what it
+  /// says on hover, and what opens the window.
+  final (String, VoidCallback)? help;
+
+  /// Something worth noticing, such as a limit the goal sets: in the
+  /// scheme's colour for those, and a little bolder.
+  final bool notice;
 
   @override
   Widget build(BuildContext context) {
     if (text.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final help = this.help;
     return Padding(
       padding: const EdgeInsets.only(top: 6, left: 2, right: 2),
-      child: Text(
-        text,
+      child: Text.rich(
+        TextSpan(
+          text: text,
+          children: [
+            if (help != null)
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Tooltip(
+                    message: help.$1,
+                    child: InkWell(
+                      onTap: help.$2,
+                      customBorder: const CircleBorder(),
+                      child: Icon(
+                        Icons.help_outline_rounded,
+                        size: 16,
+                        semanticLabel: help.$1,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.bodySmall?.copyWith(
           fontSize: 13,
-          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: notice ? FontWeight.w500 : null,
+          color: notice
+              ? theme.colorScheme.tertiary
+              : theme.colorScheme.onSurfaceVariant,
         ),
       ),
     );

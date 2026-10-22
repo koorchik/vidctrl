@@ -2,8 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vidctrl/core/media/media_info.dart';
 import 'package:vidctrl/core/scenarios/extract_audio.dart';
 import 'package:vidctrl/core/scenarios/remux.dart';
+import 'package:vidctrl/core/scenarios/save_space.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
-import 'package:vidctrl/core/scenarios/share_phone.dart';
 import 'package:vidctrl/core/scenarios/strip_metadata.dart';
 
 import '../../support/fake_media.dart';
@@ -16,22 +16,27 @@ void main() {
     range: 'tv',
   );
 
-  group('Send to a phone', () {
-    const phone = SharePhonePreset();
+  group('Save space', () {
+    const space = SaveSpacePreset();
     VideoEncode video(ConversionPlan plan) => plan.video as VideoEncode;
+    List<String> rate(ConversionPlan plan) => [
+      for (final filter in video(plan).filters)
+        if (filter.startsWith('fps=')) filter.substring(4),
+    ];
 
-    test('a 4K video becomes 8-bit H.264 at 1080p in a fast-start MP4', () {
-      final plan = phone.plan(clip(), const {}, softwareOnly);
+    test('a 4K video becomes AV1 at 1080p in a fast-start MP4', () {
+      final plan = space.plan(clip(), const {}, softwareOnly);
 
-      expect(video(plan).encoder, 'libx264');
-      expect(video(plan).pixFmt, 'yuv420p');
-      expect(video(plan).filters.single, startsWith('scale=1920:1920:'));
+      expect(video(plan).encoder, 'libsvtav1');
+      expect(video(plan).args, containsAllInOrder(['-crf', saveSpaceCrf]));
+      expect(video(plan).filters.first, startsWith('scale=1920:1920:'));
       expect(plan.muxer, 'mp4');
       expect(plan.outputArgs, containsAllInOrder(['-movflags', '+faststart']));
+      expect(plan.nameSuffix, '_av1-crf$saveSpaceCrf');
     });
 
     test('a video that is already small enough is not resized', () {
-      final plan = phone.plan(
+      final plan = space.plan(
         clip(width: 1920, height: 1080),
         const {},
         softwareOnly,
@@ -41,55 +46,85 @@ void main() {
     });
 
     test('a portrait video is limited by its height', () {
-      final plan = phone.plan(
+      final plan = space.plan(
         clip(width: 2160, height: 3840),
         const {},
         softwareOnly,
       );
 
-      expect(video(plan).filters.single, startsWith('scale=1920:1920:'));
+      expect(video(plan).filters.first, startsWith('scale=1920:1920:'));
       expect(
-        video(plan).filters.single,
+        video(plan).filters.first,
         contains('force_original_aspect_ratio=decrease'),
       );
     });
 
-    test('"smaller" limits to 720p and a lower data rate', () {
-      final plan = phone.plan(clip(), {'size': 'small'}, softwareOnly);
+    test('a changed picture says its colour samples sit on the left', () {
+      final plan = space.plan(clip(), const {}, softwareOnly);
 
-      expect(video(plan).filters.single, startsWith('scale=1280:1280:'));
-      expect(video(plan).args, containsAllInOrder(['-maxrate', '4M']));
+      expect(video(plan).filters.first, contains('out_chroma_loc=left'));
+      expect(
+        video(plan).args,
+        contains('av1_metadata=chroma_sample_position=vertical'),
+      );
+    });
+
+    test('more than 30 frames a second is halved', () {
+      ConversionPlan at(double fps) =>
+          space.plan(clip(fps: fps), const {}, softwareOnly);
+
+      expect(rate(at(60)), ['30']);
+      expect(rate(at(50)), ['25']);
+      expect(rate(at(60000 / 1001)), ['30000/1001']);
+      expect(rate(at(120)), ['30']);
+      expect(rate(at(30)), isEmpty);
+      expect(rate(at(25)), isEmpty);
+    });
+
+    test('irregular timing at 30 or less is made constant', () {
+      final plan = space.plan(
+        clip(fps: 29.3, nominalFps: 30),
+        const {},
+        softwareOnly,
+      );
+
+      expect(rate(plan), isEmpty);
+      expect(plan.outputArgs, containsAllInOrder(['-fps_mode', 'cfr']));
+      expect(plan.notes, contains(PlanNote.variableFrameRateFixed));
     });
 
     test('HDR is tone-mapped before anything else', () {
-      final plan = phone.plan(
+      final plan = space.plan(
         clip(pixFmt: 'yuv420p10le', color: hlg),
         const {},
         withToneMapping,
       );
 
       expect(video(plan).filters.first, 'zscale=t=linear:npl=100');
-      expect(video(plan).filters.last, startsWith('scale='));
+      expect(video(plan).filters.last, 'format=yuv420p10le');
       expect(plan.notes, [PlanNote.hdrToneMapped]);
     });
 
     test('without tone-mapping support the user is warned instead', () {
-      final plan = phone.plan(clip(color: hlg), const {}, softwareOnly);
+      final plan = space.plan(clip(color: hlg), const {}, softwareOnly);
 
       expect(video(plan).filters.join(), isNot(contains('tonemap')));
       expect(plan.notes, [PlanNote.hdrNotConverted]);
     });
 
-    test('modest stereo sound is kept; surround is folded to stereo', () {
-      final kept = phone.plan(clip(), const {}, softwareOnly);
-      final folded = phone.plan(
-        clip(audio: [track('ac3', channels: 6)]),
-        const {},
-        softwareOnly,
-      );
+    test('sound becomes AAC for speech; small AAC is kept', () {
+      AudioAction audio(AudioStream track) =>
+          space.plan(clip(audio: [track]), const {}, softwareOnly).audio;
 
-      expect(kept.audio, isA<AudioCopy>());
-      expect((folded.audio as AudioEncode).args, contains('-ac'));
+      final large = audio(track('aac', bitRate: 320000)) as AudioEncode;
+      expect(large.codec, 'aac');
+      expect(large.args, ['-b:a', '96k']);
+      expect(audio(track('aac', bitRate: 96000)), isA<AudioCopy>());
+      expect(audio(track('aac', bitRate: null)), isA<AudioEncode>());
+      expect(
+        (audio(track('ac3', channels: 6)) as AudioEncode).args,
+        containsAllInOrder(['-ac', '2']),
+      );
     });
   });
 

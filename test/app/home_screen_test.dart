@@ -200,10 +200,7 @@ void main() {
       expect(find.textContaining('holiday_av1-crf35.mp4'), findsOneWidget);
       expect(find.textContaining('holiday_hevc-crf24.mp4'), findsOneWidget);
       // Each job says what was changed, in the words of the panel.
-      expect(
-        find.text('For the archive · Format: Works everywhere'),
-        findsOneWidget,
-      );
+      expect(find.text('Archive · Format: Works everywhere'), findsOneWidget);
     });
 
     testWidgets('a job lists every option that was chosen for it', (

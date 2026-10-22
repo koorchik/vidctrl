@@ -28,11 +28,14 @@ class AppLocalizationsUk extends AppLocalizations {
   String get clearFinished => 'Прибрати готові';
 
   @override
-  String get scenarioArchiveTitle => 'Для архіву';
+  String get scenarioArchiveTitle => 'В архів';
+
+  @override
+  String get scenarioArchiveSubtitle => 'якість без втрат';
 
   @override
   String get scenarioArchiveHint =>
-      'Відео з камери займатимуть значно менше місця й виглядатимуть так само, як оригінал. Дати зйомки, дані камери, звук і кольори зберігаються.';
+      'Відео з камери займають значно менше місця й виглядають так само, як оригінали. Дати, дані камери, звук і кольори зберігаються.';
 
   @override
   String get scenarioResolveTitle => 'Монтувати в Resolve';
@@ -476,11 +479,18 @@ class AppLocalizationsUk extends AppLocalizations {
   String get cmdOutput => 'Куди записується результат';
 
   @override
-  String get scenarioShareTitle => 'Надіслати на телефон';
+  String get scenarioSpaceTitle => 'Менше місця';
 
   @override
-  String get scenarioShareHint =>
-      'Маленький файл, що відтворюється на будь-якому телефоні, у Telegram та інших месенджерах. У Telegram надсилайте як файл, щоб зберегти цю якість.';
+  String get scenarioSpaceSubtitle => 'якість достатня';
+
+  @override
+  String get scenarioSpaceHint =>
+      'Для записів дзвінків та інших відео про всяк випадок: значно менші файли, які все ще приємно дивитися. Дрібні деталі м\'якшають.';
+
+  @override
+  String get scenarioSpaceLimit =>
+      'Щонайбільше 1080p і 30 кадрів за секунду: більші відео зменшуються.';
 
   @override
   String get scenarioAudioTitle => 'Дістати звук';
@@ -501,15 +511,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get scenarioRemuxHint =>
       'За секунди перекладає відео в інший тип файлу, не змінюючи якості зображення.';
-
-  @override
-  String get optionSizeTitle => 'Розмір';
-
-  @override
-  String get shareSmall => 'Менший';
-
-  @override
-  String get shareStandard => 'Стандартний';
 
   @override
   String get optionFormatTitle => 'Тип файлу';
@@ -934,4 +935,46 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get personalTag => 'Особисті дані: хто, де, коли або чим зняв відео';
+
+  @override
+  String get archiveQualityHelp => 'Як архів зберігає якість';
+
+  @override
+  String get archiveQualityTitle => 'Як архів зберігає якість';
+
+  @override
+  String get archiveQualityIntro =>
+      'Архівна копія заміняє оригінал, тож має виглядати так само. Водночас вона має заощаджувати місце — важити не більше, ніж потрібно для такої якості. Поєднати ці дві вимоги — одне з головних завдань VidCtrl.';
+
+  @override
+  String get archiveQualityXpsnrValue => '42 дБ';
+
+  @override
+  String get archiveQualityXpsnr =>
+      'Метрика, що оцінює відмінність копії від оригіналу з огляду на те, наскільки її помітно оку. Від 42 дБ втрат не видно. Поріг суворий: на зернистому відео різниці не видно навіть при 41 дБ.';
+
+  @override
+  String get archiveQualityVmaf =>
+      'Метрика Netflix, що оцінює копію за шкалою до 100 так, як її оцінили б глядачі. Від 95 різниці не видно, навіть якщо поставити копію й оригінал поруч, а на кілька пунктів нижче її все ще важко помітити.';
+
+  @override
+  String get archiveQualityTunedTitle => 'Виміряно, а не вгадано';
+
+  @override
+  String get archiveQualityTuned =>
+      'Для кожного способу кодування в архіві — на процесорі, відеокарті NVIDIA чи Mac — налаштування підібрано окремо: найменший файл, що навіть на складному відео досягає цих порогів. Звичайні відео мають запас.';
+
+  @override
+  String get archiveQualityCheckedTitle => 'Перевірено перед кожним випуском';
+
+  @override
+  String get archiveQualityChecked =>
+      'На Linux, Windows і macOS автоматична перевірка кодує тестове відео з типовими налаштуваннями архіву, тим самим FFmpeg, що постачається із застосунком, і порівнює результат з оригіналом. Якщо якість нижча за потрібну, версія не виходить.';
+
+  @override
+  String get archiveQualityYoursTitle => 'Можна перевірити й своє відео';
+
+  @override
+  String get archiveQualityYours =>
+      'У черзі, у меню ⋯ готового відео, виберіть «Порівняти з оригіналом»: застосунок порівняє копію з оригіналом і простими словами скаже, наскільки вони схожі.';
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vidctrl/app/home/scenario_texts.dart';
 import 'package:vidctrl/app/home/widgets/recipe_pane.dart';
 import 'package:vidctrl/app/recipe/recipe.dart';
 import 'package:vidctrl/app/recipe/recipe_controller.dart';
@@ -9,6 +10,7 @@ import 'package:vidctrl/app/theme.dart';
 import 'package:vidctrl/app/window.dart';
 import 'package:vidctrl/core/scenarios/registry.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
+import 'package:vidctrl/l10n/app_localizations.dart';
 
 import '../support/fake_media.dart';
 import '../support/fakes.dart';
@@ -31,9 +33,17 @@ Iterable<OptionValues> combinations(List<PresetOption> options) sync* {
 /// middle of a word because the word is wider than its space.
 ///
 /// Texts meant to shorten to one line (the technical summary, a folder name)
-/// are exempt: the full text is in a tooltip or beside them.
+/// are exempt: the full text is in a tooltip or beside them. The goals'
+/// titles and subtitles are not, though some take one line.
 List<String> textProblems(WidgetTester tester) {
   final problems = <String>[];
+  final l10n = AppLocalizations.of(tester.element(find.byType(RecipePane)))!;
+  final goalTexts = {
+    for (final scenario in scenarios) ...[
+      scenarioTitle(l10n, scenario.id),
+      scenarioSubtitle(l10n, scenario.id),
+    ],
+  };
   final paragraphs = tester.renderObjectList<RenderParagraph>(
     find.descendant(
       of: find.byType(RecipePane),
@@ -43,7 +53,8 @@ List<String> textProblems(WidgetTester tester) {
   for (final paragraph in paragraphs) {
     final text = paragraph.text.toPlainText();
     final singleLine = paragraph.maxLines == 1;
-    if (paragraph.didExceedMaxLines && !singleLine) {
+    if (paragraph.didExceedMaxLines &&
+        (!singleLine || goalTexts.contains(text))) {
       problems.add('cut off: "$text"');
     }
     final width = paragraph.constraints.maxWidth;

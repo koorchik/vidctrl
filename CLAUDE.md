@@ -5,11 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A Flutter desktop app (Linux, Windows, macOS) that converts batches of videos
-by goal ("For the archive", "Edit in DaVinci Resolve", "Send to a phone", …). It
-drives the `ffmpeg` and `ffprobe` executables as separate processes; it does
-not link FFmpeg libraries. Each release carries a pinned FFmpeg 8.1 (see
-"Bundled FFmpeg"); in development it is found on `PATH` (FFmpeg 8 or newer,
-with `libx265`, `libsvtav1`, `prores_ks`, `dnxhd`).
+by goal ("Archive", "Save space", "Edit in DaVinci Resolve", …). It drives the
+`ffmpeg` and `ffprobe` executables as separate processes; it does not link
+FFmpeg libraries. Each release carries a pinned FFmpeg 8.1 (see "Bundled
+FFmpeg"); in development it is found on `PATH` (FFmpeg 8 or newer, with
+`libx265`, `libsvtav1`, `prores_ks`, `dnxhd`).
 
 What is built and what is not: `docs/ROADMAP.md`.
 
@@ -38,7 +38,7 @@ tool/fetch_ffmpeg.sh linux                            # the pinned FFmpeg into t
 
 dart run tool/convert.dart --list                     # the engine without the UI
 dart run tool/convert.dart archive.master clip.mov --dry-run
-dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for "For the archive"
+dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for the archive
 ```
 
 - Several `--exclude-tags` flags do not combine; use the `"a || b"` form.
@@ -212,12 +212,12 @@ videos and gets small files that look the same, with no help.
   anything bigger opens in a small window ("More options…"). If the test
   fails after a change, make the change fit; do not raise the minimum window
   size without a reason.
-- **Safe defaults.** "For the archive" is pre-selected: one quality, the
-  highest, in AV1 (HEVC where FFmpeg has no AV1). Drop videos, press Add to
-  queue, done. Its format and speed rows each say under them what the chosen
-  variant trades away (`choiceHint` in `scenario_texts.dart`; each variant's
-  is also its tooltip). With such rows, the goal's own explanation shows
-  only in the roomier window, so the smallest one still fits.
+- **Safe defaults.** "Archive" is pre-selected: one quality, the highest, in
+  AV1 (HEVC where FFmpeg has no AV1). Drop videos, press Add to queue, done.
+  Its format and speed rows each say under them what the chosen variant trades
+  away (`choiceHint` in `scenario_texts.dart`; each variant's is also its
+  tooltip). With such rows, the goal's own explanation shows only in the
+  roomier window, so the smallest one still fits.
 - More is available on request only: "More options…", and "Show the command"
   and "Video details" in the ⋯ menus.
 
@@ -265,7 +265,12 @@ How a widget stays right in both:
 1. Write `lib/core/scenarios/<name>.dart` with a `Scenario` and its presets.
    Give the plan a `nameSuffix` that names the settings that matter.
 2. Add it to `scenarios` in `registry.dart`.
-3. Add its texts to both ARB files and to `home/scenario_texts.dart`.
+3. Add its texts to both ARB files and to `home/scenario_texts.dart`. Keep
+   the title short; what sets it apart from a like goal goes in a subtitle
+   (`scenarioSubtitle`), shown smaller under it on the tile ("Archive" / "no
+   quality loss"). `no_scrolling_test.dart` fails if either is cut off. What
+   the goal does to every video unasked (a size limit) goes in a notice
+   (`scenarioNotice`), shown under its explanation in `tertiary`.
 4. Add table-driven plan tests in `test/core/scenarios/`, a row in
    `file_names_test.dart`, and at least one real conversion in
    `test/integration/conversion_test.dart`.

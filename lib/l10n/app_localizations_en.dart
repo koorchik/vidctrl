@@ -28,11 +28,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearFinished => 'Clear finished';
 
   @override
-  String get scenarioArchiveTitle => 'For the archive';
+  String get scenarioArchiveTitle => 'Archive';
+
+  @override
+  String get scenarioArchiveSubtitle => 'no quality loss';
 
   @override
   String get scenarioArchiveHint =>
-      'Camera videos take far less space and look the same as the originals. Shooting dates, camera details, sound and colours are kept.';
+      'Camera videos take far less space and look the same as the originals. Dates, camera details, sound and colours are kept.';
 
   @override
   String get scenarioResolveTitle => 'Edit in DaVinci Resolve';
@@ -474,11 +477,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cmdOutput => 'Where the result is written';
 
   @override
-  String get scenarioShareTitle => 'Send to a phone';
+  String get scenarioSpaceTitle => 'Save space';
 
   @override
-  String get scenarioShareHint =>
-      'Small and plays on any phone, in Telegram and other messengers. In Telegram, send it as a file to keep this quality.';
+  String get scenarioSpaceSubtitle => 'good enough';
+
+  @override
+  String get scenarioSpaceHint =>
+      'For call recordings and other videos kept just in case: much smaller files that are still good to watch. Fine details soften.';
+
+  @override
+  String get scenarioSpaceLimit =>
+      'At most 1080p and 30 frames a second: larger videos are reduced.';
 
   @override
   String get scenarioAudioTitle => 'Get the sound';
@@ -500,15 +510,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get scenarioRemuxHint =>
       'Puts the video into another kind of file in seconds, without touching the picture quality.';
-
-  @override
-  String get optionSizeTitle => 'Size';
-
-  @override
-  String get shareSmall => 'Smaller';
-
-  @override
-  String get shareStandard => 'Standard';
 
   @override
   String get optionFormatTitle => 'File type';
@@ -930,4 +931,46 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get personalTag =>
       'Personal detail: who, where, when or with what the video was made';
+
+  @override
+  String get archiveQualityHelp => 'How the archive keeps the quality';
+
+  @override
+  String get archiveQualityTitle => 'How the archive keeps the quality';
+
+  @override
+  String get archiveQualityIntro =>
+      'A master copy takes the place of the original, so it has to look the same. It is also there to save space, so it should weigh no more than that quality needs. Getting both right is one of the main aims of VidCtrl.';
+
+  @override
+  String get archiveQualityXpsnrValue => '42 dB';
+
+  @override
+  String get archiveQualityXpsnr =>
+      'A measure of how far a copy is from its original, weighing each difference by how visible it is. From 42 dB, no loss is visible. The bar is strict: on grainy footage, no difference shows at 41 dB either.';
+
+  @override
+  String get archiveQualityVmaf =>
+      'Netflix\'s measure, which rates a copy on a scale up to 100 the way viewers would. From 95, no difference shows even side by side, and a few points lower it is still hard to spot.';
+
+  @override
+  String get archiveQualityTunedTitle => 'Measured, not guessed';
+
+  @override
+  String get archiveQualityTuned =>
+      'For each way of encoding the archive offers, on the processor, NVIDIA graphics or a Mac, the settings were chosen separately: the smallest file that reaches these bars even on hard footage. Ordinary videos have a margin.';
+
+  @override
+  String get archiveQualityCheckedTitle => 'Checked before every release';
+
+  @override
+  String get archiveQualityChecked =>
+      'On Linux, Windows and macOS, an automatic check encodes a test video with the archive\'s default settings, with the same FFmpeg the app ships, and compares the result with the original. If the quality falls short, the version is not released.';
+
+  @override
+  String get archiveQualityYoursTitle => 'Your own video can be checked too';
+
+  @override
+  String get archiveQualityYours =>
+      'In the queue, in the ⋯ menu of a finished video, choose “Compare with the original”: the app compares the copy with its original and says in plain words how alike they are.';
 }

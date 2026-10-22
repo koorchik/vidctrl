@@ -138,7 +138,7 @@ void main() {
       await sources().addPaths(['/videos/a.mp4']);
       queue().addSelected();
 
-      recipe().selectPreset('share.phone');
+      recipe().selectPreset('space.small');
 
       expect(jobs().single.recipe.presetId, 'archive.master');
       expect(jobs().single.plan.nameSuffix, '_av1-crf35');
@@ -563,7 +563,7 @@ void main() {
 
     test('Use these settings restores the panel and the selection', () async {
       await sources().addPaths(['/videos/a.mp4', '/videos/b.mp4']);
-      recipe().selectPreset('share.phone');
+      recipe().selectPreset('space.small');
       sources().select(video('a.mp4').id);
       queue().addSelected();
       recipe().selectPreset('archive.master');
@@ -571,7 +571,7 @@ void main() {
 
       queue().useSettings(jobs().single.id);
 
-      expect(container.read(recipeProvider).recipe.presetId, 'share.phone');
+      expect(container.read(recipeProvider).recipe.presetId, 'space.small');
       expect(sourceState().selectedIds, {video('a.mp4').id});
     });
   });

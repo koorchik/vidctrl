@@ -1,4 +1,4 @@
-// Measures how close each way of encoding in "For the archive" comes to the
+// Measures how close each way of encoding in "Archive" comes to the
 // original, to set the quality numbers at the top of
 // `lib/core/scenarios/archive.dart`.
 //

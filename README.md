@@ -34,12 +34,14 @@ other:
 
 ## What it does today
 
-- **For the archive.** Turns camera videos into a master copy for keeping:
-  a fraction of the size, looking the same as the original. One quality, the
-  highest; the defaults need no thought. That quality was measured, not
-  guessed ([how](#how-the-archive-quality-was-measured)): the smallest file
-  that still looks the same. Shooting dates, place, timecode and
-  the camera's make and model are kept. Two choices, each saying what it
+- **Archive** (*no quality loss*). Turns camera videos into a master copy for
+  keeping: a fraction of the size, looking the same as the original. One
+  quality, the highest; the defaults need no thought. That quality was
+  measured, not guessed ([how](#how-the-archive-quality-was-measured)): the
+  smallest file that still looks the same. The "?" at the end of its
+  explanation opens the short version: the two measures, the levels they must
+  reach, and the check before every release. Shooting dates, place, timecode
+  and the camera's make and model are kept. Two choices, each saying what it
   trades away:
   - *Format:* *Smallest file* (AV1, the default) or *Works everywhere*
     (HEVC, a larger file that also plays on older iPhones, Macs and TVs).
@@ -53,8 +55,14 @@ other:
 - **Edit in DaVinci Resolve (Linux).** Makes camera and screen recordings open
   with both picture and sound in Resolve on Linux, for Resolve Studio and for
   the free edition.
-- **Send to a phone.** A small file that plays on any phone and in messengers
-  such as Telegram. HDR footage is adjusted to look right on ordinary screens.
+- **Save space** (*good enough*). For recordings of video calls and other
+  videos kept just in case: the smallest file that is still decent to watch.
+  AV1 at most 1080p and 30 frames a second, with sound for speech (AAC at 96
+  kbit/s). Set on the hardest footage measured (grass, leaves and smoke from a
+  4K camera), it keeps VMAF above 91: fine detail softens a little, the rest
+  stays clear. Camera videos come out 8 to 20 times smaller; a video call
+  recording, which its app has already squeezed, only about a tenth smaller.
+  HDR footage is adjusted to look right on ordinary screens.
 - **Get the sound.** Saves the sound track as its own file, untouched by
   default, or as MP3, M4A, WAV or FLAC.
 - **Remove personal data.** Strips place, date, camera and author
@@ -71,8 +79,8 @@ the picture copied untouched; only what must be re-encoded is re-encoded.
 
 A master copy is kept instead of the original, so it has to look the same,
 and it is made to save space, so it should be no larger than that needs.
-Getting both right was one of the main aims of the app. Each way "For the
-archive" can encode was set to the smallest file that still looks the same
+Getting both right was one of the main aims of the app. Each way the archive
+can encode was set to the smallest file that still looks the same
 as the original:
 
 - **The measure:** XPSNR (FFmpeg's `xpsnr` filter), a comparison of the
@@ -129,7 +137,7 @@ The window has three parts:
 
 Change the settings and press Add to queue again to get the same video in
 another form: each job keeps the settings it was added with, and output names
-carry them (`clip_av1-crf35.mp4`, `clip_hevc-crf24.mp4`, `clip_phone-1080p.mp4`).
+carry them (`clip_av1-crf35.mp4`, `clip_hevc-crf24.mp4`, `clip_av1-crf43.mp4`).
 
 Also:
 
@@ -175,11 +183,11 @@ Early but working on Linux. Not done yet:
   the computer awake and pausing are not implemented, and the tests of
   stopping a conversion part-way fail.
 - Only one video is converted at a time.
-- "For the archive" is measured on footage from a Nikon camera, a phone and
-  a slideshow, on the processor, NVIDIA graphics and an M1 Mac
-  ([how](#how-the-archive-quality-was-measured)). Other cameras, and Intel
-  and AMD graphics, are not measured yet. The other goals' quality
-  levels are starting values.
+- "Archive" is measured on footage from a Nikon camera, a phone and a
+  slideshow, on the processor, NVIDIA graphics and an M1 Mac
+  ([how](#how-the-archive-quality-was-measured)). Other cameras, and Intel and
+  AMD graphics, are not measured yet. The other goals' quality levels are
+  starting values.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).
 

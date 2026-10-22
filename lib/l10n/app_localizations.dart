@@ -137,13 +137,19 @@ abstract class AppLocalizations {
   /// No description provided for @scenarioArchiveTitle.
   ///
   /// In en, this message translates to:
-  /// **'For the archive'**
+  /// **'Archive'**
   String get scenarioArchiveTitle;
+
+  /// No description provided for @scenarioArchiveSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'no quality loss'**
+  String get scenarioArchiveSubtitle;
 
   /// No description provided for @scenarioArchiveHint.
   ///
   /// In en, this message translates to:
-  /// **'Camera videos take far less space and look the same as the originals. Shooting dates, camera details, sound and colours are kept.'**
+  /// **'Camera videos take far less space and look the same as the originals. Dates, camera details, sound and colours are kept.'**
   String get scenarioArchiveHint;
 
   /// No description provided for @scenarioResolveTitle.
@@ -920,17 +926,29 @@ abstract class AppLocalizations {
   /// **'Where the result is written'**
   String get cmdOutput;
 
-  /// No description provided for @scenarioShareTitle.
+  /// No description provided for @scenarioSpaceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Send to a phone'**
-  String get scenarioShareTitle;
+  /// **'Save space'**
+  String get scenarioSpaceTitle;
 
-  /// No description provided for @scenarioShareHint.
+  /// No description provided for @scenarioSpaceSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Small and plays on any phone, in Telegram and other messengers. In Telegram, send it as a file to keep this quality.'**
-  String get scenarioShareHint;
+  /// **'good enough'**
+  String get scenarioSpaceSubtitle;
+
+  /// No description provided for @scenarioSpaceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For call recordings and other videos kept just in case: much smaller files that are still good to watch. Fine details soften.'**
+  String get scenarioSpaceHint;
+
+  /// No description provided for @scenarioSpaceLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'At most 1080p and 30 frames a second: larger videos are reduced.'**
+  String get scenarioSpaceLimit;
 
   /// No description provided for @scenarioAudioTitle.
   ///
@@ -967,24 +985,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Puts the video into another kind of file in seconds, without touching the picture quality.'**
   String get scenarioRemuxHint;
-
-  /// No description provided for @optionSizeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Size'**
-  String get optionSizeTitle;
-
-  /// No description provided for @shareSmall.
-  ///
-  /// In en, this message translates to:
-  /// **'Smaller'**
-  String get shareSmall;
-
-  /// No description provided for @shareStandard.
-  ///
-  /// In en, this message translates to:
-  /// **'Standard'**
-  String get shareStandard;
 
   /// No description provided for @optionFormatTitle.
   ///
@@ -1705,6 +1705,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Personal detail: who, where, when or with what the video was made'**
   String get personalTag;
+
+  /// No description provided for @archiveQualityHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'How the archive keeps the quality'**
+  String get archiveQualityHelp;
+
+  /// No description provided for @archiveQualityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How the archive keeps the quality'**
+  String get archiveQualityTitle;
+
+  /// No description provided for @archiveQualityIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'A master copy takes the place of the original, so it has to look the same. It is also there to save space, so it should weigh no more than that quality needs. Getting both right is one of the main aims of VidCtrl.'**
+  String get archiveQualityIntro;
+
+  /// No description provided for @archiveQualityXpsnrValue.
+  ///
+  /// In en, this message translates to:
+  /// **'42 dB'**
+  String get archiveQualityXpsnrValue;
+
+  /// No description provided for @archiveQualityXpsnr.
+  ///
+  /// In en, this message translates to:
+  /// **'A measure of how far a copy is from its original, weighing each difference by how visible it is. From 42 dB, no loss is visible. The bar is strict: on grainy footage, no difference shows at 41 dB either.'**
+  String get archiveQualityXpsnr;
+
+  /// No description provided for @archiveQualityVmaf.
+  ///
+  /// In en, this message translates to:
+  /// **'Netflix\'s measure, which rates a copy on a scale up to 100 the way viewers would. From 95, no difference shows even side by side, and a few points lower it is still hard to spot.'**
+  String get archiveQualityVmaf;
+
+  /// No description provided for @archiveQualityTunedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured, not guessed'**
+  String get archiveQualityTunedTitle;
+
+  /// No description provided for @archiveQualityTuned.
+  ///
+  /// In en, this message translates to:
+  /// **'For each way of encoding the archive offers, on the processor, NVIDIA graphics or a Mac, the settings were chosen separately: the smallest file that reaches these bars even on hard footage. Ordinary videos have a margin.'**
+  String get archiveQualityTuned;
+
+  /// No description provided for @archiveQualityCheckedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked before every release'**
+  String get archiveQualityCheckedTitle;
+
+  /// No description provided for @archiveQualityChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'On Linux, Windows and macOS, an automatic check encodes a test video with the archive\'s default settings, with the same FFmpeg the app ships, and compares the result with the original. If the quality falls short, the version is not released.'**
+  String get archiveQualityChecked;
+
+  /// No description provided for @archiveQualityYoursTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own video can be checked too'**
+  String get archiveQualityYoursTitle;
+
+  /// No description provided for @archiveQualityYours.
+  ///
+  /// In en, this message translates to:
+  /// **'In the queue, in the ⋯ menu of a finished video, choose “Compare with the original”: the app compares the copy with its original and says in plain words how alike they are.'**
+  String get archiveQualityYours;
 }
 
 class _AppLocalizationsDelegate

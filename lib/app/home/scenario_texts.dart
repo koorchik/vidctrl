@@ -13,7 +13,7 @@ import '../../l10n/app_localizations.dart';
 IconData scenarioIcon(String scenarioId) => switch (scenarioId) {
   'archive' => Icons.inventory_2_rounded,
   'resolve' => Icons.movie_edit,
-  'share' => Icons.smartphone_rounded,
+  'space' => Icons.compress_rounded,
   'audio' => Icons.music_note_rounded,
   'privacy' => Icons.shield_outlined,
   'remux' => Icons.swap_horiz_rounded,
@@ -24,18 +24,37 @@ String scenarioTitle(AppLocalizations l10n, String scenarioId) =>
     switch (scenarioId) {
       'archive' => l10n.scenarioArchiveTitle,
       'resolve' => l10n.scenarioResolveTitle,
-      'share' => l10n.scenarioShareTitle,
+      'space' => l10n.scenarioSpaceTitle,
       'audio' => l10n.scenarioAudioTitle,
       'privacy' => l10n.scenarioPrivacyTitle,
       'remux' => l10n.scenarioRemuxTitle,
       _ => scenarioId,
     };
 
+/// What sets a goal apart from a like one, shown under its title in smaller
+/// type: the archive keeps the quality, "Save space" gives some up. Empty
+/// for the others, whose titles say it all.
+String scenarioSubtitle(AppLocalizations l10n, String scenarioId) =>
+    switch (scenarioId) {
+      'archive' => l10n.scenarioArchiveSubtitle,
+      'space' => l10n.scenarioSpaceSubtitle,
+      _ => '',
+    };
+
+/// What a goal does to every video that a person may not expect, shown
+/// under its explanation in the colour for things worth noticing. Empty for
+/// goals that change nothing unasked.
+String scenarioNotice(AppLocalizations l10n, String scenarioId) =>
+    switch (scenarioId) {
+      'space' => l10n.scenarioSpaceLimit,
+      _ => '',
+    };
+
 String scenarioHint(AppLocalizations l10n, String scenarioId) =>
     switch (scenarioId) {
       'archive' => l10n.scenarioArchiveHint,
       'resolve' => l10n.scenarioResolveHint,
-      'share' => l10n.scenarioShareHint,
+      'space' => l10n.scenarioSpaceHint,
       'audio' => l10n.scenarioAudioHint,
       'privacy' => l10n.scenarioPrivacyHint,
       'remux' => l10n.scenarioRemuxHint,
@@ -61,7 +80,6 @@ String optionTitle(AppLocalizations l10n, String presetId, String optionId) =>
       'codec' when presetId.startsWith('archive') => l10n.archiveFormatTitle,
       'codec' => l10n.optionCodecTitle,
       'speed' => l10n.archiveSpeedTitle,
-      'size' => l10n.optionSizeTitle,
       'format' => l10n.optionFormatTitle,
       'mode' => l10n.optionModeTitle,
       // Resolve's quality levels are told apart by the size they make.
@@ -85,8 +103,6 @@ String choiceLabel(AppLocalizations l10n, String presetId, String choice) =>
       'smaller' => l10n.sizeSmaller,
       'balanced' => l10n.sizeBalanced,
       'best' => l10n.sizeBest,
-      'small' => l10n.shareSmall,
-      'standard' => l10n.shareStandard,
       'original' => l10n.formatOriginal,
       'quick' => l10n.modeQuick,
       'thorough' => l10n.modeThorough,

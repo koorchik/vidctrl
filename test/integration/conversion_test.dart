@@ -30,8 +30,8 @@ import 'package:vidctrl/core/scenarios/archive.dart';
 import 'package:vidctrl/core/scenarios/extract_audio.dart';
 import 'package:vidctrl/core/scenarios/remux.dart';
 import 'package:vidctrl/core/scenarios/resolve_linux.dart';
+import 'package:vidctrl/core/scenarios/save_space.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
-import 'package:vidctrl/core/scenarios/share_phone.dart';
 import 'package:vidctrl/core/scenarios/strip_metadata.dart';
 
 import '../support/fakes.dart';
@@ -270,7 +270,7 @@ void main() {
     });
   });
 
-  group('For the archive', () {
+  group('Archive', () {
     const archive = ArchivePreset();
     const hevc = {'codec': 'hevc'};
 
@@ -432,8 +432,8 @@ void main() {
     });
   });
 
-  group('Send to a phone', () {
-    test('a large HDR video becomes ordinary 1080p H.264', () async {
+  group('Save space', () {
+    test('a large HDR video becomes ordinary 1080p AV1', () async {
       if (unavailable()) return;
       final source = await media!.clip(
         'hdr_big.mov',
@@ -450,13 +450,13 @@ void main() {
         filters: [hlgTags],
       );
 
-      final output = await convert(const SharePhonePreset(), source);
+      final output = await convert(const SaveSpacePreset(), source);
 
-      expect(output.video!.codec, 'h264');
-      expect(output.video!.pixFmt, 'yuv420p');
+      expect(output.video!.codec, 'av1');
       expect(output.video!.width, 1920);
       expect(output.video!.height, 1080);
       expect(output.video!.color.transfer, 'bt709');
+      expect(output.video!.chromaLocation, 'left');
       expect(output.audio.single.codec, 'aac');
     });
 
@@ -464,10 +464,32 @@ void main() {
       if (unavailable()) return;
       final source = await media!.clip('portrait.mp4', size: '1440x2560');
 
-      final output = await convert(const SharePhonePreset(), source);
+      final output = await convert(const SaveSpacePreset(), source);
 
       expect(output.video!.width, 1080);
       expect(output.video!.height, 1920);
+    });
+
+    test('60 frames a second become 30, the length unchanged', () async {
+      if (unavailable()) return;
+      final source = await media!.clip('fast.mp4', rate: '60');
+
+      final output = await convert(const SaveSpacePreset(), source);
+
+      expect(output.video!.frameRate, closeTo(30, 0.01));
+      expect(
+        output.duration.inMilliseconds,
+        closeTo(const Duration(seconds: 2).inMilliseconds, 50),
+      );
+    });
+
+    test('a small camera video keeps where its colour samples sit', () async {
+      if (unavailable()) return;
+      final source = await media!.clip('camera.mov', pixFmt: 'yuvj420p');
+
+      final output = await convert(const SaveSpacePreset(), source);
+
+      expect(output.video!.chromaLocation, 'left');
     });
   });
 

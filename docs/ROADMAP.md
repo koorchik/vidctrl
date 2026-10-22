@@ -5,10 +5,10 @@
 - **Engine:** file inspection, per-file plans, FFmpeg runner with progress,
   cancel and pause, safe output handling, capability detection
   (encoders, working hardware encoders, accepted SVT-AV1 parameters).
-- **Goals:** "For the archive" (AV1 or HEVC, processor or graphics card,
-  camera tags kept), "Edit in DaVinci Resolve" on Linux (Studio and free),
-  "Send to a phone", "Get the sound", "Remove personal data" and "Change
-  file type".
+- **Goals:** "Archive" (AV1 or HEVC, processor or graphics card, camera tags
+  kept), "Edit in DaVinci Resolve" on Linux (Studio and free), "Save space"
+  (AV1 up to 1080p for call recordings), "Get the sound", "Remove personal
+  data" and "Change file type".
 - **UI:** videos, settings and queue as separate parts; the queue starts by
   itself and can be paused, reordered and edited; the same video can be
   queued with different settings, and output names carry the settings;
@@ -41,15 +41,18 @@
 1. **Finish the newer goals**
    - Remove personal data: show a report of what was removed, and offer
      neutral file names (a name can give away a place or a date).
-   - Send to a phone: "fit into N MB" for services with a size limit.
    - Get the sound: choose which track, or all of them.
-2. **Quality calibration.** "For the archive" is matched with XPSNR on 4K
-   clips from a Nikon camera, a phone and a slideshow. Still to do: footage
-   from other cameras (Sony, Canon), matching the numbers with VMAF too
-   (every shipped FFmpeg has `libvmaf`; the calibration tool reads only
-   XPSNR so far), Intel and AMD graphics, Apple's beyond the M1, and the
-   other goals' quality levels. A fixed number cannot suit both calm and
-   busy footage; choosing it per video from a measured sample would.
+2. **Quality calibration.** "Archive" is matched with XPSNR on 4K clips from a
+   Nikon camera, a phone and a slideshow. Still to do: footage from other
+   cameras (Sony, Canon), matching the numbers with VMAF too (every shipped
+   FFmpeg has `libvmaf`; the calibration tool reads only XPSNR so far), Intel
+   and AMD graphics, Apple's beyond the M1, and the other goals' quality
+   levels. "Save space" is set on a 4K family video and a Google Meet
+   recording; screen sharing with small text and phone footage are not
+   measured yet. Its one number leaves already squeezed recordings, such as
+   calls, only about a tenth smaller, where a higher one would still look the
+   same. A fixed number cannot suit both calm and busy footage; choosing it
+   per video from a measured sample would.
 3. **Check in Resolve.** Studio 21.1.1 on Linux is checked: every codec the
    goal keeps, every sound format, sync after a rewrap, and the outputs of
    each variant, also with hardware decoding off (the findings are at the

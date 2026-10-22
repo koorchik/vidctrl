@@ -72,7 +72,9 @@ bool canComparePlan(ConversionPlan plan) {
   final resized = video.filters.any(RegExp(r'^scale=\d+:').hasMatch);
   final toneMapped = video.filters.any((f) => f.startsWith('tonemap'));
   final retimed =
-      plan.outputArgs.contains('-r') || plan.outputArgs.contains('-fps_mode');
+      plan.outputArgs.contains('-r') ||
+      plan.outputArgs.contains('-fps_mode') ||
+      video.filters.any((f) => f.startsWith('fps='));
   return !resized && !toneMapped && !retimed;
 }
 
