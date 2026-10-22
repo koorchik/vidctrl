@@ -52,7 +52,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get archiveAv1Hint =>
-      'Відтворюється на комп’ютерах і новіших пристроях: iPhone 15 Pro і новіших, Mac з M3, телевізорах приблизно з 2020 року.';
+      'Відтворюється на комп’ютерах (Mac від M1) і новіших пристроях: iPhone 15 Pro і новіших, телевізорах приблизно з 2020 року.';
 
   @override
   String get archiveHevc => 'Працює всюди';

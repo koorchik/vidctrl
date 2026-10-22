@@ -13,7 +13,7 @@
   "scenarioResolveHint": "Makes videos open with picture and sound in Resolve on Linux.",
   "archiveFormatTitle": "Format",
   "archiveAv1": "Smallest file",
-  "archiveAv1Hint": "Plays on computers and newer devices: iPhone 15 Pro and later, Macs with M3, TVs from about 2020.",
+  "archiveAv1Hint": "Plays on computers (Macs from M1) and newer devices: iPhone 15 Pro and later, TVs from about 2020.",
   "archiveHevc": "Works everywhere",
   "archiveHevcHint": "The same look in a file up to a third larger. Plays almost everywhere, older iPhones, Macs and TVs included.",
   "archiveSpeedTitle": "Speed",

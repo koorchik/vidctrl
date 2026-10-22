@@ -179,7 +179,7 @@ abstract class AppLocalizations {
   /// No description provided for @archiveAv1Hint.
   ///
   /// In en, this message translates to:
-  /// **'Plays on computers and newer devices: iPhone 15 Pro and later, Macs with M3, TVs from about 2020.'**
+  /// **'Plays on computers (Macs from M1) and newer devices: iPhone 15 Pro and later, TVs from about 2020.'**
   String get archiveAv1Hint;
 
   /// No description provided for @archiveHevc.
