@@ -9,8 +9,6 @@ import '../../core/control/protocol.dart';
 import '../../core/control/views.dart';
 import '../../core/estimate/size_estimator.dart';
 import '../../core/ffmpeg/capabilities.dart';
-import '../../core/output/output_namer.dart';
-import '../../core/quality/quality_search.dart';
 import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
 import '../../l10n/app_localizations.dart';
@@ -19,10 +17,10 @@ import '../estimates/estimate_cache.dart';
 import '../home/scenario_texts.dart';
 import '../providers.dart';
 import '../queue/queue_controller.dart';
-import '../queue/queue_state.dart';
 import '../recipe/recipe.dart';
-import '../recipe/recipe_controller.dart';
 import '../sources/sources_controller.dart';
+import 'app_views.dart';
+import 'arguments.dart';
 
 // What the window does for each request of `vidctrl-client`. Every method
 // works through the notifiers the window's own buttons use, so the window
@@ -166,11 +164,11 @@ Future<Object?> _videosAdd(
   Map<String, Object?> params,
 ) async {
   final paths = [
-    for (final path in _items(params, 'paths')) _absolute(path, 'paths'),
+    for (final path in listParam(params, 'paths')) absolutePath(path, 'paths'),
   ];
   final entries = await _addPaths(ref, paths, wait: params['wait'] != false);
   if (entries.every((e) => e.id == null)) {
-    throw _bad(
+    throw badArgument(
       'Nothing could be added: there is no file, nor a folder with videos, '
       'at ${paths.join(', ')}.',
     );
@@ -244,9 +242,9 @@ Future<Object?> _videosList(
   Map<String, Object?> params,
 ) async {
   if (params['goal'] == null && params['options'] != null) {
-    throw _bad('Options go with a goal.');
+    throw badArgument('Options go with a goal.');
   }
-  final recipe = params['goal'] == null ? null : _recipe(ref, params);
+  final recipe = params['goal'] == null ? null : recipeFrom(ref, params);
   return {
     'videos': [
       for (final video in ref.read(sourcesProvider).videos)
@@ -290,8 +288,8 @@ Future<Object?> _videosRemove(
 ) async {
   final state = ref.read(sourcesProvider);
   final ids = <int>{};
-  for (final reference in _items(params, 'videos')) {
-    final video = _video(state, _reference(reference));
+  for (final reference in listParam(params, 'videos')) {
+    final video = findVideo(state, videoReference(reference));
     if (video == null) {
       throw ControlError(
         ControlErrorKind.notFound,
@@ -331,10 +329,11 @@ Future<Object?> _queueAdd(
   Map<String, Object?> params,
 ) async {
   // Everything is checked before anything is added.
-  final recipe = _recipe(ref, params, withSample: true);
-  final output = _output(ref, params);
+  final recipe = recipeFrom(ref, params, withSample: true);
+  final output = outputFrom(ref, params);
   final references = [
-    for (final reference in _items(params, 'videos')) _reference(reference),
+    for (final reference in listParam(params, 'videos'))
+      videoReference(reference),
   ];
   final listed = ref.read(sourcesProvider);
   for (final reference in references) {
@@ -347,7 +346,8 @@ Future<Object?> _queueAdd(
   }
   final newPaths = [
     for (final reference in references)
-      if (reference is String && _video(listed, reference) == null) reference,
+      if (reference is String && findVideo(listed, reference) == null)
+        reference,
   ];
   final added = newPaths.isEmpty
       ? const <_Added>[]
@@ -366,7 +366,7 @@ Future<Object?> _queueAdd(
         }
       }
     } else {
-      ids.add(_video(listed, reference)!.id);
+      ids.add(findVideo(listed, reference)!.id);
     }
   }
   if (ids.any(
@@ -392,214 +392,9 @@ Future<Object?> _queueAdd(
       .addVideos(ready, recipe: recipe, output: output);
   return {
     'goal': recipe.presetId,
-    'options': _applied(recipe),
+    'options': appliedOptions(recipe),
     'added': [for (final job in result.added) jobView(job).toJson()],
     'alreadyQueued': result.alreadyQueued,
     'skipped': skipped,
   };
-}
-
-// ---- Views --------------------------------------------------------------
-
-VideoView videoView(SourceVideo video, {GoalPreview? preview}) {
-  final info = video.info;
-  final picture = info?.video;
-  return VideoView(
-    id: video.id,
-    path: video.path,
-    status: video.status.name,
-    sizeBytes: info?.sizeBytes,
-    durationSeconds: info == null ? null : _seconds(info.duration),
-    width: picture?.width,
-    height: picture?.height,
-    videoCodec: picture?.codec,
-    audioCodecs: [for (final track in info?.audio ?? const []) track.codec],
-    hdr: picture?.color.isHdr ?? false,
-    preview: preview,
-  );
-}
-
-JobView jobView(QueueJob job) {
-  final progress = job.isActive ? job.progress : null;
-  final remaining = progress?.remaining;
-  final result = job.result;
-  return JobView(
-    id: job.id,
-    videoId: job.sourceId,
-    path: job.path,
-    goal: job.recipe.presetId,
-    options: _applied(job.recipe),
-    sample: job.recipe.isSample ? job.recipe.sample.name : null,
-    status: job.status.name,
-    fraction: progress?.fraction,
-    remainingSeconds: remaining == null ? null : _seconds(remaining),
-    attempt: job.attempt,
-    outputPath: job.outputPath.isEmpty ? null : job.outputPath,
-    outputBytes: result?.outputBytes,
-    quality: switch (job.quality) {
-      final choice? => _qualityView(choice),
-      null => null,
-    },
-    needsALook: job.needsALook,
-    errorLines: result?.errorLines ?? const [],
-  );
-}
-
-QualityView _qualityView(QualityChoice choice) => QualityView(
-  outcome: choice.outcome.name,
-  value: choice.value,
-  standardValue: choice.standardValue,
-  vmaf: choice.chosen.score.vmaf,
-  xpsnr: choice.chosen.score.lumaDb,
-  share: choice.share,
-);
-
-double _seconds(Duration d) => d.inMilliseconds / 1000;
-
-/// Every option of [recipe]'s goal, as its preset applies them.
-Map<String, String> _applied(Recipe recipe) {
-  final preset = findPreset(recipe.presetId)!;
-  return {
-    for (final option in preset.options)
-      option.id: preset.choice(recipe.values, option.id),
-  };
-}
-
-// ---- Arguments ----------------------------------------------------------
-
-ControlError _bad(String message) =>
-    ControlError(ControlErrorKind.badArgument, message);
-
-List<Object?> _items(Map<String, Object?> params, String key) {
-  final items = params[key];
-  if (items is! List || items.isEmpty) {
-    throw _bad('"$key" must be a list with at least one item.');
-  }
-  return items;
-}
-
-String _absolute(Object? path, String key) {
-  if (path is! String || !p.isAbsolute(path)) {
-    throw _bad('"$key" takes absolute paths; "$path" is not one.');
-  }
-  return p.normalize(path);
-}
-
-/// A video's id, or its path made plain.
-Object _reference(Object? reference) =>
-    reference is int ? reference : _absolute(reference, 'videos');
-
-SourceVideo? _video(SourcesState state, Object reference) {
-  if (reference is int) return state.byId(reference);
-  for (final video in state.videos) {
-    if (p.normalize(video.path) == reference) return video;
-  }
-  return null;
-}
-
-/// The goal and options asked for in [params], or the panel's goal and
-/// options where no goal is named; options given then change the panel's.
-/// The panel itself is left as it is.
-Recipe _recipe(
-  Ref ref,
-  Map<String, Object?> params, {
-  bool withSample = false,
-}) {
-  final goal = params['goal'];
-  final panel = ref.read(recipeProvider).recipe;
-  final preset = goal == null ? findPreset(panel.presetId)! : _preset(goal);
-  return Recipe(
-    presetId: preset.id,
-    values: {
-      if (goal == null) ...panel.values,
-      ..._options(preset, params['options']),
-    },
-    sample: withSample ? _sample(params['sample']) : SampleChoice.none,
-  );
-}
-
-Preset _preset(Object goal) {
-  if (goal is String) {
-    final preset = findPreset(goal);
-    if (preset != null) return preset;
-    for (final scenario in scenarios) {
-      if (scenario.id != goal) continue;
-      if (scenario.presets.length == 1) return scenario.presets.single;
-      throw _bad(
-        'The goal "$goal" comes in ${scenario.presets.length} kinds; name '
-        'one: ${[for (final kind in scenario.presets) kind.id].join(', ')}.',
-      );
-    }
-  }
-  final goals = [
-    for (final scenario in scenarios)
-      if (scenario.presets.length == 1)
-        scenario.id
-      else
-        for (final preset in scenario.presets) preset.id,
-  ];
-  throw _bad('There is no goal "$goal". Goals: ${goals.join(', ')}.');
-}
-
-OptionValues _options(Preset preset, Object? options) {
-  if (options == null) return const {};
-  if (options is! Map) {
-    throw _bad('"options" must map option ids to choice ids.');
-  }
-  final values = <String, String>{};
-  for (final MapEntry(:key, :value) in options.entries) {
-    final option = preset.options.where((o) => o.id == key).firstOrNull;
-    if (option == null) {
-      throw _bad(
-        preset.options.isEmpty
-            ? 'The goal ${preset.id} has no options.'
-            : 'The goal ${preset.id} has no option "$key". Options: '
-                  '${[for (final o in preset.options) o.id].join(', ')}.',
-      );
-    }
-    if (value is! String || !option.choices.contains(value)) {
-      throw _bad(
-        'The option ${option.id} of ${preset.id} has no choice "$value". '
-        'Choices: ${option.choices.join(', ')}.',
-      );
-    }
-    values[option.id] = value;
-  }
-  return values;
-}
-
-SampleChoice _sample(Object? sample) => switch (sample) {
-  null => SampleChoice.none,
-  'start' => SampleChoice.start,
-  'middle' => SampleChoice.middle,
-  _ => throw _bad('"sample" is start or middle, not "$sample".'),
-};
-
-/// Where results go: the panel's setting when nothing is asked; `next` for
-/// a folder beside each video (`subfolder` names it, and alone implies
-/// `next`); or a folder for all of them.
-OutputSettings _output(Ref ref, Map<String, Object?> params) {
-  final out = params['out'];
-  final subfolder = params['subfolder'];
-  if (subfolder != null &&
-      (subfolder is! String ||
-          subfolder.isEmpty ||
-          subfolder == '.' ||
-          subfolder == '..' ||
-          p.basename(subfolder) != subfolder)) {
-    throw _bad('"subfolder" is the name of one folder, not "$subfolder".');
-  }
-  if (out == null && subfolder == null) return ref.read(recipeProvider).output;
-  if (out == null || out == 'next') {
-    return subfolder is String
-        ? OutputSettings(subfolderName: subfolder)
-        : const OutputSettings();
-  }
-  if (subfolder != null) {
-    throw _bad('"subfolder" goes with out "next", not with a folder.');
-  }
-  return OutputSettings(
-    mode: OutputMode.customFolder,
-    customDir: _absolute(out, 'out'),
-  );
 }
