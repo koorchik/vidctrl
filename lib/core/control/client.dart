@@ -130,7 +130,7 @@ Future<int> _runClient(List<String> args, ClientIo io, _Output output) async {
     return output.fail(e);
   }
   if (command == null) {
-    io.out.write(quickStart('vidctrl-client'));
+    io.out.write(quickStart('vidctrl-client', os: Platform.operatingSystem));
     return ExitCode.ok;
   }
   if (command.offline) return command.run(null, output);

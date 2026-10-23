@@ -282,6 +282,35 @@ class AppLocalizationsUk extends AppLocalizations {
   String get website => 'Вебсайт';
 
   @override
+  String get agentTitle => 'Робота з ШІ-агентом';
+
+  @override
+  String get agentIntro =>
+      'Нехай ШІ-агент, наприклад Claude, додає відео й запускає конвертацію за вас. А ви стежите тут.';
+
+  @override
+  String get agentPromptLabel => 'Вставте це у свого агента';
+
+  @override
+  String get agentProgramLabel => 'Програма, якою користується агент';
+
+  @override
+  String get agentKindCommands =>
+      'Агенти, що запускають команди (Claude Code, Codex, термінал): вставте текст вище.';
+
+  @override
+  String get agentKindChat =>
+      'Чат, який не запускає команд, не зможе працювати з VidCtrl; візьміть агента, що вміє.';
+
+  @override
+  String get agentKindSandbox =>
+      'Якщо агент працює в пісочниці, дозвольте йому запускати цю програму поза нею.';
+
+  @override
+  String get agentMissing =>
+      'Поруч із цією збіркою немає vidctrl-client. Зберіть його через tool/build_client.sh.';
+
+  @override
   String get camctrlQuestion => 'Знімаєте на Blackmagic?';
 
   @override

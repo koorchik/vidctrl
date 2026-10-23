@@ -281,6 +281,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get website => 'Website';
 
   @override
+  String get agentTitle => 'Use with an AI agent';
+
+  @override
+  String get agentIntro =>
+      'Let an AI agent such as Claude add videos and start conversions for you. You keep watching here.';
+
+  @override
+  String get agentPromptLabel => 'Paste this into your agent';
+
+  @override
+  String get agentProgramLabel => 'The program the agent uses';
+
+  @override
+  String get agentKindCommands =>
+      'Agents that run commands (Claude Code, Codex, a terminal): paste the text above.';
+
+  @override
+  String get agentKindChat =>
+      'A chat that cannot run commands cannot use VidCtrl; use an agent that can.';
+
+  @override
+  String get agentKindSandbox =>
+      'If your agent runs in a sandbox, let it run this program outside it.';
+
+  @override
+  String get agentMissing =>
+      'This build has no vidctrl-client beside it. Build it with tool/build_client.sh.';
+
+  @override
   String get camctrlQuestion => 'Shooting on Blackmagic?';
 
   @override

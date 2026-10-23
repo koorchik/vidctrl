@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import '../quality/quality_meter.dart' show Closeness;
 import '../quality/quality_search.dart' show QualityOutcome;
 import '../scenarios/registry.dart';
@@ -30,16 +32,25 @@ typedef GoalWords = ({
   Map<String, OptionWords> options,
 });
 
-/// [client] as it is typed in a shell: a plain name as it is, a path in
-/// quotes.
-String shellWord(String client) =>
-    RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(client) ? client : '"$client"';
+/// [client] as it is typed in the terminal of [os] (`Platform.operatingSystem`)
+/// to run it: a plain name as it is, a path quoted. On Linux and macOS in
+/// single quotes, so a `$` in it does not expand. On Windows for
+/// PowerShell, its default terminal, which runs a quoted path only after
+/// `&`; there `` ` `` and `$` are escaped with `` ` ``.
+String shellWord(String client, {required String os}) {
+  if (RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(client)) return client;
+  if (os == 'windows') {
+    final escaped = client.replaceAllMapped(RegExp(r'[`$]'), (m) => '`${m[0]}');
+    return '& "$escaped"';
+  }
+  return "'${client.replaceAll("'", r"'\''")}'";
+}
 
 /// What an agent needs before anything else, with [client] as the command
-/// that runs this program: the manual's first section, what the client
-/// prints with no arguments, and the prompt the window gives to copy.
-String quickStart(String client) {
-  final c = shellWord(client);
+/// that runs this program on [os]: the manual's first section, what the
+/// client prints with no arguments, and the prompt the window gives to copy.
+String quickStart(String client, {required String os}) {
+  final c = shellWord(client, os: os);
   return '''
 VidCtrl is open on this computer, and the person watches its window. The program `$c` controls it: it adds videos to the window's list and queues conversions there.
 
@@ -52,7 +63,7 @@ VidCtrl is open on this computer, and the person watches its window. The program
 
 /// The short list `--help` prints.
 String usage({String client = 'vidctrl-client'}) {
-  final c = shellWord(client);
+  final c = shellWord(client, os: Platform.operatingSystem);
   final docs = commandDocs(c);
   final width = docs
       .map((d) => _synopsis(d).length)
@@ -77,7 +88,7 @@ String usage({String client = 'vidctrl-client'}) {
 /// One command's part of the manual, with the shapes its JSON answer is
 /// made of. [command] is one of `clientCommands`.
 String commandHelp(String command, {String client = 'vidctrl-client'}) {
-  final c = shellWord(client);
+  final c = shellWord(client, os: Platform.operatingSystem);
   final doc = commandDocs(c).where((d) => d.name == command).firstOrNull;
   if (doc == null) throw ArgumentError.value(command, 'command');
   final text = [
@@ -93,7 +104,7 @@ String manual({
   required String client,
   Map<String, GoalWords> words = manualGoalWords,
 }) {
-  final c = shellWord(client);
+  final c = shellWord(client, os: Platform.operatingSystem);
   return [
     '# vidctrl-client',
     '',
@@ -101,9 +112,15 @@ String manual({
         'script or an AI agent. `$c manual` prints this guide; '
         '`$c help <command>` prints one command\'s part.',
     '',
+    'In the examples, `$c` stands for the program as you run it: by its '
+        'name when it is on the `PATH`, otherwise by its full path, quoted '
+        "as the quick start has it: `'/opt/VidCtrl/vidctrl-client'` on "
+        'Linux and macOS, `& "C:\\…\\vidctrl-client.exe"` in PowerShell on '
+        'Windows.',
+    '',
     '## Quick start',
     '',
-    quickStart(client),
+    quickStart(client, os: Platform.operatingSystem),
     _about(c),
     _never(c),
     _commandsPart(c, words),

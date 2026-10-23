@@ -39,6 +39,10 @@
   macOS build made blockier AV1 on Apple chips (its SVT-AV1 3.1.2).
   The macOS download is a disk image, signed and notarized when the Apple
   secrets are set (`tool/package_macos.sh`).
+- **AI agents:** `vidctrl-client`, which comes beside the app, lets an agent
+  or a script add videos to the open window, queue conversions and wait for
+  them while the person watches, and "Use with an AI agent" in the header
+  gives the text to paste into the agent.
 
 ## Next
 

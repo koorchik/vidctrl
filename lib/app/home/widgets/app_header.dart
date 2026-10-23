@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'about_button.dart';
+import 'agent_button.dart';
 import 'language_button.dart';
 import 'look_button.dart';
 import 'new_version_tag.dart';
@@ -10,7 +11,7 @@ import 'web_links.dart';
 /// left, with word of a newer version beside them, and the buttons that
 /// concern the whole app on the right. It is on every screen, so the
 /// website, the About menu, the look and the language are there even when
-/// FFmpeg is missing.
+/// FFmpeg is missing; "Use with an AI agent" only once it is found.
 class AppHeader extends StatelessWidget {
   const AppHeader({super.key});
 
@@ -39,6 +40,7 @@ class AppHeader extends StatelessWidget {
           const NewVersionTag(),
           // The buttons end where the panel below them does.
           const Spacer(),
+          const AgentButton(),
           const AboutButton(),
           const LookButton(),
           const LanguageButton(),

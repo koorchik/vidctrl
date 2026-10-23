@@ -371,6 +371,28 @@ void main() {
         await save(tester, '10_save_space');
       });
 
+      testWidgets('use with an AI agent', (tester) async {
+        await pumpApp(tester, environment(), look: look);
+        await tester.tap(find.byTooltip('Use with an AI agent'));
+        await tester.pumpAndSettle();
+        await save(tester, '6_agent');
+      });
+
+      testWidgets('use with an AI agent, smallest window, in Ukrainian', (
+        tester,
+      ) async {
+        await pumpApp(
+          tester,
+          environment(),
+          look: look,
+          locale: const Locale('uk'),
+          size: minimumWindowSize,
+        );
+        await tester.tap(find.byTooltip('Робота з ШІ-агентом'));
+        await tester.pumpAndSettle();
+        await save(tester, '6b_agent_smallest_uk');
+      });
+
       testWidgets('the about menu', (tester) async {
         await pumpApp(tester, environment(), look: look);
         await tester.tap(find.byTooltip('About VidCtrl'));

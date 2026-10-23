@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:vidctrl/app/build_info.dart';
+import 'package:vidctrl/app/control/agent_prompt.dart';
 import 'package:vidctrl/app/providers.dart';
 import 'package:vidctrl/core/estimate/progress_estimator.dart';
 import 'package:vidctrl/core/estimate/size_estimator.dart';
@@ -451,6 +452,7 @@ class FakeEnvironment {
     this.thumbnail,
     this.build = const BuildInfo(),
     this.releases,
+    this.clientPath = '/opt/vidctrl/vidctrl-client',
   });
 
   final Capabilities capabilities;
@@ -461,6 +463,9 @@ class FakeEnvironment {
   /// Where newer versions are looked for; nowhere by default, so no test
   /// goes on the internet.
   final ReleaseSource? releases;
+
+  /// Where vidctrl-client is beside the app; null for a build without it.
+  final String? clientPath;
 
   /// Where the FFmpeg in use was found; the copy inside the app by default.
   final FfmpegPaths ffmpegPaths;
@@ -491,6 +496,7 @@ class FakeEnvironment {
     environmentProvider.overrideWith((ref) async => environment),
     buildInfoProvider.overrideWithValue(build),
     releaseSourceProvider.overrideWithValue(releases),
+    clientExecutableProvider.overrideWithValue(clientPath),
   ];
 }
 

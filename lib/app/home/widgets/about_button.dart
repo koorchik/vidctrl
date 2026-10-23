@@ -11,13 +11,14 @@ import '../../build_info.dart';
 import '../../providers.dart';
 import '../../theme.dart';
 import '../technical_text.dart';
+import 'agent_dialog.dart';
 import 'button_menu.dart';
 import 'update_dialog.dart';
 import 'web_links.dart';
 
 /// Which FFmpeg the app uses; then the app's version, a check for a newer
-/// one, the website, and the licences of everything that comes with the
-/// app.
+/// one, "Use with an AI agent", the website, and the licences of everything
+/// that comes with the app.
 class AboutButton extends ConsumerWidget {
   const AboutButton({super.key});
 
@@ -73,6 +74,11 @@ class AboutButton extends ConsumerWidget {
                     UpdateDialog(current: current, source: releases),
               ),
               child: Text(l10n.checkForUpdates),
+            ),
+          if (environment != null)
+            PopupMenuItem<void>(
+              onTap: () => showAgentDialog(context),
+              child: Text(l10n.agentTitle),
             ),
           PopupMenuItem<void>(
             onTap: () => openWithDefaultApp(websiteUrl),

@@ -120,8 +120,9 @@ void main() {
       await settle(tester);
 
       final tag = tester.getRect(find.byType(NewVersionTag));
-      final about = tester.getRect(find.byTooltip('Про VidCtrl'));
-      expect(tag.right, lessThan(about.left));
+      // The first of the header's buttons.
+      final agent = tester.getRect(find.byTooltip('Робота з ШІ-агентом'));
+      expect(tag.right, lessThan(agent.left));
       expect(tester.takeException(), isNull);
     });
   }

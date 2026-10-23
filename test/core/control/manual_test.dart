@@ -62,8 +62,9 @@ void main() {
   test('the manual, help and quick start never speak of deleting files', () {
     final texts = [
       text,
-      quickStart('x'),
-      quickStart('/opt/VidCtrl/vidctrl-client'),
+      quickStart('x', os: 'linux'),
+      quickStart('/opt/VidCtrl/vidctrl-client', os: 'linux'),
+      quickStart(r'C:\VidCtrl\vidctrl-client.exe', os: 'windows'),
       usage(),
       jsonEncode(manualJson()),
       for (final c in clientCommands) commandHelp(c),
@@ -76,17 +77,65 @@ void main() {
   test('the manual says plainly that remove leaves the file on disk', () {
     final top = text.indexOf('## Commands');
     expect(text.indexOf(neverDeletes), inInclusiveRange(0, top));
-    expect(quickStart('x'), contains(filesRule));
-    expect(text, contains(quickStart('vidctrl-client')));
+    expect(quickStart('x', os: 'linux'), contains(filesRule));
+    expect(text, contains(quickStart('vidctrl-client', os: 'linux')));
     expect(commandHelp('remove'), contains('stay on disk'));
   });
 
   test('the quick start names the program, the manual and wait', () {
-    final start = quickStart('/opt/Vid Ctrl/vidctrl-client');
-    expect(start, contains('`"/opt/Vid Ctrl/vidctrl-client" manual`'));
-    expect(start, contains('`"/opt/Vid Ctrl/vidctrl-client" wait`'));
+    final start = quickStart('/opt/Vid Ctrl/vidctrl-client', os: 'linux');
+    expect(start, contains("`'/opt/Vid Ctrl/vidctrl-client' manual`"));
+    expect(start, contains("`'/opt/Vid Ctrl/vidctrl-client' wait`"));
     expect(start, contains('--json'));
-    expect(quickStart('vidctrl-client'), contains('`vidctrl-client manual`'));
+    expect(
+      quickStart('vidctrl-client', os: 'windows'),
+      contains('`vidctrl-client manual`'),
+    );
+  });
+
+  group('a path is typed as the system\'s terminal needs it', () {
+    test('on Linux and macOS in single quotes, so nothing in it expands', () {
+      for (final os in ['linux', 'macos']) {
+        expect(
+          shellWord(r'/home/alice/$HOME/vidctrl-client', os: os),
+          r"'/home/alice/$HOME/vidctrl-client'",
+        );
+      }
+      expect(
+        shellWord("/home/alice/Bob's/vidctrl-client", os: 'linux'),
+        r"'/home/alice/Bob'\''s/vidctrl-client'",
+      );
+    });
+
+    test('on Windows called with & in PowerShell, with its own escapes', () {
+      expect(
+        shellWord(
+          r'C:\Program Files\VidCtrl\vidctrl-client.exe',
+          os: 'windows',
+        ),
+        r'& "C:\Program Files\VidCtrl\vidctrl-client.exe"',
+      );
+      expect(
+        shellWord(r'C:\Users\alice\$work`s\vidctrl-client.exe', os: 'windows'),
+        r'& "C:\Users\alice\`$work``s\vidctrl-client.exe"',
+      );
+      expect(
+        quickStart(r'C:\VidCtrl\vidctrl-client.exe', os: 'windows'),
+        contains(r'`& "C:\VidCtrl\vidctrl-client.exe" manual`'),
+      );
+    });
+
+    test('a plain name stays as it is', () {
+      for (final os in ['linux', 'macos', 'windows']) {
+        expect(shellWord('vidctrl-client', os: os), 'vidctrl-client');
+      }
+    });
+  });
+
+  test('the manual says what the name in its examples stands for', () {
+    final intro = text.substring(0, text.indexOf('## Quick start'));
+    expect(intro, contains('full path'));
+    expect(intro, contains('& "C:'));
   });
 
   test('--help is a short list that points to the manual', () {

@@ -566,6 +566,54 @@ abstract class AppLocalizations {
   /// **'Website'**
   String get website;
 
+  /// No description provided for @agentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use with an AI agent'**
+  String get agentTitle;
+
+  /// No description provided for @agentIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Let an AI agent such as Claude add videos and start conversions for you. You keep watching here.'**
+  String get agentIntro;
+
+  /// No description provided for @agentPromptLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste this into your agent'**
+  String get agentPromptLabel;
+
+  /// No description provided for @agentProgramLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'The program the agent uses'**
+  String get agentProgramLabel;
+
+  /// No description provided for @agentKindCommands.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents that run commands (Claude Code, Codex, a terminal): paste the text above.'**
+  String get agentKindCommands;
+
+  /// No description provided for @agentKindChat.
+  ///
+  /// In en, this message translates to:
+  /// **'A chat that cannot run commands cannot use VidCtrl; use an agent that can.'**
+  String get agentKindChat;
+
+  /// No description provided for @agentKindSandbox.
+  ///
+  /// In en, this message translates to:
+  /// **'If your agent runs in a sandbox, let it run this program outside it.'**
+  String get agentKindSandbox;
+
+  /// No description provided for @agentMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'This build has no vidctrl-client beside it. Build it with tool/build_client.sh.'**
+  String get agentMissing;
+
   /// No description provided for @camctrlQuestion.
   ///
   /// In en, this message translates to:

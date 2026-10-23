@@ -852,7 +852,7 @@ void main() {
   test('manual and help need no running app', () async {
     final launcher = _FakeLauncher();
     for (final (args, printed) in [
-      (<String>[], quickStart('vidctrl-client')),
+      (<String>[], quickStart('vidctrl-client', os: Platform.operatingSystem)),
       (['manual'], manual(client: 'vidctrl-client')),
       (['manual', '--json'], '${jsonEncode(manualJson())}\n'),
       (['help'], usage()),
