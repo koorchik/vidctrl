@@ -253,19 +253,22 @@ class QueueController extends Notifier<QueueState> {
         job.recipe,
       );
       if (!ref.mounted) return;
+      // Cancelled after pausing: the cancel wins, as for a paused encode,
+      // and neither is left over for the next job's check.
+      if (_checkCancelled) {
+        _checkCancelled = false;
+        _checkPaused = false;
+        _update(
+          job.id,
+          (j) => j.copyWith(status: JobStatus.cancelled, clearAttempt: true),
+        );
+        return;
+      }
       if (_checkPaused) {
         _checkPaused = false;
         _update(
           job.id,
           (j) => j.copyWith(status: JobStatus.waiting, clearAttempt: true),
-        );
-        return;
-      }
-      if (_checkCancelled) {
-        _checkCancelled = false;
-        _update(
-          job.id,
-          (j) => j.copyWith(status: JobStatus.cancelled, clearAttempt: true),
         );
         return;
       }

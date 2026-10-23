@@ -844,6 +844,35 @@ void main() {
       expect(outputName(), 'a_av1-crf26.mp4');
     });
 
+    test('cancelling after pausing while the video is measured cancels that '
+        'job only', () async {
+      for (final name in ['a.mp4', 'b.mp4']) {
+        env.estimator.choices['/videos/$name'] = fakeChoice(
+          QualityOutcome.raised,
+        );
+      }
+      env.estimator.hold = true;
+      await sources().addPaths(['/videos/a.mp4', '/videos/b.mp4']);
+      queue().addSelected();
+      await settle();
+
+      queue().togglePause();
+      await queue().cancelActive();
+      await settle();
+
+      expect(jobs().first.status, JobStatus.cancelled);
+      expect(jobs().last.status, JobStatus.waiting);
+
+      // The next video's measuring is not cancelled in its turn.
+      env.estimator.hold = false;
+      queue().togglePause();
+      await settle();
+
+      expect(jobs().first.status, JobStatus.cancelled);
+      expect(env.executor.startedNames, ['b.mp4']);
+      expect(p.basename(jobs().last.outputPath), 'b_av1-crf26.mp4');
+    });
+
     test(
       'a sample of a video not worth converting is made all the same',
       () async {
