@@ -319,6 +319,31 @@ The UI renders presets and options generically; it needs no other change.
   1.5 times the size (crf 27). The blocky Arm build gave 39.5 dB and VMAF
   92.5. So the comparison's verdict follows VMAF (95 "looks the same", 93
   "very close").
+- **Already compressed films lose detail at the archive's quality.** A
+  dark, grainy 1080p film download (H.264, about 10 Mbit/s) came out with
+  smooth, plastic faces at crf 35: VMAF 89 to 97 by piece, XPSNR near 39 dB.
+  A camera's file carries far more than it needs (a Nikon's 4K HEVC at 112
+  Mbit/s lost nothing visible at a tenth of that); such a download does
+  not. More bytes are the only cure: crf 25 took 2 to 2.4 times the size,
+  and crf 20 (70% of the original's) still fell short of it. XPSNR barely
+  moves on grain (38.0 to 39.1 dB from crf 35 to 20), so it cannot pick a
+  crf there. Nothing else helped per byte: `luminance-qp-bias`, variance
+  boost, `ac-bias`, `tf-strength`, `tune=1` (worse), preset 2 (5 to 10%
+  smaller, four times slower); SVT-AV1 has no two-pass mode with crf.
+  `film-grain=8` cost nothing in size and removed banding, but brought
+  back only grain, not detail, and lowers plain XPSNR 1 to 2 dB, as drawn
+  grain is not the original's; it was left out for now.
+- **Screenshots for comparing:** FFmpeg turns an 8-bit picture into RGB by
+  a faster, less exact path than a 10-bit one, so the 8-bit original came
+  out darker and more contrasty than its 10-bit copy, a difference that is
+  not in the files. Convert both the same way
+  (`scale=flags=accurate_rnd+full_chroma_int:in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgb24`).
+- **SVT-AV1 4.2 notes:** `scd=1` is ignored with a warning. `tune=0` turns
+  CDEF and loop restoration off on frames it finds noisy. `film-grain=N`
+  sets how noisy the encoder assumes the picture to be (N/10) when it
+  measures the grain, on flat blocks only; with `film-grain-denoise=0` (the
+  default) the denoised copy is only measured, the original is encoded,
+  and a frame with no grain found gets none.
 - **`xpsnr` takes the original first.** It weighs each difference by how
   busy the first picture is, so the first input must be the original (as
   FFmpeg's documentation says); `libvmaf` is the other way round. The
