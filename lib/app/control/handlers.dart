@@ -8,20 +8,18 @@ import 'package:path/path.dart' as p;
 import '../../core/control/listener.dart';
 import '../../core/control/protocol.dart';
 import '../../core/control/views.dart';
-import '../../core/estimate/size_estimator.dart';
 import '../../core/scenarios/registry.dart';
 import '../../l10n/app_localizations.dart';
 import '../build_info.dart';
-import '../estimates/estimate_cache.dart';
 import '../home/scenario_texts.dart';
 import '../providers.dart';
 import '../queue/queue_controller.dart';
-import '../recipe/recipe.dart';
 import '../sources/sources_controller.dart';
 import 'app_views.dart';
 import 'arguments.dart';
 import 'events.dart';
 import 'queue_handlers.dart';
+import 'result_handlers.dart';
 import 'waiter.dart';
 
 // What the window does for each request of `vidctrl-client`. Every method
@@ -39,6 +37,8 @@ const _methods = <String, _Method>{
   Methods.videosAdd: _videosAdd,
   Methods.videosList: _videosList,
   Methods.videosRemove: _videosRemove,
+  Methods.videosDetails: videosDetails,
+  Methods.videosEstimate: videosEstimate,
   Methods.queueList: _queueList,
   Methods.queueAdd: _queueAdd,
   Methods.queueRemove: queueRemove,
@@ -50,6 +50,8 @@ const _methods = <String, _Method>{
   Methods.queueCancel: queueCancel,
   Methods.queueConvertAnyway: queueConvertAnyway,
   Methods.queueConvertWhole: queueConvertWhole,
+  Methods.jobGet: jobGet,
+  Methods.jobCompare: jobCompare,
 };
 
 /// A method that goes on beyond its answer, or answers only later.
@@ -275,33 +277,10 @@ Future<Object?> _videosList(
           video,
           preview: recipe == null || !video.isReady
               ? null
-              : _preview(ref, env, video, recipe),
+              : goalPreview(ref, env, video, recipe),
         ).toJson(),
     ],
   };
-}
-
-/// What [recipe] would do to [video], as the video list shows it.
-GoalPreview _preview(
-  Ref ref,
-  AppEnvironment env,
-  SourceVideo video,
-  Recipe recipe,
-) {
-  final info = video.info!;
-  final plan = findPreset(recipe.presetId)!
-      .plan(info, recipe.values, env.capabilities);
-  final cache = ref.read(estimateCacheProvider);
-  final key = estimateKey(video.path, recipe);
-  final estimate = estimateWithoutEncoding(info, plan) ?? cache.estimates[key];
-  return GoalPreview(
-    goal: recipe.presetId,
-    plan: estimate?.choice?.converts == false ? 'keptAsIs' : plan.kind.name,
-    expectedBytes: estimate?.bytes,
-    measured: estimate?.measured ?? false,
-    measuring: cache.measuring.contains(key),
-    closeness: estimate?.quality?.closeness.name,
-  );
 }
 
 Future<Object?> _videosRemove(

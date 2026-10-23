@@ -96,7 +96,7 @@ Errors:
 
 The videos in the list, and what a goal would do to each.
 
-With `--goal` (and `--opt`), each video that could be read says what that goal would do to it, how large the result would be and how close it would look, where known. A size is known at once where the goal copies; a converted one is measured by encoding a few short pieces. The window measures the videos selected in its panel, with the goal the panel shows, while the queue is idle; videos just added are selected. `measuring` is true while it measures: ask again a little later. For another goal than the panel's, a size that needs measuring stays unknown; a sample (`vidctrl-client queue add --sample middle`) shows it.
+With `--goal` (and `--opt`), each video that could be read says what that goal would do to it, how large the result would be and how close it would look, where known. A size is known at once where the goal copies; a converted one is measured by encoding a few short pieces. The window measures the videos selected in its panel, with the goal the panel shows, while the queue is idle; videos just added are selected. `measuring` is true while it measures: ask again a little later. For another goal than the panel's, a size that needs measuring stays unknown until `vidctrl-client estimate` measures it.
 
 Options:
 
@@ -127,6 +127,92 @@ With `--json`: `videos` (list of Video), in the order of the list; with `--goal`
 Errors:
 
 - An unknown goal, option or choice, or `--opt` without `--goal`: exit 5.
+
+### `vidctrl-client details <video> | --job <job>`
+
+How a video or a result is made, as "Video details" shows it.
+
+As "Video details" in the window: how the file is encoded, track by track (picture, then sound, then the file as a whole), in the window's words. A video still being read is waited for. With `--job`, the same for the result of a job that is done, as "Result details" in its ⋯ menu.
+
+Options:
+
+- `--job <job>`: the result of this job instead of a video in the list.
+- `--raw`: FFmpeg's whole report on the file (ffprobe's JSON), instead of the details.
+
+Examples:
+
+```sh
+vidctrl-client details 0
+vidctrl-client details --job 1 --raw --json
+```
+
+It prints, for example:
+
+```
+Video 0: Ready. /home/alice/Videos/beach.mov
+  4.20 GB, 12:34, 3840x2160, hevc, sound aac
+Video track 1:
+  Codec: H.265 / HEVC (High Efficiency Video Coding) · Main 10 · level 5.1
+  Resolution: 3840×2160
+  Frame rate: 25 fps (25/1)
+  Bit depth: 10-bit
+  Chroma subsampling: 4:2:0
+Audio track 1:
+  Codec: AAC (Advanced Audio Coding) · LC
+  Channels: 2 (stereo)
+  Sample rate: 48 kHz
+File:
+  Container: QuickTime / MOV
+  Size: 4.20 GB
+```
+
+With `--json`: `info` (Video): the video; for a job, its result, with the `id` of the video it was made from. `details` (list): for each track and the file, `title` (string) and `rows` (list of [label, value], both strings). With `--raw`, `raw` (object) instead of `details`: ffprobe's report as it gave it.
+
+```json
+{"info":{"id":0,"path":"/home/alice/Videos/beach.mov","status":"ready","statusText":"Ready","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false},"details":[{"title":"Video track 1","rows":[["Codec","H.265 / HEVC (High Efficiency Video Coding) · Main 10 · level 5.1"],["Resolution","3840×2160"],["Frame rate","25 fps (25/1)"],["Bit depth","10-bit"],["Chroma subsampling","4:2:0"]]},{"title":"Audio track 1","rows":[["Codec","AAC (Advanced Audio Coding) · LC"],["Channels","2 (stereo)"],["Sample rate","48 kHz"]]},{"title":"File","rows":[["Container","QuickTime / MOV"],["Size","4.20 GB"]]}]}
+```
+
+Errors:
+
+- A video that is not in the list, a job that is not done, or a result that cannot be read where it was written: exit 5 (`notFound`). A video FFmpeg cannot open: exit 5.
+
+### `vidctrl-client estimate <videos…>`
+
+Measures how large videos would come out with a goal.
+
+As the window does for the videos selected in its panel: it encodes a few short pieces of each video and compares them with the original, so it knows how large the result would be and how close it would look; Archive also chooses each video's quality, as before converting it. It answers once every video is measured, one after the other: seconds to a minute or so each. A size the goal knows without measuring (a copy) is given at once.
+
+Only while the queue is idle, as in the window: measuring and converting would share the processor. Without `--goal`, the goal shown in the window's panel. What it measured stays in the window: `vidctrl-client videos --goal <goal>` gives it again, and the window's list shows it for the goal of its panel.
+
+Options:
+
+- `--goal <goal>`: the goal, as `vidctrl-client goals` lists them.
+- `--opt <option>=<choice>`: an option of that goal, once for each.
+
+Example:
+
+```sh
+vidctrl-client estimate 0 1 2 --goal archive --json
+```
+
+It prints, for example:
+
+```
+Video 0: Ready. /home/alice/Videos/beach.mov
+  4.20 GB, 12:34, 3840x2160, hevc, sound aac
+  With archive.master: Converted. About 610.0 MB, measured. Looks the same as the original.
+```
+
+With `--json`: `videos` (list of Video), as given, each that could be read with its `preview` (Preview) for the goal.
+
+```json
+{"videos":[{"id":0,"path":"/home/alice/Videos/beach.mov","status":"ready","statusText":"Ready","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false,"preview":{"goal":"archive.master","plan":"encode","planText":"Converted","expectedBytes":610000000,"measured":true,"measuring":false,"closeness":"same","closenessText":"Looks the same as the original"}}]}
+```
+
+Errors:
+
+- While the queue converts: `busy`, exit 5 ("Videos are being converted; the window measures when the queue is idle."). Measure before queuing, or after `vidctrl-client wait`.
+- A video that is not in the list (`vidctrl-client add` it first), one FFmpeg cannot open, or an unknown goal, option or choice: exit 5.
 
 ### `vidctrl-client remove <videos…>`
 
@@ -478,6 +564,87 @@ Errors:
 
 - A job that is not in the queue, or not the one converting: exit 5, and nothing is cancelled.
 
+### `vidctrl-client job <job>`
+
+One job, as its row and (i) window show it.
+
+Its status, goal and options, its result and size once done, and how its quality was chosen: the outcome and the scores of the poorest piece. A job worth a look by eye (`needsALook`, the outcome `belowTarget`) has a name ending in `-check`: tell the person to look at it beside the original.
+
+With `--command`, what "Show the command" in its ⋯ menu shows: the FFmpeg command VidCtrl runs for it, for this system's terminal (PowerShell on Windows). It is for the person to read: do not run it, the window converts. For an Archive job whose quality is not chosen yet, its quality number may still change.
+
+Options:
+
+- `--command`: add the FFmpeg command VidCtrl runs for it.
+
+Examples:
+
+```sh
+vidctrl-client job 1
+vidctrl-client job 1 --command --json
+```
+
+It prints, for example:
+
+```
+Job 1: Done. /home/alice/Videos/party.mov
+  archive.master, codec=av1, speed=cpu, video 1
+  Result: /home/alice/Videos/Converted/party_av1-crf20-check.mp4, 2.10 GB
+  Worth a look by eye: even the best quality falls a little short somewhere (crf 20, usual 35; VMAF 93.8; XPSNR 40.2 dB). Expected at 52% of the original's size.
+  Its name ends in -check: look at it beside the original.
+The command, as "Show the command" in the window gives it:
+  ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4
+```
+
+With `--json`: `job` (Job); `command` (string, optional): with `--command`, left out for a job that runs nothing (one that ended skipped or is kept as it is).
+
+```json
+{"job":{"id":1,"videoId":1,"path":"/home/alice/Videos/party.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"done","statusText":"Done","outputPath":"/home/alice/Videos/Converted/party_av1-crf20-check.mp4","outputBytes":2100000000,"quality":{"outcome":"belowTarget","outcomeText":"Worth a look by eye: even the best quality falls a little short somewhere","value":20,"standardValue":35,"vmaf":93.8,"xpsnr":40.2,"share":0.52},"needsALook":true,"errorLines":[]},"command":"ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4"}
+```
+
+Errors:
+
+- A job that is not in the queue: exit 5.
+
+### `vidctrl-client compare <job>`
+
+Compares a result with its original, as the window's menu does.
+
+As "Compare with the original" in a done job's ⋯ menu: VidCtrl compares the result with its original frame by frame (a sample with the same piece of it) and says how close it looks, by VMAF where this FFmpeg measures it, otherwise by XPSNR (see "Closeness"). It takes about as long as the video lasts, or longer, and one comparison runs at a time. The window shows it under the job, and the person may stop it there.
+
+Offered only where each frame of the result stands for one of the original: not after the picture was made smaller, its frame rate changed or its HDR turned into SDR ("Save space" makes 4K videos 1080p). Asked again while that job is being compared, it waits for the same comparison.
+
+Options:
+
+- `--no-wait`: answer at once; the `compare-finished` event (`vidctrl-client events`) tells the result.
+
+Examples:
+
+```sh
+vidctrl-client compare 1
+vidctrl-client compare 1 --no-wait --json
+```
+
+It prints, for example:
+
+```
+Job 1: Compared with the original. Very close to the original (VMAF 94.1; XPSNR 40.6 dB).
+
+# With --no-wait:
+Job 1: Comparing with the original; `vidctrl-client compare 1` waits for the result.
+```
+
+With `--json`: `job` (int); `status` (string): `measured`; `closeness` (string, see "Closeness") and `closenessText` (string) in words; `xpsnr` (number, in dB); `vmaf` (number, optional: where this FFmpeg measures it). With `--no-wait`, `{"started": true}`.
+
+```json
+{"job":1,"status":"measured","closeness":"veryClose","closenessText":"Very close to the original","xpsnr":40.6,"vmaf":94.1}
+```
+
+Errors:
+
+- A job that is not done, or whose frames do not pair with the original's, or an FFmpeg without the `xpsnr` filter: exit 5, saying why.
+- Another job being compared: `busy`, exit 5; ask again once it has ended.
+- The comparison failed (exit 5, with FFmpeg's words), or was stopped in the window (exit 5).
+
 ### `vidctrl-client status`
 
 Whether VidCtrl is open, and how its queue stands.
@@ -706,7 +873,7 @@ A video in the window's list.
 - `videoCodec` (string, optional): the picture's format, as `hevc`.
 - `audioCodecs` (list of string): one per sound track.
 - `hdr` (bool).
-- `preview` (Preview, optional): with `videos --goal`.
+- `preview` (Preview, optional): with `videos --goal`, and from `estimate`.
 
 #### Preview
 
@@ -875,7 +1042,7 @@ Each id and its words (the `...Text` fields in JSON), then what to make of it.
 - `waiting`: Waiting. In the queue, its turn not come yet.
 - `running`: Converting. Being converted now, or its quality being chosen (`attempt`).
 - `paused`: Paused. Under way, held because the queue is paused in the window.
-- `done`: Done. The result is at `outputPath`. Tell the person, and say so when `needsALook` is true.
+- `done`: Done. The result is at `outputPath`. Tell the person, and say so when `needsALook` is true. `compare <job>` says how close it looks to the original.
 - `skipped`: Nothing to do. Nothing was written: the video already met the goal, the goal can do nothing with it (plan `unsupported`), or converting would hardly make it smaller (outcome `notWorthIt`). Counts as finished, not as a failure.
 - `failed`: Failed. It could not be converted; `errorLines` says why. The person can try it again in the window, as `queue retry <job>` does.
 - `cancelled`: Cancelled. Stopped before it was done, in the window or by `cancel`. `wait` counts it as a failure; `queue retry <job>` tries it again.
@@ -960,7 +1127,7 @@ The same for every command:
 | `queue-paused` | none | The queue was paused, in the window or by `pause`. |
 | `queue-resumed` | none | It goes on again. |
 | `queue-idle` | none | The queue has nothing more to do. |
-| `compare-finished` | `job` (int), `status` (`measured` or `failed`), `closeness`, `closenessText`, `vmaf` (optional), `xpsnr`; or `errorLines` | "Compare with the original" in the window ended. |
+| `compare-finished` | `job` (int), `status` (`measured` or `failed`), `closeness`, `closenessText`, `vmaf` (optional), `xpsnr`; or `errorLines` | "Compare with the original" ended, in the window or by `compare`. |
 | `app-closing` | none | The window is closing; `events` and `wait` exit 4. |
 
 ## Recipes
@@ -1008,15 +1175,16 @@ vidctrl-client events --since-now --json      # in the background
 
 Read its lines as they come. On each `job-finished`, tell the person about that job: its `status`, `outputPath`, `outputBytes`, `quality.outcome` and `needsALook`. On `queue-idle` the queue has nothing more to do: stop following. On `app-closing` the window closed.
 
-### Make samples first, then convert the whole
+### Make samples first, compare, then convert the whole
 
 ```sh
 vidctrl-client queue add ~/Videos/beach.mov ~/Videos/party.mov --goal archive --sample middle --json
 vidctrl-client wait --json
-vidctrl-client queue --json
+vidctrl-client compare 0 --json               # each sample job's id from `added`
+vidctrl-client compare 1 --json
 ```
 
-Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`; its `quality` tells how the whole video will come out: `vmaf` and `xpsnr` of the poorest piece, and `share`, the expected size as a share of the original's. Tell the person where the samples are, so they can look at them. Once they agree, convert each whole video with its sample's settings, by the sample jobs' ids from `added`:
+Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`. `compare` compares it with the same piece of its original and says how close it looks: `closeness` (`closenessText` in words), with `vmaf` and `xpsnr`. Each comparison takes about as long as the piece lasts, or longer. `vidctrl-client job <job> --json` gives the sample's `quality` too: the quality chosen for the whole video and `share`, its expected size as a share of the original's. Tell the person where the samples are and how close each looks, so they can look at them. Once they agree, convert each whole video with its sample's settings, by the sample jobs' ids:
 
 ```sh
 vidctrl-client queue convert-whole 0 --json
@@ -1041,10 +1209,10 @@ vidctrl-client resume                         # when the person says so
 
 ```sh
 vidctrl-client add ~/Videos/trip --json
-vidctrl-client videos --goal archive --json
+vidctrl-client estimate 0 1 2 --goal archive --json      # the ids from `add`
 ```
 
-Each video's `preview` gives the `plan` (`planText` in words), the `expectedBytes` once known (`measured` when measured by encoding pieces) and the `closeness`. While `measuring` is true, ask again a little later. The window measures sizes with the goal its panel shows; for another goal, queue a sample of a video or two (as above): with Archive, its `quality.share` is the expected size as a share of the original's.
+`estimate` measures each video in turn and answers once all are measured; that takes seconds to a minute or so for each. Each video's `preview` gives the `plan` (`planText` in words), the `expectedBytes` (`measured` when measured by encoding pieces) and the `closeness`; beside its `sizeBytes`, that is how much smaller it would come out. A preview with no `expectedBytes` could not be measured. While the queue converts, `estimate` is refused (`busy`): measure before queuing, or once `vidctrl-client wait` has returned. Later, `vidctrl-client videos --goal archive --json` gives the same again.
 
 ## Limits
 

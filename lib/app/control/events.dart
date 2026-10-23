@@ -147,14 +147,7 @@ List<ControlEvent> qualityEvents(
     switch (check) {
       case QualityMeasured():
         events.add(
-          ControlEvent(Events.compareFinished, {
-            'job': job,
-            'status': 'measured',
-            'closeness': check.closeness.name,
-            'closenessText': closenessWords(check.closeness.name),
-            'xpsnr': check.lumaDb,
-            'vmaf': ?check.vmaf,
-          }),
+          ControlEvent(Events.compareFinished, comparisonJson(job, check)),
         );
       case QualityFailed():
         events.add(
@@ -170,3 +163,14 @@ List<ControlEvent> qualityEvents(
   }
   return events;
 }
+
+/// How close job [job]'s result is to its original, as `job.compare`
+/// answers and `compare-finished` tells it.
+Map<String, Object?> comparisonJson(int job, QualityMeasured check) => {
+  'job': job,
+  'status': 'measured',
+  'closeness': check.closeness.name,
+  'closenessText': closenessWords(check.closeness.name),
+  'xpsnr': check.lumaDb,
+  'vmaf': ?check.vmaf,
+};

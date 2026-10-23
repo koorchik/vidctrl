@@ -62,12 +62,11 @@ String usage({String client = 'vidctrl-client'}) {
     '',
     'Usage: $c <command> [arguments] [options]',
     '',
-    for (final area in CommandArea.values)
-      if (docs.any((d) => d.area == area)) ...[
-        '${area.title}:',
-        for (final doc in docs.where((d) => d.area == area))
-          '  ${_synopsis(doc).padRight(width)}  ${doc.summary}',
-      ],
+    for (final area in CommandArea.values) ...[
+      '${area.title}:',
+      for (final doc in docs.where((d) => d.area == area))
+        '  ${_synopsis(doc).padRight(width)}  ${doc.summary}',
+    ],
     '',
     'Every command takes --json, --no-start and --help.',
     'Run `$c manual` for the full guide.',
@@ -379,7 +378,7 @@ A video in the window's list.
 - `videoCodec` (string, optional): the picture's format, as `hevc`.
 - `audioCodecs` (list of string): one per sound track.
 - `hdr` (bool).
-- `preview` (Preview, optional): with `videos --goal`.
+- `preview` (Preview, optional): with `videos --goal`, and from `estimate`.
 ''',
   'Preview': '''
 What a goal would do to a video, as the list shows it.
@@ -524,7 +523,8 @@ const _jobStatuses = [
   (
     'done',
     'The result is at `outputPath`. Tell the person, and say so when '
-        '`needsALook` is true.',
+        '`needsALook` is true. `compare <job>` says how close it looks to '
+        'the original.',
   ),
   (
     'skipped',
@@ -713,7 +713,7 @@ const _events = [
     '`job` (int), `status` (`measured` or '
         '`failed`), `closeness`, `closenessText`, `vmaf` (optional), `xpsnr`; '
         'or `errorLines`',
-    '"Compare with the original" in the window ended.',
+    '"Compare with the original" ended, in the window or by `compare`.',
   ),
   (
     Events.appClosing,
@@ -811,15 +811,16 @@ $c events --since-now --json      # in the background
 
 Read its lines as they come. On each `job-finished`, tell the person about that job: its `status`, `outputPath`, `outputBytes`, `quality.outcome` and `needsALook`. On `queue-idle` the queue has nothing more to do: stop following. On `app-closing` the window closed.
 
-### Make samples first, then convert the whole
+### Make samples first, compare, then convert the whole
 
 ```sh
 $c queue add ~/Videos/beach.mov ~/Videos/party.mov --goal archive --sample middle --json
 $c wait --json
-$c queue --json
+$c compare 0 --json               # each sample job's id from `added`
+$c compare 1 --json
 ```
 
-Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`; its `quality` tells how the whole video will come out: `vmaf` and `xpsnr` of the poorest piece, and `share`, the expected size as a share of the original's. Tell the person where the samples are, so they can look at them. Once they agree, convert each whole video with its sample's settings, by the sample jobs' ids from `added`:
+Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`. `compare` compares it with the same piece of its original and says how close it looks: `closeness` (`closenessText` in words), with `vmaf` and `xpsnr`. Each comparison takes about as long as the piece lasts, or longer. `$c job <job> --json` gives the sample's `quality` too: the quality chosen for the whole video and `share`, its expected size as a share of the original's. Tell the person where the samples are and how close each looks, so they can look at them. Once they agree, convert each whole video with its sample's settings, by the sample jobs' ids:
 
 ```sh
 $c queue convert-whole 0 --json
@@ -844,10 +845,10 @@ $c resume                         # when the person says so
 
 ```sh
 $c add ~/Videos/trip --json
-$c videos --goal archive --json
+$c estimate 0 1 2 --goal archive --json      # the ids from `add`
 ```
 
-Each video's `preview` gives the `plan` (`planText` in words), the `expectedBytes` once known (`measured` when measured by encoding pieces) and the `closeness`. While `measuring` is true, ask again a little later. The window measures sizes with the goal its panel shows; for another goal, queue a sample of a video or two (as above): with Archive, its `quality.share` is the expected size as a share of the original's.
+`estimate` measures each video in turn and answers once all are measured; that takes seconds to a minute or so for each. Each video's `preview` gives the `plan` (`planText` in words), the `expectedBytes` (`measured` when measured by encoding pieces) and the `closeness`; beside its `sizeBytes`, that is how much smaller it would come out. A preview with no `expectedBytes` could not be measured. While the queue converts, `estimate` is refused (`busy`): measure before queuing, or once `$c wait` has returned. Later, `$c videos --goal archive --json` gives the same again.
 ''';
 
 String _limits(String c) =>

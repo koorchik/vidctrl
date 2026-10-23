@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import '../media/media_details.dart' show formatBytes;
+import '../media/media_details.dart' show formatBytes, fullReport;
 import 'views.dart';
 import 'words.dart';
 
@@ -80,7 +80,14 @@ String addedText(Map<String, Object?> entry) {
   };
 }
 
-List<String> videoText(VideoView video) {
+List<String> videoText(VideoView video) => [
+  'Video ${video.id}: ${statusWords(video.status)}. ${video.path}',
+  ..._factsText(video),
+  if (video.preview case final preview?) '  ${_previewText(preview)}',
+];
+
+/// Its size, length, picture and sound, on one line.
+List<String> _factsText(VideoView video) {
   final facts = [
     if (video.sizeBytes case final bytes?) formatBytes(bytes),
     if (video.durationSeconds case final seconds?) _clock(seconds),
@@ -90,12 +97,34 @@ List<String> videoText(VideoView video) {
     if (video.audioCodecs.isNotEmpty) 'sound ${video.audioCodecs.join(', ')}',
     if (video.hdr) 'HDR',
   ];
+  return [if (facts.isNotEmpty) '  ${facts.join(', ')}'];
+}
+
+/// A `videos.details` answer: the video, or the result of [job], then each
+/// track's details as the window's "Video details" shows them.
+List<String> detailsText(Map<String, Object?> answer, {int? job}) {
+  final info = VideoView.fromJson(
+    Map<String, Object?>.from(answer['info'] as Map),
+  );
   return [
-    'Video ${video.id}: ${statusWords(video.status)}. ${video.path}',
-    if (facts.isNotEmpty) '  ${facts.join(', ')}',
-    if (video.preview case final preview?) '  ${_previewText(preview)}',
+    if (job == null)
+      ...videoText(info)
+    else ...[
+      'Job $job\'s result: ${info.path}',
+      ..._factsText(info),
+    ],
+    for (final section in (answer['details'] as List?) ?? const []) ...[
+      '${(section as Map)['title']}:',
+      for (final row in section['rows'] as List)
+        '  ${(row as List).first}: ${row.last}',
+    ],
   ];
 }
+
+/// The whole report of a `videos.details --raw` answer, as FFmpeg gives it.
+List<String> reportText(Map<String, Object?> answer) => [
+  fullReport(Map<String, Object?>.from(answer['raw'] as Map)),
+];
 
 String _previewText(GoalPreview preview) {
   final size = switch (preview.expectedBytes) {
@@ -152,6 +181,36 @@ List<String> queueText(bool busy, bool paused, List<JobView> jobs) => [
     'The queue is ${_queueState(busy, paused)}:',
   for (final job in jobs) ...jobText(job),
 ];
+
+/// A `job.get` answer: the job as the queue pane and its (i) window show
+/// it, then, when [command] was asked for, what "Show the command" gives.
+List<String> jobDetailsText(
+  JobView job, {
+  bool command = false,
+  String? commandLine,
+}) => [
+  ...jobText(job),
+  if (job.needsALook && job.quality?.outcome == 'belowTarget')
+    '  Its name ends in -check: look at it beside the original.',
+  if (command)
+    if (commandLine == null)
+      'It runs no command: nothing is converted for it.'
+    else ...[
+      'The command, as "Show the command" in the window gives it:',
+      '  $commandLine',
+    ],
+];
+
+/// A `job.compare` answer, or the line [eventText] gives for its event.
+String comparedText(Object? job, Map<String, Object?> comparison) =>
+    'Job $job: Compared with the original. '
+    '${closenessWords(comparison['closeness'] as String)} '
+    '(${_scores(comparison['vmaf'] as num?, comparison['xpsnr'] as num?).join('; ')}).';
+
+/// A `job.compare` answer when it does not wait.
+String comparingText(int job) =>
+    'Job $job: Comparing with the original; `vidctrl-client compare $job` '
+    'waits for the result.';
 
 /// A `queue.add` answer.
 List<String> queueAddText(Map<String, Object?> answer) {
@@ -322,9 +381,7 @@ List<String> eventText(String event, Map<String, Object?> params) {
     'queue-resumed' => ['The queue goes on.'],
     'queue-idle' => ['The queue has nothing more to do.'],
     'compare-finished' when the('status') == 'measured' => [
-      'Job ${the('job')}: Compared with the original. '
-          '${closenessWords(the('closeness') as String)} '
-          '(${_scores(the('vmaf') as num?, the('xpsnr') as num?).join('; ')}).',
+      comparedText(the('job'), params),
     ],
     'compare-finished' => [
       'Job ${the('job')}: Could not be compared with the original.',

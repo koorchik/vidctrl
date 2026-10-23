@@ -138,7 +138,7 @@ class _MediaDetailsDialogState extends ConsumerState<MediaDetailsDialog> {
       case _View.report:
         return fullReport(_raw);
       case _View.encoding:
-        for (final s in _ordered(encodingDetails(_raw))) {
+        for (final s in orderedDetails(encodingDetails(_raw))) {
           section(groupTitle(l10n, s.group, s.number), [
             for (final row in s.rows)
               (fieldLabel(l10n, row.field), rowValue(l10n, row)),
@@ -406,7 +406,7 @@ class _Fact extends StatelessWidget {
 }
 
 /// Picture first, then sound, then the file as a whole.
-List<DetailSection> _ordered(List<DetailSection> sections) {
+List<DetailSection> orderedDetails(List<DetailSection> sections) {
   const order = [
     DetailGroup.video,
     DetailGroup.audio,
@@ -467,7 +467,7 @@ class _EncodingView extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     return _Cards(
       cards: [
-        for (final section in _ordered(encodingDetails(raw)))
+        for (final section in orderedDetails(encodingDetails(raw)))
           (
             wide:
                 section.group == DetailGroup.video ||

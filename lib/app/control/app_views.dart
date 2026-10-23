@@ -1,22 +1,46 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/control/views.dart';
+import '../../core/estimate/size_estimator.dart';
 import '../../core/ffmpeg/capabilities.dart';
+import '../../core/media/media_info.dart';
 import '../../core/quality/quality_search.dart';
 import '../../core/scenarios/archive.dart';
 import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
+import '../estimates/estimate_cache.dart';
+import '../providers.dart';
 import '../queue/queue_state.dart';
 import '../recipe/recipe.dart';
 import '../sources/sources_controller.dart';
 
 // The window's state in the shapes a client reads.
 
-VideoView videoView(SourceVideo video, {GoalPreview? preview}) {
-  final info = video.info;
+VideoView videoView(SourceVideo video, {GoalPreview? preview}) => _videoView(
+  video.id,
+  video.path,
+  video.status.name,
+  video.info,
+  preview: preview,
+);
+
+/// The result of [job], read as [info], in the shape of a video: its id is
+/// that of the video the job was made from.
+VideoView resultView(QueueJob job, MediaInfo info) =>
+    _videoView(job.sourceId, info.path, 'ready', info);
+
+VideoView _videoView(
+  int id,
+  String path,
+  String status,
+  MediaInfo? info, {
+  GoalPreview? preview,
+}) {
   final picture = info?.video;
   return VideoView(
-    id: video.id,
-    path: video.path,
-    status: video.status.name,
+    id: id,
+    path: path,
+    status: status,
     sizeBytes: info?.sizeBytes,
     durationSeconds: info == null ? null : _seconds(info.duration),
     width: picture?.width,
@@ -64,6 +88,29 @@ QualityView _qualityView(QualityChoice choice) => QualityView(
   xpsnr: choice.chosen.score.lumaDb,
   share: choice.share,
 );
+
+/// What [recipe] would do to [video], as the video list shows it.
+GoalPreview goalPreview(
+  Ref ref,
+  AppEnvironment env,
+  SourceVideo video,
+  Recipe recipe,
+) {
+  final info = video.info!;
+  final plan = findPreset(recipe.presetId)!
+      .plan(info, recipe.values, env.capabilities);
+  final cache = ref.read(estimateCacheProvider);
+  final key = estimateKey(video.path, recipe);
+  final estimate = estimateWithoutEncoding(info, plan) ?? cache.estimates[key];
+  return GoalPreview(
+    goal: recipe.presetId,
+    plan: estimate?.choice?.converts == false ? 'keptAsIs' : plan.kind.name,
+    expectedBytes: estimate?.bytes,
+    measured: estimate?.measured ?? false,
+    measuring: cache.measuring.contains(key),
+    closeness: estimate?.quality?.closeness.name,
+  );
+}
 
 double _seconds(Duration d) => d.inMilliseconds / 1000;
 

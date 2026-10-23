@@ -8,6 +8,7 @@ import 'manual.dart';
 import 'manual_words.g.dart';
 import 'protocol.dart';
 import 'views.dart';
+import 'words.dart';
 
 // Each command's part of vidctrl-client's manual, with samples of what it
 // prints, made by the client's own words. Nothing here speaks of deleting a
@@ -253,6 +254,64 @@ final _waitAnswer = {
   ],
 };
 
+/// What "Show the command" shows for [_checkedJob].
+const _command =
+    "ffmpeg -hide_banner -i $_folder/party.mov -map 0:v:0 -map '0:a?' "
+    '-map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -pix_fmt yuv420p10le '
+    '-c:a copy -movflags +faststart+use_metadata_tags -f mp4 '
+    '$_folder/Converted/party_av1-crf20-check.mp4';
+
+final _jobAnswer = {'job': _checkedJob.toJson(), 'command': _command};
+
+final _compareAnswer = {
+  'job': 1,
+  'status': 'measured',
+  'closeness': 'veryClose',
+  'closenessText': closenessWords('veryClose'),
+  'xpsnr': 40.6,
+  'vmaf': 94.1,
+};
+
+final _detailsAnswer = {
+  'info': _video.toJson(),
+  'details': [
+    {
+      'title': 'Video track 1',
+      'rows': [
+        [
+          'Codec',
+          'H.265 / HEVC (High Efficiency Video Coding) · Main 10 · level 5.1',
+        ],
+        ['Resolution', '3840×2160'],
+        ['Frame rate', '25 fps (25/1)'],
+        ['Bit depth', '10-bit'],
+        ['Chroma subsampling', '4:2:0'],
+      ],
+    },
+    {
+      'title': 'Audio track 1',
+      'rows': [
+        ['Codec', 'AAC (Advanced Audio Coding) · LC'],
+        ['Channels', '2 (stereo)'],
+        ['Sample rate', '48 kHz'],
+      ],
+    },
+    {
+      'title': 'File',
+      'rows': [
+        ['Container', 'QuickTime / MOV'],
+        ['Size', '4.20 GB'],
+      ],
+    },
+  ],
+};
+
+final _estimateAnswer = {
+  'videos': [
+    {..._video.toJson(), 'preview': _preview.toJson()},
+  ],
+};
+
 List<String> _jsonBlock(Object? value) => ['```json', jsonEncode(value), '```'];
 
 /// Every command's part of the manual, in the order `--help` lists them,
@@ -303,8 +362,8 @@ List<CommandDoc> commandDocs(
           'panel, with the goal the panel shows, while the queue is idle; '
           'videos just added are selected. `measuring` is true while it '
           'measures: ask again a little later. For another goal than the '
-          'panel\'s, a size that needs measuring stays unknown; a sample '
-          '(`$c queue add --sample middle`) shows it.',
+          'panel\'s, a size that needs measuring stays unknown until '
+          '`$c estimate` measures it.',
     ],
     options: [
       ('--goal <goal>', 'say what this goal would do to each video.'),
@@ -327,6 +386,85 @@ List<CommandDoc> commandDocs(
     errors: [
       'An unknown goal, option or choice, or `--opt` without `--goal`: '
           'exit 5.',
+    ],
+  ),
+  CommandDoc(
+    'details',
+    area: CommandArea.videos,
+    arguments: '<video> | --job <job>',
+    summary: 'how a video or a result is made, as "Video details" shows it',
+    about: [
+      'As "Video details" in the window: how the file is encoded, track by '
+          'track (picture, then sound, then the file as a whole), in the '
+          'window\'s words. A video still being read is waited for. With '
+          '`--job`, the same for the result of a job that is done, as '
+          '"Result details" in its ⋯ menu.',
+    ],
+    options: [
+      ('--job <job>', 'the result of this job instead of a video in the list.'),
+      (
+        '--raw',
+        'FFmpeg\'s whole report on the file (ffprobe\'s JSON), instead of '
+            'the details.',
+      ),
+    ],
+    examples: ['$c details 0', '$c details --job 1 --raw --json'],
+    text: detailsText(_detailsAnswer),
+    json: [
+      '`info` (Video): the video; for a job, its result, with the `id` of '
+          'the video it was made from. `details` (list): for each track and '
+          'the file, `title` (string) and `rows` (list of [label, value], '
+          'both strings). With `--raw`, `raw` (object) instead of '
+          '`details`: ffprobe\'s report as it gave it.',
+      ..._jsonBlock(_detailsAnswer),
+    ],
+    shapes: ['Video'],
+    errors: [
+      'A video that is not in the list, a job that is not done, or a result '
+          'that cannot be read where it was written: exit 5 (`notFound`). A '
+          'video FFmpeg cannot open: exit 5.',
+    ],
+  ),
+  CommandDoc(
+    'estimate',
+    area: CommandArea.videos,
+    arguments: '<videos…>',
+    summary: 'measures how large videos would come out with a goal',
+    about: [
+      'As the window does for the videos selected in its panel: it encodes '
+          'a few short pieces of each video and compares them with the '
+          'original, so it knows how large the result would be and how '
+          'close it would look; Archive also chooses each video\'s quality, '
+          'as before converting it. It answers once every video is '
+          'measured, one after the other: seconds to a minute or so each. A '
+          'size the goal knows without measuring (a copy) is given at once.',
+      'Only while the queue is idle, as in the window: measuring and '
+          'converting would share the processor. Without `--goal`, the goal '
+          'shown in the window\'s panel. What it measured stays in the '
+          'window: `$c videos --goal <goal>` gives it again, and the '
+          'window\'s list shows it for the goal of its panel.',
+    ],
+    options: [
+      ('--goal <goal>', 'the goal, as `$c goals` lists them.'),
+      ('--opt <option>=<choice>', 'an option of that goal, once for each.'),
+    ],
+    examples: ['$c estimate 0 1 2 --goal archive --json'],
+    text: [
+      for (final v in _estimateAnswer['videos']!)
+        ...videoText(VideoView.fromJson(v)),
+    ],
+    json: [
+      '`videos` (list of Video), as given, each that could be read with its '
+          '`preview` (Preview) for the goal.',
+      ..._jsonBlock(_estimateAnswer),
+    ],
+    shapes: ['Video', 'Preview'],
+    errors: [
+      'While the queue converts: `busy`, exit 5 ("Videos are being '
+          'converted; the window measures when the queue is idle."). '
+          'Measure before queuing, or after `$c wait`.',
+      'A video that is not in the list (`$c add` it first), one FFmpeg '
+          'cannot open, or an unknown goal, option or choice: exit 5.',
     ],
   ),
   CommandDoc(
@@ -630,6 +768,85 @@ List<CommandDoc> commandDocs(
     errors: [
       'A job that is not in the queue, or not the one converting: exit 5, '
           'and nothing is cancelled.',
+    ],
+  ),
+  CommandDoc(
+    'job',
+    area: CommandArea.results,
+    arguments: '<job>',
+    summary: 'one job, as its row and (i) window show it',
+    about: [
+      'Its status, goal and options, its result and size once done, and how '
+          'its quality was chosen: the outcome and the scores of the poorest '
+          'piece. A job worth a look by eye (`needsALook`, the outcome '
+          '`belowTarget`) has a name ending in `-check`: tell the person to '
+          'look at it beside the original.',
+      'With `--command`, what "Show the command" in its ⋯ menu shows: the '
+          'FFmpeg command VidCtrl runs for it, for this system\'s terminal '
+          '(PowerShell on Windows). It is for the person to read: do not run '
+          'it, the window converts. For an Archive job whose quality is not '
+          'chosen yet, its quality number may still change.',
+    ],
+    options: [('--command', 'add the FFmpeg command VidCtrl runs for it.')],
+    examples: ['$c job 1', '$c job 1 --command --json'],
+    text: jobDetailsText(_checkedJob, command: true, commandLine: _command),
+    json: [
+      '`job` (Job); `command` (string, optional): with `--command`, left '
+          'out for a job that runs nothing (one that ended skipped or is '
+          'kept as it is).',
+      ..._jsonBlock(_jobAnswer),
+    ],
+    shapes: ['Job', 'Quality'],
+    errors: ['A job that is not in the queue: exit 5.'],
+  ),
+  CommandDoc(
+    'compare',
+    arguments: '<job>',
+    area: CommandArea.results,
+    summary: 'compares a result with its original, as the window\'s menu does',
+    about: [
+      'As "Compare with the original" in a done job\'s ⋯ menu: VidCtrl '
+          'compares the result with its original frame by frame (a sample '
+          'with the same piece of it) and says how close it looks, by VMAF '
+          'where this FFmpeg measures it, otherwise by XPSNR (see '
+          '"Closeness"). It takes about as long as the video lasts, or '
+          'longer, and one comparison runs at a time. The window shows it '
+          'under the job, and the person may stop it there.',
+      'Offered only where each frame of the result stands for one of the '
+          'original: not after the picture was made smaller, its frame rate '
+          'changed or its HDR turned into SDR ("Save space" makes 4K videos '
+          '1080p). Asked again while that job is being compared, it waits '
+          'for the same comparison.',
+    ],
+    options: [
+      (
+        '--no-wait',
+        'answer at once; the `compare-finished` event (`$c events`) tells '
+            'the result.',
+      ),
+    ],
+    examples: ['$c compare 1', '$c compare 1 --no-wait --json'],
+    text: [
+      comparedText(1, _compareAnswer),
+      '',
+      '# With --no-wait:',
+      comparingText(1),
+    ],
+    json: [
+      '`job` (int); `status` (string): `measured`; `closeness` (string, see '
+          '"Closeness") and `closenessText` (string) in words; `xpsnr` '
+          '(number, in dB); `vmaf` (number, optional: where this FFmpeg '
+          'measures it). With `--no-wait`, `{"started": true}`.',
+      ..._jsonBlock(_compareAnswer),
+    ],
+    errors: [
+      'A job that is not done, or whose frames do not pair with the '
+          'original\'s, or an FFmpeg without the `xpsnr` filter: exit 5, '
+          'saying why.',
+      'Another job being compared: `busy`, exit 5; ask again once it has '
+          'ended.',
+      'The comparison failed (exit 5, with FFmpeg\'s words), or was '
+          'stopped in the window (exit 5).',
     ],
   ),
   CommandDoc(

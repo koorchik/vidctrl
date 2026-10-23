@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:vidctrl/app/control/control_controller.dart';
+import 'package:vidctrl/app/estimates/estimate_cache.dart';
 import 'package:vidctrl/app/providers.dart';
 import 'package:vidctrl/app/quality/quality_controller.dart';
 import 'package:vidctrl/app/queue/queue_controller.dart';
@@ -12,13 +13,18 @@ import 'package:vidctrl/app/queue/queue_state.dart';
 import 'package:vidctrl/app/recipe/recipe.dart';
 import 'package:vidctrl/app/recipe/recipe_controller.dart';
 import 'package:vidctrl/app/sources/sources_controller.dart';
+import 'package:vidctrl/core/control/client_text.dart';
 import 'package:vidctrl/core/control/connection.dart';
 import 'package:vidctrl/core/control/endpoint.dart';
 import 'package:vidctrl/core/control/listener.dart';
 import 'package:vidctrl/core/control/protocol.dart';
+import 'package:vidctrl/core/control/views.dart';
 import 'package:vidctrl/core/ffmpeg/capabilities.dart';
+import 'package:vidctrl/core/ffmpeg/command_text.dart';
+import 'package:vidctrl/core/media/media_info.dart';
 import 'package:vidctrl/core/output/output_namer.dart';
 import 'package:vidctrl/core/quality/quality_search.dart';
+import 'package:vidctrl/core/scenarios/registry.dart';
 
 import '../../support/control.dart';
 import '../../support/fake_media.dart';
@@ -1045,6 +1051,388 @@ void main() {
         client.call(Methods.queueRetry, {'job': 'first'}),
         _failsWith(ControlErrorKind.badArgument, contains('first')),
       );
+    });
+  });
+
+  group('results', () {
+    /// Queues [name] through [client] with [goal]; returns the job id.
+    Future<int> queue(
+      ControlConnection client,
+      String name, {
+      String goal = 'space',
+    }) async {
+      final answer = await client.call(Methods.queueAdd, {
+        'videos': [video(name)],
+        'goal': goal,
+      }) as Map;
+      return ((answer['added'] as List).single as Map)['id'] as int;
+    }
+
+    Future<void> until(bool Function() condition) async {
+      for (var i = 0; i < 100 && !condition(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(condition(), isTrue);
+    }
+
+    /// Until the fake executor has started [count] conversions.
+    Future<void> started(int count) =>
+        until(() => env.executor.started.length >= count);
+
+    /// A job of [name] made no smaller in size, converted: its frames pair
+    /// with the original's, so it can be compared.
+    Future<int> converted(ControlConnection client, String name) async {
+      final path = video(name);
+      env.ffprobe.add(path, like: clip(width: 1920, height: 1080));
+      final before = env.executor.started.length;
+      final answer = await client.call(Methods.queueAdd, {
+        'videos': [path],
+        'goal': 'space',
+      }) as Map;
+      final id = ((answer['added'] as List).single as Map)['id'] as int;
+      await started(before + 1);
+      env.executor.started.last.finish();
+      await pumpEventQueue();
+      return id;
+    }
+
+    QueueJob jobOf(ProviderContainer container, int id) =>
+        container.read(queueProvider).jobs.firstWhere((j) => j.id == id);
+
+    test('job says a result worth a look by eye, with its quality', () async {
+      final a = video('a.mp4');
+      env.estimator.choices[a] = fakeChoice(QualityOutcome.belowTarget);
+      final (_, client) = await startControlled(env);
+      final id = await queue(client, 'a.mp4', goal: 'archive');
+      await started(1);
+      env.executor.started.single.finish();
+      await pumpEventQueue();
+
+      final answer = await client.call(Methods.jobGet, {'job': id}) as Map;
+
+      final job = answer['job'] as Map;
+      expect(job['status'], 'done');
+      expect(job['needsALook'], isTrue);
+      expect(job['quality'], containsPair('outcome', 'belowTarget'));
+      expect(job['outputPath'], endsWith('-check.mp4'));
+      expect(answer, isNot(contains('command')));
+      final text = jobDetailsText(
+        JobView.fromJson(Map<String, Object?>.from(job)),
+      ).join('\n');
+      expect(text, contains('Worth a look by eye'));
+      expect(text, contains('-check'));
+    });
+
+    test('job --command gives the command "Show the command" shows', () async {
+      final (container, client) = await startControlled(env);
+      final id = await queue(client, 'a.mp4');
+
+      final answer = await client.call(Methods.jobGet, {
+        'job': id,
+        'command': true,
+      }) as Map;
+
+      final shown = container
+          .read(queueProvider.notifier)
+          .commandFor(jobOf(container, id))!;
+      final command = answer['command'] as String;
+      expect(command, singleLineCommand('ffmpeg', shown));
+      // Every option it gives is one the window shows.
+      for (final word in command.split(' ')) {
+        if (word.startsWith('-')) expect(shown, contains(word));
+      }
+      expect(command, isNot(contains('-progress')));
+    });
+
+    test('job without a command for one that runs nothing', () async {
+      final a = video('a.mp4');
+      env.estimator.choices[a] = fakeChoice(QualityOutcome.notWorthIt);
+      final (container, client) = await startControlled(env);
+      final id = await queue(client, 'a.mp4', goal: 'archive');
+      await until(() => !jobOf(container, id).isPending);
+
+      final answer = await client.call(Methods.jobGet, {
+        'job': id,
+        'command': true,
+      }) as Map;
+
+      expect(answer['job'], containsPair('status', 'skipped'));
+      expect(answer, isNot(contains('command')));
+      await expectLater(
+        client.call(Methods.jobGet, {'job': 9}),
+        _failsWith(ControlErrorKind.notFound, contains('9')),
+      );
+    });
+
+    test('compare waits for the comparison and says how close it is', () async {
+      final (container, client) = await startControlled(env);
+      final id = await converted(client, 'hd.mp4');
+
+      final answer = client.call(Methods.jobCompare, {'job': id});
+      await until(() => env.qualityMeter.started.isNotEmpty);
+      expect(container.read(qualityProvider)[id], isA<QualityComparing>());
+      env.qualityMeter.last.finish(43);
+
+      expect(await answer, {
+        'job': id,
+        'status': 'measured',
+        'closeness': 'same',
+        'closenessText': 'Looks the same as the original',
+        'xpsnr': 43.0,
+      });
+      expect(container.read(qualityProvider)[id], isA<QualityMeasured>());
+    });
+
+    test('compare --no-wait answers at once and tells when it ends', () async {
+      final (_, client) = await startControlled(env);
+      final heard = Heard(client);
+      final id = await converted(client, 'hd.mp4');
+      await client.call(Methods.subscribe, {'snapshot': false});
+
+      expect(
+        await client.call(Methods.jobCompare, {'job': id, 'wait': false}),
+        {'started': true},
+      );
+      await until(() => env.qualityMeter.started.isNotEmpty);
+      env.qualityMeter.last.finish(41, vmaf: 94);
+
+      final compared = await heard.first(Events.compareFinished);
+      expect(compared.params['job'], id);
+      expect(compared.params['closeness'], 'veryClose');
+      expect(compared.params['vmaf'], 94);
+    });
+
+    test('compare of a job not done, or resized, says why not', () async {
+      final (_, client) = await startControlled(env);
+      final running = await queue(client, 'a.mp4');
+      await started(1);
+
+      await expectLater(
+        client.call(Methods.jobCompare, {'job': running}),
+        _failsWith(ControlErrorKind.badArgument, contains('done')),
+      );
+      env.executor.started.single.finish();
+      await pumpEventQueue();
+      // Made smaller: 4K becomes 1080p, and its frames do not pair.
+      await expectLater(
+        client.call(Methods.jobCompare, {'job': running}),
+        _failsWith(ControlErrorKind.badArgument, contains('resized')),
+      );
+      expect(env.qualityMeter.started, isEmpty);
+    });
+
+    test('compare without xpsnr in this FFmpeg says so', () async {
+      env = FakeEnvironment(
+        capabilities: const Capabilities(
+          ffmpegVersion: 'test',
+          encoders: {'libsvtav1', 'libx265', 'libx264', 'aac'},
+        ),
+      );
+      final (_, client) = await startControlled(env);
+      final id = await converted(client, 'hd.mp4');
+
+      await expectLater(
+        client.call(Methods.jobCompare, {'job': id}),
+        _failsWith(ControlErrorKind.badArgument, contains('xpsnr')),
+      );
+    });
+
+    test('compare while another runs is busy; a failed one says why', () async {
+      final (_, client) = await startControlled(env);
+      final first = await converted(client, 'hd.mp4');
+      final second = await converted(client, 'hd2.mp4');
+
+      final answer = client.call(Methods.jobCompare, {'job': first});
+      await until(() => env.qualityMeter.started.isNotEmpty);
+      await expectLater(
+        client.call(Methods.jobCompare, {'job': second}),
+        _failsWith(ControlErrorKind.busy),
+      );
+      env.qualityMeter.last.fail();
+      await expectLater(
+        answer,
+        _failsWith(
+          ControlErrorKind.badArgument,
+          contains('Invalid data found when processing input'),
+        ),
+      );
+    });
+
+    test('details of a video give its encoding as the window shows it, or '
+        'the whole report', () async {
+      final a = p.join(folder.path, 'a.mov');
+      File(a).writeAsStringSync('');
+      final raw = {
+        'format': {'format_long_name': 'QuickTime / MOV', 'size': '750000000'},
+        'streams': [
+          {
+            'codec_type': 'video',
+            'codec_name': 'h264',
+            'codec_long_name': 'H.264 / AVC',
+            'width': 3840,
+            'height': 2160,
+          },
+        ],
+      };
+      final like = clip();
+      env.ffprobe.add(
+        a,
+        like: MediaInfo(
+          path: a,
+          formatName: like.formatName,
+          duration: like.duration,
+          sizeBytes: like.sizeBytes,
+          video: like.video,
+          audio: like.audio,
+          raw: raw,
+        ),
+      );
+      final (_, client) = await startControlled(env);
+      await client.call(Methods.videosAdd, {
+        'paths': [a],
+      });
+
+      final answer =
+          await client.call(Methods.videosDetails, {'video': a}) as Map;
+
+      expect(answer['info'], containsPair('path', a));
+      final sections = (answer['details'] as List).cast<Map>();
+      expect(sections.first['title'], 'Video track 1');
+      expect(
+        sections.first['rows'],
+        contains(equals(['Resolution', '3840×2160'])),
+      );
+      expect(sections.map((s) => s['title']), contains('File'));
+
+      final report = await client.call(Methods.videosDetails, {
+        'video': a,
+        'raw': true,
+      }) as Map;
+      expect(report['raw'], raw);
+      expect(report, isNot(contains('details')));
+    });
+
+    test('details of a job read its result', () async {
+      final (container, client) = await startControlled(env);
+      final id = await queue(client, 'a.mp4');
+      await expectLater(
+        client.call(Methods.videosDetails, {'job': id}),
+        _failsWith(ControlErrorKind.notFound, contains('no result')),
+      );
+      await started(1);
+      env.executor.started.single.finish();
+      await pumpEventQueue();
+      final output = jobOf(container, id).outputPath;
+      await expectLater(
+        client.call(Methods.videosDetails, {'job': id}),
+        _failsWith(ControlErrorKind.notFound, contains(output)),
+      );
+
+      env.ffprobe.add(output, like: clip(width: 1920, height: 1080));
+      final answer =
+          await client.call(Methods.videosDetails, {'job': id}) as Map;
+
+      expect(answer['info'], containsPair('path', output));
+      expect(answer['info'], containsPair('width', 1920));
+      await expectLater(
+        client.call(Methods.videosDetails, {'video': 0, 'job': id}),
+        _failsWith(ControlErrorKind.badArgument),
+      );
+    });
+
+    test(
+      'estimate measures as the window does, and the list shows it',
+      () async {
+        final (container, client) = await startControlled(env);
+        final a = video('a.mp4');
+        await client.call(Methods.videosAdd, {
+          'paths': [a],
+        });
+
+        final answer = await client.call(Methods.videosEstimate, {
+          'videos': [a],
+          'goal': 'space',
+        }) as Map;
+
+        final preview =
+            ((answer['videos'] as List).single as Map)['preview'] as Map;
+        expect(preview['goal'], 'space.small');
+        expect(preview['expectedBytes'], (750000000 * 0.2).round());
+        expect(preview['measured'], isTrue);
+        expect(preview['measuring'], isFalse);
+        expect(env.estimator.measured, [a]);
+        expect(container.read(estimateCacheProvider).estimates, hasLength(1));
+        final listed =
+            await client.call(Methods.videosList, {'goal': 'space'}) as Map;
+        expect(
+          ((listed['videos'] as List).single as Map)['preview'],
+          containsPair('expectedBytes', preview['expectedBytes']),
+        );
+
+        // Archive chooses the quality as it measures, as before converting.
+        await client.call(Methods.videosEstimate, {
+          'videos': [a],
+          'goal': 'archive',
+        });
+        expect(env.estimator.raised, [a]);
+      },
+    );
+
+    test('estimate waits for a measurement the window started', () async {
+      env.estimator.hold = true;
+      final (container, client) = await startControlled(env);
+      final a = video('a.mp4');
+      await client.call(Methods.videosAdd, {
+        'paths': [a],
+      });
+      final recipe = Recipe(presetId: 'space.small');
+      final info = container.read(sourcesProvider).videos.single.info!;
+      unawaited(
+        container
+            .read(estimateCacheProvider.notifier)
+            .measure(
+              estimateKey(a, recipe),
+              info,
+              findPreset('space.small')!.plan(info, const {}, softwareOnly),
+            ),
+      );
+
+      var answered = false;
+      final answer = client
+          .call(Methods.videosEstimate, {
+            'videos': [a],
+            'goal': 'space',
+          })
+          .then((answer) {
+            answered = true;
+            return answer as Map;
+          });
+      await pumpEventQueue();
+      expect(answered, isFalse);
+      env.estimator.release();
+
+      final preview = ((await answer)['videos'] as List).single as Map;
+      expect(preview['preview'], containsPair('measured', true));
+      expect(env.estimator.measured, [a]);
+    });
+
+    test('estimate while videos are converted is busy', () async {
+      final (_, client) = await startControlled(env);
+      await queue(client, 'a.mp4');
+      await started(1);
+
+      await expectLater(
+        client.call(Methods.videosEstimate, {
+          'videos': [0],
+          'goal': 'space',
+        }),
+        _failsWith(
+          ControlErrorKind.busy,
+          'Videos are being converted; the window measures when the queue '
+          'is idle.',
+        ),
+      );
+      expect(env.estimator.measured, isEmpty);
     });
   });
 

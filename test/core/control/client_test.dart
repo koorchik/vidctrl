@@ -175,6 +175,93 @@ Map<String, Object?> _outcome(
   'needsALook': needsALook,
 };
 
+Map<String, Object?> _video(int id) => {
+  'id': id,
+  'path': '/videos/clip$id.mov',
+  'status': 'ready',
+  'sizeBytes': 1500000000,
+  'width': 3840,
+  'height': 2160,
+  'audioCodecs': ['aac'],
+  'hdr': false,
+};
+
+/// What the window answers about results: a job worth a look by eye, its
+/// comparison, a video's details and an estimate.
+final _resultAnswers = <String, _Answer>{
+  Methods.jobGet: (params, _) => {
+    'job': {
+      ..._job(
+        2,
+        'done',
+        outputPath: '/videos/Converted/clip2_av1-crf20-check.mp4',
+      ),
+      'outputBytes': 1000000,
+      'quality': {
+        'outcome': 'belowTarget',
+        'value': 20,
+        'standardValue': 35,
+        'vmaf': 93.1,
+        'xpsnr': 40.2,
+        'share': .4,
+      },
+      'needsALook': true,
+    },
+    if (params['command'] == true)
+      'command':
+          'ffmpeg -hide_banner -i file:/videos/clip2.mov -c:v libsvtav1 -crf 20 '
+          'file:/videos/Converted/clip2_av1-crf20-check.mp4',
+  },
+  Methods.jobCompare: (params, _) => params['wait'] == false
+      ? {'started': true}
+      : {
+          'job': params['job'],
+          'status': 'measured',
+          'closeness': 'same',
+          'closenessText': 'Looks the same as the original',
+          'vmaf': 96.2,
+          'xpsnr': 43.0,
+        },
+  Methods.videosDetails: (params, _) => {
+    'info': _video(1),
+    if (params['raw'] == true)
+      'raw': {
+        'format': {'format_name': 'mov'},
+      }
+    else
+      'details': [
+        {
+          'title': 'Video track 1',
+          'rows': [
+            ['Format', 'H.265 / HEVC'],
+            ['Resolution', '3840×2160'],
+          ],
+        },
+        {
+          'title': 'File',
+          'rows': [
+            ['Size', '1.5 GB'],
+          ],
+        },
+      ],
+  },
+  Methods.videosEstimate: (params, _) => {
+    'videos': [
+      {
+        ..._video(1),
+        'preview': {
+          'goal': 'archive.master',
+          'plan': 'encode',
+          'expectedBytes': 400000000,
+          'measured': true,
+          'measuring': false,
+          'closeness': 'same',
+        },
+      },
+    ],
+  },
+};
+
 void main() {
   setUp(() async {
     final dir = await Directory.systemTemp.createTemp('client');
@@ -397,6 +484,87 @@ void main() {
         ['pause', 'now'],
         ['cancel', '1', '2'],
         ['cancel', 'all'],
+      ]) {
+        final run = await _run(args);
+        expect(run.exitCode, ExitCode.badArguments, reason: '$args');
+        expect(run.err, isNotEmpty, reason: '$args');
+      }
+      expect(app.calls.length, asked);
+    },
+  );
+
+  test(
+    'job, compare, details and estimate ask what the window shows',
+    () async {
+      final app = await _FakeApp.start(_endpoint, _resultAnswers);
+      for (final (args, method, params, printed) in [
+        (['job', '2'], Methods.jobGet, {'job': 2}, 'Worth a look by eye'),
+        (
+          ['job', '2', '--command'],
+          Methods.jobGet,
+          {'job': 2, 'command': true},
+          'ffmpeg -hide_banner',
+        ),
+        (['compare', '2'], Methods.jobCompare, {'job': 2}, 'Looks the same'),
+        (
+          ['compare', '2', '--no-wait'],
+          Methods.jobCompare,
+          {'job': 2, 'wait': false},
+          'Job 2: Comparing with the original',
+        ),
+        (['details', '1'], Methods.videosDetails, {'video': 1}, 'Resolution: '),
+        (
+          ['details', 'a.mov'],
+          Methods.videosDetails,
+          {'video': '/home/alice/work/a.mov'},
+          'Video track 1',
+        ),
+        (['details', '--job', '2'], Methods.videosDetails, {'job': 2}, 'File'),
+        (
+          ['details', '1', '--raw'],
+          Methods.videosDetails,
+          {'video': 1, 'raw': true},
+          '"format_name": "mov"',
+        ),
+        (
+          [
+            'estimate',
+            '1',
+            'b.mov',
+            '--goal',
+            'archive',
+            '--opt',
+            'codec=hevc',
+          ],
+          Methods.videosEstimate,
+          {
+            'videos': [1, '/home/alice/work/b.mov'],
+            'goal': 'archive',
+            'options': {'codec': 'hevc'},
+          },
+          'About 400.0 MB, measured',
+        ),
+      ]) {
+        final run = await _run(args);
+        expect(run.exitCode, ExitCode.ok, reason: '$args ${run.err}');
+        expect(app.paramsOf(method), params, reason: '$args');
+        expect(run.out, contains(printed), reason: '$args');
+      }
+
+      // Refused before the window is asked anything.
+      final asked = app.calls.length;
+      for (final args in [
+        ['job'],
+        ['job', 'x'],
+        ['job', '1', '2'],
+        ['compare'],
+        ['compare', '1', '2'],
+        ['details'],
+        ['details', '1', '--job', '2'],
+        ['details', '--job', 'x'],
+        ['details', '1', '2'],
+        ['estimate'],
+        ['estimate', '1', '--opt', 'codec'],
       ]) {
         final run = await _run(args);
         expect(run.exitCode, ExitCode.badArguments, reason: '$args');
@@ -755,6 +923,7 @@ void main() {
     late _FakeApp app;
     var following = false;
     app = await _FakeApp.start(_endpoint, {
+      ..._resultAnswers,
       Methods.status: (_, _) => {
         ..._status('ready'),
         'busy': true,
@@ -932,6 +1101,13 @@ void main() {
       ['pause'],
       ['resume'],
       ['cancel'],
+      ['job', '2', '--command'],
+      ['compare', '2'],
+      ['compare', '2', '--no-wait'],
+      ['details', '1'],
+      ['details', '--job', '2'],
+      ['details', '1', '--raw'],
+      ['estimate', '1', '--goal', 'archive'],
       ['wait'],
       ['events', '--since-now'],
     ]) {

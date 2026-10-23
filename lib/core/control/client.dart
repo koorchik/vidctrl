@@ -23,6 +23,8 @@ import 'views.dart';
 const clientCommands = <String>[
   'add',
   'videos',
+  'details',
+  'estimate',
   'remove',
   'queue',
   'queue add',
@@ -35,6 +37,8 @@ const clientCommands = <String>[
   'pause',
   'resume',
   'cancel',
+  'job',
+  'compare',
   'status',
   'wait',
   'events',
@@ -293,11 +297,26 @@ ArgParser _parser() {
       _withGlobals(ArgParser())..addFlag('wait', defaultsTo: true),
     )
     ..addCommand('videos', _withGoal(_withGlobals(ArgParser())))
+    ..addCommand(
+      'details',
+      _withGlobals(ArgParser())
+        ..addOption('job', help: 'The result of this job.')
+        ..addFlag('raw', negatable: false, help: 'The whole report.'),
+    )
+    ..addCommand('estimate', _withGoal(_withGlobals(ArgParser())))
     ..addCommand('remove', _withGlobals(ArgParser()))
     ..addCommand('queue', queue)
     ..addCommand('pause', _withGlobals(ArgParser()))
     ..addCommand('resume', _withGlobals(ArgParser()))
     ..addCommand('cancel', _withGlobals(ArgParser()))
+    ..addCommand(
+      'job',
+      _withGlobals(ArgParser())..addFlag('command', negatable: false),
+    )
+    ..addCommand(
+      'compare',
+      _withGlobals(ArgParser())..addFlag('wait', defaultsTo: true),
+    )
     ..addCommand('wait', _withGlobals(ArgParser())..addOption('timeout'))
     ..addCommand(
       'events',
@@ -375,6 +394,44 @@ _Command? _command(ArgResults top, ClientIo io) {
           return [for (final video in videos) ...videoText(video)];
         }),
       );
+    case 'details':
+      final job = command.option('job');
+      if (job == null && args.length != 1 || job != null && args.isNotEmpty) {
+        throw _bad('details takes one video, or --job and a job number.');
+      }
+      final raw = command.flag('raw');
+      final params = {
+        if (job == null)
+          'video': _video(args.single, io)
+        else
+          'job': _jobId(job, 'details --job'),
+        if (raw) 'raw': true,
+      };
+      return _Command(
+        'details',
+        (c, o) => _call(
+          c!,
+          o,
+          Methods.videosDetails,
+          params,
+          (a) =>
+              raw ? reportText(a) : detailsText(a, job: params['job'] as int?),
+        ),
+      );
+    case 'estimate':
+      final params = {
+        'videos': [for (final v in some('videos')) _video(v, io)],
+        ..._goalParams(command),
+      };
+      return _Command(
+        'estimate',
+        (c, o) => _call(c!, o, Methods.videosEstimate, params, (a) {
+          return [
+            for (final v in a['videos'] as List)
+              ...videoText(VideoView.fromJson(_object(v))),
+          ];
+        }),
+      );
     case 'remove':
       final videos = [for (final v in some('videos')) _video(v, io)];
       return _Command(
@@ -440,6 +497,35 @@ _Command? _command(ArgResults top, ClientIo io) {
             ),
           ];
         }),
+      );
+    case 'job':
+      if (args.length != 1) throw _bad('job takes one job number.');
+      final job = _jobId(args.single, 'job');
+      final withCommand = command.flag('command');
+      return _Command(
+        'job',
+        (c, o) => _call(
+          c!,
+          o,
+          Methods.jobGet,
+          {'job': job, if (withCommand) 'command': true},
+          (a) => jobDetailsText(
+            JobView.fromJson(_object(a['job'])),
+            command: withCommand,
+            commandLine: a['command'] as String?,
+          ),
+        ),
+      );
+    case 'compare':
+      if (args.length != 1) throw _bad('compare takes one job number.');
+      final job = _jobId(args.single, 'compare');
+      final wait = command.flag('wait');
+      return _Command(
+        'compare',
+        (c, o) => _call(c!, o, Methods.jobCompare, {
+          'job': job,
+          if (!wait) 'wait': false,
+        }, (a) => [wait ? comparedText(job, a) : comparingText(job)]),
       );
     case 'wait':
       final jobs = [
