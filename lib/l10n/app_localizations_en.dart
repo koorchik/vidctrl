@@ -540,6 +540,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get estimating => 'measuring size…';
 
   @override
+  String get estimatingQuality => 'measuring size and quality…';
+
+  @override
   String takesAbout(String time) {
     return 'takes about $time';
   }

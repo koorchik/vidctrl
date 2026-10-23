@@ -600,6 +600,35 @@ void main() {
       expect(env.estimator.measured, ['/videos/a.mp4']);
     });
 
+    test('the measurement says how close the result will look', () async {
+      env.estimator.quality = const QualityScore(39.2, vmaf: 92.6);
+      await sources().addPaths(['/videos/a.mp4']);
+      await settle();
+
+      final preview = container.read(previewProvider)[video('a.mp4').id]!;
+      expect(preview.estimate!.quality!.closeness, Closeness.differs);
+    });
+
+    test(
+      'a finished sample corrects the size and keeps the closeness',
+      () async {
+        env.estimator.quality = const QualityScore(41.4, vmaf: 96.0);
+        await sources().addPaths(['/videos/a.mp4']);
+        await settle();
+        recipe().setSample(SampleChoice.start);
+        queue().addSelected();
+        await settle();
+
+        env.executor.last.finish(bytes: 5000000);
+        await settle();
+
+        final key = estimateKey('/videos/a.mp4', jobs().single.recipe);
+        final estimate = container.read(estimateCacheProvider).estimates[key]!;
+        expect(estimate.bytes, 30000000);
+        expect(estimate.quality!.vmaf, 96.0);
+      },
+    );
+
     test('a quick fix is calculated, not measured', () async {
       recipe().selectPreset('resolve.studio');
       await sources().addPaths(['/videos/a.mp4']);

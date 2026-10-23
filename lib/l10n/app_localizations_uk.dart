@@ -541,6 +541,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get estimating => 'оцінюємо розмір…';
 
   @override
+  String get estimatingQuality => 'оцінюємо розмір і якість…';
+
+  @override
   String takesAbout(String time) {
     return 'триватиме приблизно $time';
   }

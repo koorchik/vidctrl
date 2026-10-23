@@ -656,6 +656,8 @@ void main() {
       final estimate = await SampleEstimator(
         FfmpegRunner(media!.paths.ffmpeg),
         workDir: Directory(media!.file('estimates')),
+        compare: true,
+        vmaf: capabilities.hasFilter('libvmaf'),
       ).estimate(info, plan);
       final actual = await convert(
         const ArchivePreset(),
@@ -667,6 +669,33 @@ void main() {
       expect(estimate.bytes, closeTo(actual.sizeBytes, actual.sizeBytes * 0.3));
       expect(estimate.time, isNotNull);
       expect(Directory(media!.file('estimates')).listSync(), isEmpty);
+      // Each piece was compared with the same piece of the original: the
+      // archive's look of a test pattern.
+      expect(estimate.quality!.lumaDb, greaterThan(40));
+      if (capabilities.hasFilter('libvmaf')) {
+        expect(estimate.quality!.vmaf, greaterThan(93));
+      }
+    });
+
+    test('a picture made smaller is not compared', () async {
+      if (unavailable()) return;
+      final source = await media!.clip(
+        'to_estimate_smaller.mp4',
+        size: '2560x1440',
+        seconds: 1,
+      );
+      final info = await ffprobe.probe(source);
+      // Made 1080p: its frames no longer pair with the original's.
+      final plan = const SaveSpacePreset().plan(info, const {}, capabilities);
+
+      final estimate = await SampleEstimator(
+        FfmpegRunner(media!.paths.ffmpeg),
+        workDir: Directory(media!.file('estimates_smaller')),
+        compare: true,
+      ).estimate(info, plan);
+
+      expect(estimate!.measured, isTrue);
+      expect(estimate.quality, isNull);
     });
 
     test(

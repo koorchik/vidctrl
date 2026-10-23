@@ -31,7 +31,8 @@ class AppEnvironment {
   final Capabilities capabilities;
   final SleepInhibitor sleepInhibitor;
 
-  /// Predicts output sizes before anything is converted.
+  /// Predicts output sizes, and how close the pictures will come to their
+  /// originals, before anything is converted.
   final OutputEstimator estimator;
 
   /// Compares converted files with their originals, when asked.
@@ -50,13 +51,18 @@ final environmentProvider = FutureProvider<AppEnvironment>(
   (ref) async {
     final paths = FfmpegLocator().locate();
     if (paths == null) throw const FfmpegMissing();
+    final capabilities = await CapabilityProbe(paths.ffmpeg).detect();
     return AppEnvironment(
       ffmpeg: paths,
       ffprobe: Ffprobe(paths.ffprobe),
       executor: JobExecutor(FfmpegRunner(paths.ffmpeg)),
-      capabilities: await CapabilityProbe(paths.ffmpeg).detect(),
+      capabilities: capabilities,
       sleepInhibitor: SleepInhibitor.forPlatform(),
-      estimator: SampleEstimator(FfmpegRunner(paths.ffmpeg)),
+      estimator: SampleEstimator(
+        FfmpegRunner(paths.ffmpeg),
+        compare: capabilities.hasFilter('xpsnr'),
+        vmaf: capabilities.hasFilter('libvmaf'),
+      ),
       qualityMeter: QualityMeter(FfmpegRunner(paths.ffmpeg)),
       thumbnailer: Thumbnailer(paths.ffmpeg),
     );

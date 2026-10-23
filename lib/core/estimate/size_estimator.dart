@@ -5,6 +5,8 @@
 /// quality-targeted encode cannot: its size depends on the footage (grain,
 /// motion, detail). For those a few short pieces of the video are encoded
 /// with the exact settings and the result is scaled up to the whole length.
+/// Each piece is also compared with the same piece of the original, so how
+/// close the result will look is known before converting too.
 library;
 
 import 'dart:async';
@@ -15,11 +17,17 @@ import 'package:path/path.dart' as p;
 import '../ffmpeg/command_builder.dart';
 import '../ffmpeg/runner.dart';
 import '../media/media_info.dart';
+import '../quality/quality_meter.dart';
 import '../scenarios/blocks.dart';
 import '../scenarios/scenario.dart';
 
 class OutputEstimate {
-  const OutputEstimate({required this.bytes, this.time, this.measured = false});
+  const OutputEstimate({
+    required this.bytes,
+    this.time,
+    this.measured = false,
+    this.quality,
+  });
 
   final int bytes;
 
@@ -28,6 +36,10 @@ class OutputEstimate {
 
   /// Measured by encoding samples, as opposed to calculated.
   final bool measured;
+
+  /// How close the picture will come to the original: the poorest of the
+  /// samples. Null where it was not measured.
+  final QualityScore? quality;
 }
 
 /// The size of the output when it can be calculated without encoding
@@ -121,12 +133,14 @@ OutputEstimate extrapolateSamples({
   required int sampleBytes,
   required Duration sampled,
   required Duration spent,
+  QualityScore? quality,
 }) {
   final scale = info.duration.inMicroseconds / sampled.inMicroseconds;
   return OutputEstimate(
     bytes: (sampleBytes * scale).round() + audioOutputBytes(info, plan),
     time: spent * scale,
     measured: true,
+    quality: quality,
   );
 }
 
@@ -139,17 +153,25 @@ abstract interface class OutputEstimator {
   Future<void> cancelAll();
 }
 
-/// Measures quality-targeted encodes by encoding samples with FFmpeg.
+/// Measures quality-targeted encodes by encoding samples with FFmpeg, and
+/// with [compare], how close each comes to the original (with [vmaf], VMAF
+/// too; the FFmpeg needs the `xpsnr` and `libvmaf` filters).
 class SampleEstimator implements OutputEstimator {
-  SampleEstimator(this._runner, {Directory? workDir})
-    : _workDir =
-          workDir ??
-          Directory(
-            p.join(Directory.systemTemp.path, 'vidctrl_estimates_$pid'),
-          );
+  SampleEstimator(
+    this._runner, {
+    Directory? workDir,
+    this.compare = false,
+    this.vmaf = false,
+  }) : _workDir =
+           workDir ??
+           Directory(
+             p.join(Directory.systemTemp.path, 'vidctrl_estimates_$pid'),
+           );
 
   final FfmpegRunner _runner;
   final Directory _workDir;
+  final bool compare;
+  final bool vmaf;
   final _running = <FfmpegRun>{};
 
   /// Estimates under way, so that [cancelAll] can wait for them to end.
@@ -182,6 +204,8 @@ class SampleEstimator implements OutputEstimator {
 
     var bytes = 0;
     var sampled = Duration.zero;
+    final scores = <QualityScore?>[];
+    final comparable = compare && canComparePlan(plan);
     final stopwatch = Stopwatch()..start();
     for (final sample in samples) {
       final output = File(
@@ -205,6 +229,13 @@ class SampleEstimator implements OutputEstimator {
         if (result.status != RunStatus.completed) return null;
         if (!await output.exists()) return null;
         bytes += await output.length();
+        if (comparable) {
+          // Comparing is not part of converting: kept out of the time.
+          stopwatch.stop();
+          scores.add(await _compare(info, output.path, sample, generation));
+          stopwatch.start();
+          if (generation != _generation) return null;
+        }
       } finally {
         if (await output.exists()) await output.delete();
       }
@@ -218,7 +249,40 @@ class SampleEstimator implements OutputEstimator {
       sampleBytes: bytes,
       sampled: sampled,
       spent: stopwatch.elapsed,
+      quality: scores.isEmpty || scores.contains(null)
+          ? null
+          : QualityScore.worstOf(scores.cast<QualityScore>()),
     );
+  }
+
+  /// How close [output], an encoded [sample], comes to the same piece of the
+  /// original. Null when it could not be compared.
+  Future<QualityScore?> _compare(
+    MediaInfo info,
+    String output,
+    SampleRange sample,
+    int generation,
+  ) async {
+    final video = info.video;
+    final run = await _runner.start(
+      comparisonArgs(
+        original: info.path,
+        result: output,
+        range: sample,
+        vmafModel: vmaf && video != null
+            ? vmafModelFor(video.width, video.height)
+            : null,
+        threads: Platform.numberOfProcessors,
+      ),
+    );
+    _running.add(run);
+    if (generation != _generation) unawaited(run.cancel());
+    final result = await run.result;
+    _running.remove(run);
+    if (result.status != RunStatus.completed) return null;
+    final lumaDb = parseXpsnr(result.errorLines);
+    if (lumaDb == null) return null;
+    return QualityScore(lumaDb, vmaf: parseVmaf(result.errorLines));
   }
 
   @override

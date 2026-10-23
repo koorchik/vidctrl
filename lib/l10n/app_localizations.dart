@@ -1040,6 +1040,12 @@ abstract class AppLocalizations {
   /// **'measuring size…'**
   String get estimating;
 
+  /// No description provided for @estimatingQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'measuring size and quality…'**
+  String get estimatingQuality;
+
   /// No description provided for @takesAbout.
   ///
   /// In en, this message translates to:

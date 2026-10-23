@@ -178,6 +178,33 @@ void main() {
       expect(closenessOf(xpsnr: 40.6), Closeness.veryClose);
     });
 
+    test('a video is as close as its poorest piece', () {
+      // A dark film: most pieces fine, one dark scene not.
+      final worst = QualityScore.worstOf(const [
+        QualityScore(41.0, vmaf: 96.5),
+        QualityScore(38.0, vmaf: 89.5),
+        QualityScore(39.2, vmaf: 97.2),
+      ])!;
+
+      expect(worst.lumaDb, 38.0);
+      expect(worst.vmaf, 89.5);
+      expect(worst.closeness, Closeness.differs);
+    });
+
+    test('a piece without VMAF leaves the video without VMAF', () {
+      final worst = QualityScore.worstOf(const [
+        QualityScore(43.0, vmaf: 97.0),
+        QualityScore(42.5),
+      ])!;
+
+      expect(worst.vmaf, isNull);
+      expect(worst.closeness, Closeness.same);
+    });
+
+    test('no pieces, no score', () {
+      expect(QualityScore.worstOf(const []), isNull);
+    });
+
     for (final (db, closeness) in [
       (double.infinity, Closeness.same),
       (45.1, Closeness.same),

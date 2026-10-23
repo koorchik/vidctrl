@@ -236,6 +236,7 @@
   "statusNoSound": "No sound in this file",
   "statusCannotHold": "This file type cannot hold this video",
   "estimating": "measuring size…",
+  "estimatingQuality": "measuring size and quality…",
   "takesAbout": "takes about {time}",
   "@takesAbout": {
     "placeholders": {

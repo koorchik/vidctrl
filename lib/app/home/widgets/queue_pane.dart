@@ -20,6 +20,7 @@ import '../headings.dart';
 import '../scenario_texts.dart';
 import '../size_change_text.dart';
 import '../technical_text.dart';
+import 'closeness_line.dart';
 import 'command_dialog.dart';
 import 'media_details_dialog.dart';
 
@@ -279,7 +280,13 @@ class _JobTile extends ConsumerWidget {
                     color: _statusColor(context),
                   ),
                 ),
-                if (check != null) _QualityLine(check: check),
+                if (check != null)
+                  _QualityLine(check: check)
+                // What the expected-size samples showed, until a comparison
+                // of the result says more.
+                else if (whole?.quality case final score?
+                    when job.status == JobStatus.waiting)
+                  ClosenessLine(score: score),
                 if (job.status == JobStatus.done && job.isSample)
                   Align(
                     alignment: AlignmentDirectional.centerStart,
@@ -671,7 +678,6 @@ class _QualityLine extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final style = theme.textTheme.bodySmall;
-    final format = Formatter(l10n);
     switch (check) {
       case QualityComparing(:final fraction):
         return Column(
@@ -700,42 +706,8 @@ class _QualityLine extends ConsumerWidget {
             ),
           ],
         );
-      case QualityMeasured(:final lumaDb, :final vmaf, :final closeness):
-        final (words, color) = switch (closeness) {
-          Closeness.same => (
-            l10n.closenessSame,
-            SuccessColors.of(context).text,
-          ),
-          Closeness.veryClose => (
-            l10n.closenessVeryClose,
-            scheme.onSurfaceVariant,
-          ),
-          Closeness.differs => (l10n.closenessDiffers, scheme.tertiary),
-        };
-        return Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Row(
-            children: [
-              Flexible(
-                child: Text(
-                  words,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: style?.copyWith(color: color),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: TechnicalText(
-                  [
-                    if (vmaf != null) l10n.vmafScore(format.score(vmaf)),
-                    l10n.xpsnrScore(format.score(lumaDb)),
-                  ].join('  ·  '),
-                ),
-              ),
-            ],
-          ),
-        );
+      case QualityMeasured(:final lumaDb, :final vmaf):
+        return ClosenessLine(score: QualityScore(lumaDb, vmaf: vmaf));
       case QualityFailed():
         return Padding(
           padding: const EdgeInsets.only(top: 2),

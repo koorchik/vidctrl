@@ -39,8 +39,8 @@ class EstimateCacheState {
 final estimateCacheProvider =
     NotifierProvider<EstimateCache, EstimateCacheState>(EstimateCache.new);
 
-/// Expected output sizes, measured or learned from finished samples, shared
-/// by the video list and the queue.
+/// Expected output sizes and closeness to the original, measured or learned
+/// from finished samples, shared by the video list and the queue.
 class EstimateCache extends Notifier<EstimateCacheState> {
   late AppEnvironment _env;
 
@@ -88,8 +88,15 @@ class EstimateCache extends Notifier<EstimateCacheState> {
 
   /// Records what a finished sample showed about the whole video. Ten seconds
   /// measure better than the automatic three-second pieces, so this wins.
+  /// The sample says nothing about closeness, so the measured one stays.
   void learn(String key, OutputEstimate estimate) {
-    state = state.copyWith(estimates: {...state.estimates, key: estimate});
+    final learned = OutputEstimate(
+      bytes: estimate.bytes,
+      time: estimate.time,
+      measured: estimate.measured,
+      quality: estimate.quality ?? state.estimates[key]?.quality,
+    );
+    state = state.copyWith(estimates: {...state.estimates, key: learned});
   }
 
   /// Stops measuring, so converting gets the whole processor. Completes once

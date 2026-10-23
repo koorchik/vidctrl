@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/media/video_files.dart';
 import '../../../core/platform/open_external.dart';
+import '../../../core/quality/quality_meter.dart';
 import '../../../core/scenarios/scenario.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../format.dart';
@@ -16,6 +17,7 @@ import '../../sources/sources_controller.dart';
 import '../../theme.dart';
 import '../headings.dart';
 import '../technical_text.dart';
+import 'closeness_line.dart';
 import 'command_dialog.dart';
 import 'media_details_dialog.dart';
 
@@ -390,7 +392,9 @@ class _PreviewLine extends StatelessWidget {
     final estimate = preview.estimate;
     final expected = estimate != null
         ? '→ ${l10n.aboutSize(format.bytes(estimate.bytes))}'
-        : (preview.measuring ? '· ${l10n.estimating}' : null);
+        : preview.measuring
+        ? '· ${canComparePlan(preview.plan) ? l10n.estimatingQuality : l10n.estimating}'
+        : null;
 
     final (text, color) = switch (preview.plan.kind) {
       PlanKind.skip => (l10n.statusReadyAsIs, success.text),
@@ -434,6 +438,9 @@ class _PreviewLine extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(color: color),
           ),
+          if (estimate?.quality case final score?
+              when preview.plan.kind == PlanKind.encode)
+            ClosenessLine(score: score),
           for (final note in notes)
             Text(
               note,

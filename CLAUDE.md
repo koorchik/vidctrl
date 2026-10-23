@@ -130,12 +130,15 @@ Capabilities)` (`scenarios/scenario.dart`) looks at one file and returns a
   `queue/job_executor.dart` wraps one conversion: temporary file, rename on
   success, cleanup on failure.
 - `estimate/size_estimator.dart` predicts output size: calculated for copies
-  and fixed-rate formats, measured by encoding short pieces otherwise.
+  and fixed-rate formats, measured by encoding short pieces otherwise. Each
+  piece is also compared with the original, so the video list and the
+  waiting jobs say how close the result will look (the poorest piece).
 - `quality/quality_meter.dart` compares a result with its original in one
   pass: XPSNR (`xpsnr`) always, VMAF (`libvmaf`, the 4K model above 1080p)
   where the FFmpeg has it; frames paired by order, a sample against the same
   piece. `closenessOf` turns the scores into words, by VMAF where measured.
-  "Compare with the original" and `tool/calibrate_archive.dart` both use it.
+  "Compare with the original", the size estimator and
+  `tool/calibrate_archive.dart` use it.
 - `scenarios/registry.dart` lists the scenarios in display order.
 
 Sound: lossless or unusual sound (the FLAC or PCM of an editor export) becomes
@@ -401,6 +404,10 @@ The UI renders presets and options generically; it needs no other change.
 - **Expected size** of a quality-targeted encode cannot be calculated; the
   estimator encodes 3-second pieces spread over the video (picture only; the
   sound is calculated) and scales up. It is stopped when converting starts.
+  Comparing the pieces makes it 40 to 80% slower (a film's six pieces: 12
+  to 19 s); that time is kept out of the expected conversion time. The
+  poorest piece decides: a film whose dark scenes lose detail is fine on
+  average.
 - **Byte counts overflow when multiplied.** Tens of gigabytes times
   gigabytes exceeds 64-bit integers; take the ratio first.
 - **Widget tests:**

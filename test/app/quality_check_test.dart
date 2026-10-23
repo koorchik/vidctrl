@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vidctrl/app/home/technical_text.dart';
+import 'package:vidctrl/core/quality/quality_meter.dart';
 
 import '../support/fakes.dart';
 import '../support/pump_app.dart';
@@ -53,6 +54,41 @@ void main() {
     await wait(tester);
     return env.qualityMeter.last;
   }
+
+  testWidgets('before converting, the video list says how close it will look', (
+    tester,
+  ) async {
+    env.estimator.quality = const QualityScore(39.2, vmaf: 92.6);
+    final sources = await pumpApp(tester, env, locale: const Locale('en'));
+    await addVideos(tester, sources, ['/videos/holiday.mp4']);
+    await tester.pump();
+
+    expect(find.text('Differences may be visible'), findsOneWidget);
+    expect(
+      find.widgetWithText(TechnicalText, 'VMAF 92.6  ·  XPSNR 39.2 dB'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a waiting job says it too, a running one does not', (
+    tester,
+  ) async {
+    env.estimator.quality = const QualityScore(41.4, vmaf: 96.0);
+    env.ffprobe.add('/videos/second.mp4');
+    final sources = await pumpApp(tester, env, locale: const Locale('en'));
+    await addVideos(tester, sources, [
+      '/videos/holiday.mp4',
+      '/videos/second.mp4',
+    ]);
+    await tester.pump();
+    await tester.tap(find.byType(FilledButton).last);
+    await tester.pump();
+    await tester.pump();
+
+    // Both videos in the list, and in the queue only the second, waiting
+    // job: the first is converting.
+    expect(find.text('Looks the same as the original'), findsNWidgets(3));
+  });
 
   testWidgets('a result can be compared once its conversion is done', (
     tester,

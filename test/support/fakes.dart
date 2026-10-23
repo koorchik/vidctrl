@@ -164,9 +164,12 @@ class FakeSleepInhibitor implements SleepInhibitor {
 }
 
 /// Pretends to measure: every re-encode comes out at [ratio] of the source
-/// size and takes as long as the video lasts.
+/// size, [quality] close to it, and takes as long as the video lasts.
 class FakeEstimator implements OutputEstimator {
   double ratio = 0.2;
+
+  /// How close the samples came to the original; null for not compared.
+  QualityScore? quality;
 
   /// When set, measuring fails.
   bool fail = false;
@@ -203,6 +206,7 @@ class FakeEstimator implements OutputEstimator {
       bytes: (info.sizeBytes * ratio).round(),
       time: info.duration,
       measured: true,
+      quality: quality,
     );
   }
 

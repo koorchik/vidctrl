@@ -10,6 +10,7 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import '../ffmpeg/command_builder.dart';
 import '../ffmpeg/runner.dart';
@@ -55,6 +56,30 @@ Closeness closenessOfVmaf(double vmaf) => vmaf >= sameAsOriginalVmaf
 /// The verdict: by VMAF where it was measured, by XPSNR otherwise.
 Closeness closenessOf({required double xpsnr, double? vmaf}) =>
     vmaf != null ? closenessOfVmaf(vmaf) : closenessOfXpsnr(xpsnr);
+
+/// How close a picture came to its original, by both measures.
+class QualityScore {
+  const QualityScore(this.lumaDb, {this.vmaf});
+
+  /// The poorest of [scores] by each measure: one weak piece of a video is
+  /// what a person notices, however good the rest. Null when there are none.
+  static QualityScore? worstOf(Iterable<QualityScore> scores) {
+    if (scores.isEmpty) return null;
+    final vmafs = [for (final s in scores) s.vmaf];
+    return QualityScore(
+      scores.map((s) => s.lumaDb).reduce(min),
+      vmaf: vmafs.contains(null) ? null : vmafs.cast<double>().reduce(min),
+    );
+  }
+
+  /// XPSNR of the brightness, in dB.
+  final double lumaDb;
+
+  /// Null where this FFmpeg cannot measure VMAF.
+  final double? vmaf;
+
+  Closeness get closeness => closenessOf(xpsnr: lumaDb, vmaf: vmaf);
+}
 
 /// The VMAF model for a picture of [width] by [height]: the 4K one, made for
 /// a 4K screen seen from closer, for anything larger than 1080p.

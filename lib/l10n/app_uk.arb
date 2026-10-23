@@ -157,6 +157,7 @@
   "statusNoSound": "У цьому файлі немає звуку",
   "statusCannotHold": "Цей тип файлу не може містити таке відео",
   "estimating": "оцінюємо розмір…",
+  "estimatingQuality": "оцінюємо розмір і якість…",
   "takesAbout": "триватиме приблизно {time}",
   "languageSystem": "Як на комп’ютері",
   "lookTitle": "Вигляд",

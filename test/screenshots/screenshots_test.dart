@@ -12,6 +12,7 @@ import 'package:vidctrl/app/theme.dart';
 import 'package:vidctrl/app/window.dart';
 import 'package:vidctrl/core/ffmpeg/locator.dart';
 import 'package:vidctrl/core/media/ffprobe.dart';
+import 'package:vidctrl/core/quality/quality_meter.dart';
 
 import '../support/fake_media.dart';
 import '../support/fakes.dart';
@@ -57,6 +58,8 @@ void main() {
       build: const BuildInfo(version: '0.3.0', repository: 'owner/vidctrl'),
       releases: FakeReleaseSource(),
     );
+    // What a camera's file measures: nothing to see.
+    env.estimator.quality = const QualityScore(41.4, vmaf: 96.0);
     env.ffprobe.add('/videos/DSC_0412.MOV');
     env.ffprobe.add(
       '/videos/DSC_0413.MOV',
