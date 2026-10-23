@@ -11,15 +11,16 @@ queue, tell me when they are done". The agent does the finding itself
 watching the window: videos appear in the list, jobs appear in the queue and
 convert, exactly as if they had been dropped in by hand.
 
-A command line was chosen over an MCP server first: it serves agents,
-shell scripts and people alike, and an MCP server can be a thin wrapper over
-it later (see "Later"). The owner liked working with DaVinci Resolve
+A command line was chosen over an MCP server: it serves agents, shell
+scripts and people alike, and with the starting prompt and the manual an
+agent needs nothing more, so there is no MCP server (see "Non-goals"). The
+owner liked working with DaVinci Resolve
 through an MCP server and wants the same feeling: the agent drives, the
 window shows.
 
 ## Goals
 
-- A command, `vidctrl-cli` (name: see "Calls made by the designer"), that
+- A command, `vidctrl-client` (a client of the running app), that
   talks to the **running window** and changes what the window shows. If no
   window is running, it opens one and then talks to it.
 - It can do what the window can do with videos and the queue, by the same
@@ -49,6 +50,8 @@ window shows.
 - **No file search.** The agent finds the files and passes paths.
 - **No closing the window** (the owner saw no need), no settings, look or
   language changes.
+- **No MCP server.** The owner decided against it: the starting prompt and
+  `vidctrl-client` give an agent everything, and MCP would add nothing.
 
 ## Anti-goals
 
@@ -64,6 +67,11 @@ What would make this a failure even if it worked:
 - An agent can make the app lose work or a file the UI could not: the
   command adds no destructive power beyond the window's (originals are
   never overwritten, `.part` files and renames stay the executor's).
+- **Anything that deletes or suggests deleting a file on disk.** No command
+  deletes a file, original or result. Nothing the command prints, the manual
+  included, tells or hints to delete the originals: no "before deleting the
+  original", no "the original can go now", no recipe that cleans up. An
+  agent reading it must never come away thinking that is its job.
 
 ## Decided with the owner
 
@@ -72,6 +80,16 @@ What would make this a failure even if it worked:
 - Cancelling the running conversion and removing jobs need **no
   confirmation** in the window, as they need none there now.
 - Closing the window from the command line: not offered.
+- The name is **`vidctrl-client`**: it is a client of the running app, not
+  a command-line version of it.
+- **Easy to start:** a button in the window gives a prompt to copy into any
+  agent, with where `vidctrl-client` is, to run `manual` first and how to
+  wait for the conversions (see "Use with an AI agent").
+- A command prints the **full manual** for an agent (`vidctrl-client
+  manual`, see "The manual").
+- **No instructions to delete originals, anywhere.** "Remove" means taking a
+  video off the list or a job out of the queue, as in the window; the file
+  on disk stays. Every removing command and its manual entry says so.
 - Monitoring and waiting are core, not extras: "wait until it's converted,
   then get the result", or get each result as it finishes.
 
@@ -82,8 +100,8 @@ What would make this a failure even if it worked:
   as the owner runs it (its Bash sandbox is off). The command needs the
   app's loopback network, its per-user folder and, to start the app, the
   desktop. A sandboxed agent (Claude Code's sandbox gives a process its own
-  network), WSL on Windows, SSH and containers are not served; `docs/CLI.md`
-  says to exempt `vidctrl-cli` from a sandbox.
+  network), WSL on Windows, SSH and containers are not served; `docs/CLIENT.md`
+  says to exempt `vidctrl-client` from a sandbox.
 - **Packaging:** it must work from today's zips and disk image, and from
   package managers that link the program onto the `PATH` (AUR, the Homebrew
   tap, Scoop, winget, all planned soon after launch): the command finds the
@@ -109,7 +127,7 @@ Three pieces:
    `queueProvider`, `qualityProvider` and `estimateCacheProvider`. Being on
    the UI isolate, its calls interleave with the mouse's in order, with no
    locking.
-3. **The command** (`bin/vidctrl_cli.dart`, built with `dart compile exe`,
+3. **The command** (`bin/vidctrl_client.dart`, built with `dart compile exe`,
    importing only `lib/core`): parses arguments, finds or starts the app,
    sends one request (or subscribes), prints the answer, exits with a code.
 
@@ -190,10 +208,10 @@ is an error that lists the valid ones.
 | `videos [--goal g] [--opt …]` | the video list | path, size, duration, resolution, codecs, HDR; with a goal: what the plan would be (skip, remux, encode, unsupported, kept as is) and the expected size and closeness if known |
 | `estimate <videos…> --goal g [--opt …]` | selecting videos, which measures them | runs `EstimateCache.measure` only while the queue is idle, as the preview does; the result lands in the shared cache, so the list shows it too |
 | `details <video\|job> [--raw]` | "Video details" | `--raw` gives the whole ffprobe report |
-| `remove <videos…>` | removing from the list | |
+| `remove <videos…>` | removing from the list | off the list only; the file stays on disk, and the output says so |
 | `queue` | the queue pane | each job: id, video, goal and options, sample or not, status, progress and time left, "checking the quality… try N", output path, chosen quality and outcome |
 | `queue add <videos…> [--goal g] [--opt k=v]… [--sample start\|middle] [--out next\|<folder>] [--subfolder Name]` | Add to queue | paths not in the list yet are added first; an identical pending job is reported as already queued, not added; without `--goal` the panel's current goal and options are used (like the button) and the output says which; without `--sample` the whole video, whatever the panel's sample choice; without `--out` the panel's output setting (remembered, maybe a custom folder) |
-| `queue remove <jobs…>`, `queue move <job> <position>`, `queue retry <job>`, `queue clear-finished` | the job's ⋯ menu, dragging, "Clear finished" | |
+| `queue remove <jobs…>`, `queue move <job> <position>`, `queue retry <job>`, `queue clear-finished` | the job's ⋯ menu, dragging, "Clear finished" | `remove` and `clear-finished` take jobs out of the queue; finished results stay on disk |
 | `pause`, `resume` | the pause button | explicit, not a toggle, so a script can repeat them |
 | `cancel [job]` | cancel | the running one by default |
 | `queue convert-anyway <job>`, `queue convert-whole <job>` | "Convert anyway", "Convert the whole video" | |
@@ -247,27 +265,149 @@ as it is: converting would hardly make it smaller"), with the technical
 names beside, in English. `--json` carries ids and numbers, and the same
 English words as separate fields.
 
+### The manual
+
+`vidctrl-client manual` prints, in one go, everything an agent needs to use
+the app without having seen it: the agent runs it first and is ready. The
+owner asked for this. It is Markdown on stdout, works without the app
+running and starts nothing.
+
+- **What the app is and how to think about it:** videos list, goals, queue,
+  jobs as snapshots; the window shows everything the command does; nothing
+  converts without the window; originals are never touched; output names
+  carry the settings; samples go to `Samples/`.
+- **Every command:** what it does, its arguments, an example, what it prints
+  with and without `--json` (the JSON fields, with types), and its errors.
+- **Every goal:** id, what it is for in plain words, its options and
+  choices with the default and what each trades away (`choiceHint`), which
+  videos it skips or leaves as they are. Ids and choices come from
+  `registry.dart` at build time, so the list cannot fall behind; the words
+  come from the English ARB.
+- **What the outcomes mean**, so an agent can tell the owner: done,
+  skipped, kept as it is (and "Convert anyway"), `belowTarget` (the `-check`
+  name: tell the owner to look at it by eye), failed, cancelled.
+- **What the app never does**, said plainly near the top: it deletes no file;
+  "remove" takes a video off the list or a job out of the queue, and the
+  file on disk stays.
+- **Exit codes, `wait` rules and the event list.**
+- **Recipes**, worked end to end: "queue every video over 2 GB in ~/Videos
+  and tell me when done" (with `find`, `queue add`, `wait`); "report each
+  file as it finishes" (`events`); "make samples first, compare, then
+  convert the whole"; "what would Archive do with these, and how big?"
+  (`videos --goal`, `estimate`).
+- **Limits:** same user and desktop, no sandbox, no FFmpeg parameters, no
+  closing the window.
+
+`vidctrl-client --help` stays a short list of commands and ends with "Run
+`vidctrl-client manual` for the full guide"; `help <command>` prints that
+command's part of the manual. `manual --json` gives the same as data
+(commands, arguments, goals, exit codes) for a program that builds on
+it.
+
+The manual's text lives in one place in `lib/core/control/`, built into the
+command, and `docs/CLIENT.md` is generated from it (a test fails when they
+differ). Tests also check that every command the parser knows and every
+goal and option in `registry.dart` appear in it, so a new goal or command
+cannot ship undocumented, and that neither the manual nor any text the
+command prints speaks of deleting a file (a list of words, like the
+technical terms in `home_screen_test.dart`). The window's own
+`qualityCheckByEye` ("Check by eye before deleting the original") is not
+reused: the command words `belowTarget` as "worth a look by eye".
+
 ## What changes in the window
 
-Nothing needs to: it already renders the notifiers' state. One choice
-follows from "like a drop": videos added by `add` become the selection, as
-dropped ones do, so the panel's preview measures them (see the calls below).
+Showing what the command did needs nothing new: the window already renders
+the notifiers' state. One choice follows from "like a drop": videos added by
+`add` become the selection, as dropped ones do, so the panel's preview
+measures them (see the calls below).
+
+### "Use with an AI agent"
+
+The owner asked for this: a person who has never heard of `vidctrl-client`
+must find it in the window and get an agent working in one paste.
+
+- **Where:** a button in the header, beside About, look and language, with
+  an icon and the tooltip "Use with an AI agent". It is on every screen
+  except "engine missing", where there is nothing for an agent to do. Also
+  an item of the same name in the About menu.
+- **It opens a small window** (like "More options…"), plain words first:
+  one or two sentences on what it is for ("Let an AI agent such as Claude
+  add videos and start conversions for you. You keep watching here."), then
+  the prompt in a box with **Copy** beside it, then the program's location
+  with its own Copy and "Show in folder", then a line for each kind of
+  agent (below). Nothing here changes a setting; it only copies text.
+- **The prompt** is filled in at run time with the real, absolute path of
+  `vidctrl-client` beside the running app (from `Platform.resolvedExecutable`;
+  this lands in the person's clipboard only, never in a file). It says, in
+  short:
+  - VidCtrl is open on this computer and the person watches its window;
+    this program controls it (the path, quoted).
+  - Run `"<path>" manual` first; it explains every command, the goals and
+    what the results mean. Read output with `--json`.
+  - Finding videos is the agent's job (its own `find`, `du`); give paths to
+    `add` and `queue add --goal …`.
+  - Conversions run in the window one at a time and can take hours. To know
+    when they end, run `"<path>" wait` in the background (or follow
+    `events`) and tell the person when it returns, with each result and any
+    marked "worth a look by eye".
+  - Never delete, move or rename any file. "Remove" only takes a video off
+    the list or a job out of the queue.
+  The full guide stays in `manual`, so the prompt stays a dozen lines and
+  cannot go out of date: what changes with a release is in the manual, which
+  the agent reads from the same program.
+- **Language:** the window's words follow the app's language; the prompt
+  is in English (command names, fields and the manual are), with one line
+  asking the agent to answer the person in their language: Ukrainian when
+  the app is in Ukrainian.
+- **Kinds of agent**, one short line each:
+  - agents that run commands (Claude Code, Codex, Claude Desktop's Code
+    tab, any terminal harness): paste the prompt;
+  - an agent that cannot run commands (a plain chat): use one that can;
+  - a sandboxed agent: let it run this program outside the sandbox.
+- **When the program is missing** (a development build without it): the
+  window says so and shows how to build it, and Copy is disabled.
+- **Discoverability elsewhere:** the README's features and a short section
+  "Use with an AI agent" showing the same prompt; `vidctrl-client` with no
+  arguments prints the same quick start as the prompt and points to
+  `manual`; the manual opens with that quick start too.
+- **UI rules hold:** texts in both ARB files; "AI agent" goes
+  through `TechnicalText` where they are technical names on the main
+  screen; the header still ends where the panel does at the smallest window
+  (`no_scrolling_test.dart`, the header test); both looks; a screenshot of
+  the new window per look. A test checks that the prompt contains the path,
+  `manual`, `wait` and the rule about files, and nothing about deleting
+  (the same word list as the manual's).
 
 ## Shipping
 
 - The release workflow compiles the command on each system
-  (`dart compile exe bin/vidctrl_cli.dart`) and puts it beside the app:
+  (`dart compile exe bin/vidctrl_client.dart`) and puts it beside the app:
   Linux in the bundle beside `vidctrl`, Windows beside `vidctrl.exe`, macOS
-  in `Contents/MacOS/`, where `tool/package_macos.sh` signs it inside out
-  with the rest (hardened runtime, so notarization passes). CI checks it is
-  there, as it checks FFmpeg.
+  in `Contents/MacOS/`. CI checks it is there, as it checks FFmpeg.
+- **macOS signing.** `dart compile exe` writes a native Mach-O (the Dart
+  runtime with the compiled program inside, made so that `codesign` accepts
+  it, signed ad hoc by the compiler). `tool/package_macos.sh` re-signs it
+  like `ffmpeg` and `ffprobe`: Developer ID, `--options runtime`,
+  `--timestamp`, before the app itself (inside out). It is then part of the
+  app's notarization and stapled ticket, so a notarized download runs it
+  from a terminal with no warning. Without the Apple secrets everything is
+  signed ad hoc, as now, and the release notes' way of opening the app
+  (removing the quarantine from the whole `.app`) covers the client too.
+  **Not yet known:** whether a Dart program runs under the hardened runtime
+  with no entitlements (one report on Apple's forums of an AOT binary in an
+  app bundle failing there). So step 1 starts with a spike on a Mac: a
+  hello-world `dart compile exe` signed with `--options runtime`, run from
+  `Contents/MacOS/`, notarized; if it needs an entitlement, the client gets
+  its own entitlements file with only that.
+- **Windows:** the client is unsigned like the app for now; started from a
+  terminal or by an agent it is not stopped by SmartScreen, which checks
+  programs opened from Explorer. Signing on Windows, already on the
+  roadmap, signs both.
 - Reaching it from a terminal: until there are installers, the README says
-  how to link it onto the `PATH` (`ln -s …/vidctrl-cli ~/.local/bin/`;
+  how to link it onto the `PATH` (`ln -s …/vidctrl-client ~/.local/bin/`;
   macOS `/usr/local/bin`). An installer can do that later.
-- `docs/CLI.md`, plus `vidctrl-cli help` and `help <command>`, written for
-  an agent reading them cold: what each command does, ids, exit codes, and
-  two worked examples ("queue every video over 2 GB in ~/Videos and tell me
-  when done"; "make samples first, compare, then convert the whole").
+- `docs/CLIENT.md` is the manual's text (see "The manual"), so it can be read on
+  the web too.
 
 ## Testing
 
@@ -281,26 +421,26 @@ dropped ones do, so the panel's preview measures them (see the calls below).
 - Events: a fake job finishing produces `job-finished`, a closing container
   produces `app-closing`.
 - The command: argument parsing and exit codes against a fake server; one
-  test that starts it as a process (`dart run bin/vidctrl_cli.dart`)
+  test that starts it as a process (`dart run bin/vidctrl_client.dart`)
   against a server in the test.
 - A widget test that an `add` from the server shows in the video list and a
   `queue add` in the queue pane.
 
 ## Order of work
 
+0. The macOS signing spike (see "Shipping"): it decides nothing else, but
+   a surprise there is cheapest found first.
 1. Protocol, endpoint file, server with `status`, `goals`, `add`, `videos`,
-   `queue`, `queue add`, `wait`, `events`. Usable by an agent end to end.
+   `queue`, `queue add`, `wait`, `events`, and the `manual` for them.
+   Usable by an agent end to end.
 2. The rest of the queue operations, `job`, `compare`, `details`,
    `estimate`.
 3. Shipping: compile and bundle on three systems, signing, CI check,
-   `docs/CLI.md`.
-4. MCP (see "Later").
+   `docs/CLIENT.md` generated from the manual, and the "Use with an AI
+   agent" window (it needs the program beside the app to show a real path).
 
 ## Later
 
-- `vidctrl-cli mcp`: an MCP server on stdio inside the same command, one tool
-  per command with the same arguments and JSON, `wait` as a long call and
-  events as notifications. No logic of its own.
 - A mark in the queue for jobs that came from the command line, if
   watching shows it is wanted.
 - A finish notification of the desktop's own, already on the roadmap
@@ -310,9 +450,11 @@ dropped ones do, so the panel's preview measures them (see the calls below).
 
 Not discussed with the owner; each can be changed without changing the rest.
 
-- **Name `vidctrl-cli`**, a separate console program: the window's program
-  is already `vidctrl` on Linux and Windows, and a Windows GUI program
-  cannot print to a terminal or be waited for there.
+- **A separate console program**, not a mode of the window's: a Windows GUI
+  program cannot print to a terminal or be waited for there.
+- **"Use with an AI agent" in the header and the About menu**, a small
+  window with the prompt; English prompt, with a line to answer in the
+  app's language.
 - **TCP on loopback with a token**, not Unix sockets and named pipes: one
   transport on three systems.
 - **`queue add` without `--goal` uses the panel's goal**, like the button;
