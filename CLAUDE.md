@@ -36,6 +36,7 @@ flutter test tool/make_screenshots.dart               # redraws the README's pic
 dart run tool/desktop_entry.dart                      # Linux: registers the icon with the desktop
 tool/fetch_ffmpeg.sh linux                            # the pinned FFmpeg into third_party/ffmpeg/ (or windows, macos)
 tool/build_client.sh build/linux/x64/release/bundle   # vidctrl-client beside a built app
+tool/build_client.sh build/linux/x64/debug/bundle     # once, for the agent window under flutter run
 flutter test tool/make_manual.dart                    # rewrites docs/CLIENT.md and the client's goal words
 
 dart run tool/convert.dart --list                     # the engine without the UI
