@@ -1,6 +1,6 @@
 # vidctrl-client
 
-`vidctrl-client` controls the open VidCtrl window. Below, `vidctrl-client` stands for the program as you run it: by its full path when not on the `PATH`, quoted as the window's prompt has it: `'/opt/VidCtrl/vidctrl-client'`, `"C:\…\vidctrl-client.exe"` on Windows, `& "C:\…\vidctrl-client.exe"` in PowerShell.
+In this guide, `vidctrl-client` stands for the program as you run it: when it is not on the `PATH`, by its full path, quoted as the window's prompt has it.
 
 ## Quick start
 
@@ -16,9 +16,8 @@ VidCtrl is open on this computer, and the person watches its window. The program
 A window that converts videos by goal; `vidctrl-client` changes what it shows, as the person would with the mouse.
 
 - **Videos**: the window's list. `add` is like dropping a file there; each file is listed once, and videos just added become the selection.
-- **Goals**: what to make of a video, by the panel's ids (see "Goals").
 - **Jobs**: `queue add` makes one per video, a snapshot of video, goal, options and folder that later changes do not touch. The queue starts by itself and goes in order.
-- **The window shows everything**; the person may act there too (pause, add, take jobs out), and this program sees it.
+- **The window shows everything**; the person may act there too, and this program sees it.
 - **Nothing converts without the window.** Every command but `status`, `manual` and `help` opens one if none is ("Starting VidCtrl…" on stderr, up to 30 s); closing it stops conversions. Two commands at once may each open one: run `vidctrl-client queue` first, then `events` in the background.
 - **Results** are new files, by default in `Converted` beside each video, named with the settings (`beach.mov` gives `Converted/beach_av1-crf35.mp4`, a second ` (2)`), written as a hidden `.part` until whole.
 - **Samples**: 10 seconds from the start or middle, with the whole's settings, into `Samples` there (`beach_av1-crf35_sample10s.mp4`, `_sample10s-mid`).
@@ -28,20 +27,19 @@ A window that converts videos by goal; `vidctrl-client` changes what it shows, a
 
 VidCtrl deletes no file: "remove" takes a video off the list or a job out of the queue, and the file stays on disk.
 
-- No command changes, moves or renames a file, nor closes the window or changes its panel's goal, remembered settings, look or language.
-- Never delete, move or rename any file. Leave every file to the person.
+- No command changes, moves or renames a file, nor closes the window or changes its panel's goal, remembered settings, look or language. Leave every file to the person.
 
 ## Commands
 
-`vidctrl-client <command> [arguments] [options]`. All take `--json` (one JSON document; `events`: one per line), `--no-start` (exit 2, not open the window) and `--help`. Videos by id or path, jobs by id; one `--opt` per option. A goal, option or choice unknown or not offered here (see `goals`) is refused, naming the valid ones, but for the choice the goal makes here anyway. Errors: stderr and an exit code (see "Waiting"). `→` is the `--json` answer.
+`vidctrl-client <command> [arguments] [options]`. All take `--json` (one JSON document; `events`: one per line), `--no-start` (exit 2, not open the window) and `--help`. Videos by id or path, jobs by id; one `--opt` per option. An unknown goal, option or choice is refused, naming the valid ones. An option this computer does not offer (see `goals`) is taken only with the choice the goal makes here anyway (`--opt speed=cpu` without a GPU encoder), so a script may name the defaults everywhere. Errors: stderr and an exit code (see "Waiting"). `→` is the `--json` answer.
 
-- `add <paths…> [--no-wait]`: Adds files, and the videos in folders, to the list, and waits until each is read. Results in `Converted` count too: give files, not a folder of results. → `{videos: [{path, id?, result}]}`
+- `add <paths…> [--no-wait]`: Adds files, and the videos in folders, to the list, and waits until each is read. Results in `Converted` count too: give files, not a folder of results. → `{videos: [{path, id?: int, result}]}`
 - `videos [--goal <goal>] [--opt <option>=<choice>]`: The list; with `--goal`, each video's `preview` (sizes measured only for the panel's goal while the queue is idle; else `estimate`). → `{videos: [Video]}`
-- `details <video> | --job <job> [--raw]`: How a video, or a done job's result, is encoded, track by track; `--raw`: ffprobe's report. → `{info: Video, details: [{group, number, title, rows}]}` or `{info, raw}`
+- `details <video> | --job <job> [--raw]`: How a video, or a done job's result, is encoded, track by track; `--raw`: ffprobe's report. → `{info: Video, details: [{group, number: int, title, rows: [[string]]}]}` or `{info: Video, raw: object}`
 - `estimate <videos…> [--goal <goal>] [--opt <option>=<choice>]`: Measures expected size and closeness by encoding pieces, seconds to a minute each; without `--goal`, the panel's. `BUSY` while converting. → `{videos: [Video]}` with `preview`
 - `remove <videos…>`: Takes videos off the list; files stay on disk, jobs in the queue. → `{removed: [int]}`
 - `queue`: The jobs, in order. → `{paused: bool, busy: bool, jobs: [Job]}`
-- `queue add <videos…> [--goal <goal>] [--opt <option>=<choice>] [--sample start|middle] [--out next|<folder>] [--subfolder <name>]`: Queues each readable video, adding unlisted paths (folders give their videos). Without `--goal`, the panel's: name it. `--out <folder>`: every result there; `--out next`: beside each video, in `--subfolder` (`Converted`); neither: the panel's folder. A like waiting job is not queued twice; nothing is if an argument is wrong or none can be (exit 5). → `{goal, options, added: [Job], alreadyQueued: [int], skipped: [{video, reason}]}`
+- `queue add <videos…> [--goal <goal>] [--opt <option>=<choice>] [--sample start|middle] [--out next|<folder>] [--subfolder <name>]`: Queues each readable video, adding unlisted paths and the videos in folders. Without `--goal`, the panel's: name it. `--out <folder>`: every result there; `--out next`: beside each video, in `--subfolder` (`Converted`); neither: the panel's folder. A like waiting job is not queued twice; nothing is if an argument is wrong or none can be (exit 5). → `{goal, options: {option: choice}, added: [Job], alreadyQueued: [int], skipped: [{video: int or string, reason}]}` (`alreadyQueued`: video ids)
 - `queue remove <jobs…>`: Takes jobs out, cancelling one under way; files stay on disk. → `{removed: [int]}`
 - `queue move <job> <position>`: Moves a waiting job; position 1, the top, converts next. → `{jobs: [Job]}`
 - `queue retry <job>`: A `FAILED` or `CANCELLED` job waits again; read its `errorLines` first. → `{job: Job}`
@@ -57,46 +55,46 @@ VidCtrl deletes no file: "remove" takes a video off the list or a job out of the
 - `wait [jobs…] [--timeout <seconds>]`: Waits until the jobs end (see "Waiting"). → `{outcomes: [Outcome]}` at the end
 - `events [--since-now]`: Prints events as they happen (see "Codes"): a `SNAPSHOT` first (not with `--since-now`), until the window closes (exit 4). → `{event, time, …its fields}` per line
 - `goals`: The goals with the options this computer offers. → `{goals: [Goal]}`
-- `manual`: This guide. → `{commands, goals, exitCodes, events, codes}`
+- `manual`: This guide. → `{commands: […], goals: […], events: […], exitCodes: {…}, codes: {…}}`
 - `help [command]`: The commands, or one command's details. → text only
 
 `vidctrl-client help <command>` prints a command's examples, its text output and a JSON sample.
 
 ## JSON
 
-Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never words; goal, option and choice ids as `--goal` and `--opt` take them. `[X]` is a list; `?` marks a field left out when not known; only `cancel` gives `null`. Untyped fields are strings.
+Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never words; goal, option and choice ids as `--goal` and `--opt` take them. `[X]` is a list; `?` marks a field left out when not known; only `cancel` gives `null`. Here and in the `→` answers, an untyped field is a string.
 
 - Video: `id` int, `path`, `status`, `sizeBytes`? int, `durationSeconds`? number, `width`? int, `height`? int, `videoCodec`?, `audioCodecs` [string], `hdr` bool, `preview`? Preview.
 - Preview: `goal`, `plan`, `expectedBytes`? int, `measured` bool (by encoding pieces), `measuring` bool, `closeness`?.
 - Job: `id` int, `videoId` int, `path`, `goal`, `options` {option: choice} (as made here: report these), `sample`?, `status`, `fraction`? 0-1, `remainingSeconds`? number, `attempt`? int, `outputPath`?, `outputBytes`? int, `quality`? Quality, `needsALook` bool, `errorLines` [string].
 - Quality: `outcome`, `value`? int (lower is better), `standardValue`? int, `vmaf`? number, `xpsnr`? number (of the poorest piece), `share` number (expected size / original's).
 - Outcome: `jobId` int, `path`, `status`, `outputPath`?, `needsALook` bool.
-- Status: `state`, `version`, `busy` bool, `paused` bool, `jobs` {status: count}.
+- Status: `state`, `version`, `busy` bool, `paused` bool, `jobs` {status: int}.
 - Goal: `id` (`archive.master`), `scenario`, `title`, `subtitle`, `options` [{`id`, `title`, `defaultChoice`, `advanced` bool, `choices` [{`id`, `label`, `hint`}]}].
 - Error, on stderr: `{"error": {"code", "message"}}`; read `code`, the message is for people.
 
 ## Codes
 
-Each kind, where it is found, and its codes; `vidctrl-client help <command>` has them in full.
+Where each kind is found, then its codes; in full in `vidctrl-client help <command>`.
 
-- **Job statuses** (Job and Outcome `status`, Status `jobs` keys): `WAITING`; `RUNNING` converting or choosing quality; `PAUSED` held by a pause; `DONE` result at `outputPath`; `SKIPPED` nothing written; not a failure; `FAILED` see `errorLines`; `CANCELLED` a failure for `wait`; `REMOVED` `wait` only: taken out, not a failure.
+- **Job statuses** (Job and Outcome `status`, Status `jobs` keys): `WAITING`; `RUNNING` converting or choosing quality; `PAUSED` held by a pause; `DONE` result at `outputPath`; `SKIPPED` nothing written, not a failure; `FAILED` see `errorLines`; `CANCELLED` a failure for `wait`; `REMOVED` `wait` only: taken out, not a failure.
 - **Video statuses** (Video `status`): `PROBING` being read; `READY` can be queued; `UNREADABLE` not a video FFmpeg opens.
 - **Plans** (Preview `plan`): `SKIP` already fine (`SKIPPED`); `REMUX` copied into another file type; `AUDIO_ONLY` only the sound converted; `ENCODE` the picture converted: slow; `UNSUPPORTED` nothing the goal can do (`SKIPPED`); `KEPT_AS_IS` Archive: not worth it (`SKIPPED`).
 - **Closeness** (Preview `closeness`, `compare`): `SAME` looks the same (VMAF 95+ on the poorest piece); `VERY_CLOSE` VMAF 93+; `DIFFERS` may visibly differ.
-- **Quality outcomes** (Quality `outcome`): `STANDARD` the usual quality; `RAISED` a better one was needed: larger; `BELOW_TARGET` short even at the best: named `…-check`, `needsALook`, still `DONE`; ask the person to look by eye; `NOT_WORTH_IT` would keep over 80% of the size: `SKIPPED` (see `queue convert-anyway`).
+- **Quality outcomes** (Quality `outcome`): `STANDARD` the usual quality; `RAISED` a better one was needed: larger; `BELOW_TARGET` short even at the best: named `…-check`, `needsALook`, still `DONE`, ask the person to look by eye; `NOT_WORTH_IT` would keep over 80% of the size: `SKIPPED` (see `queue convert-anyway`).
 - **Window states** (Status `state`): `STARTING` looking for FFmpeg; `READY`; `FFMPEG_MISSING` the window says what to do.
 - **Adding** (`add`'s `result`, `queue add`'s `skipped[].reason`): `ADDED`; `KNOWN` listed already; `NOT_FOUND` nothing there, or no longer listed; `UNREADABLE` listed, not a video FFmpeg opens.
 - **Samples** (Job `sample`): `START`; `MIDDLE`.
 - **Comparisons** (`compare`'s and `COMPARE_FINISHED`'s `status`): `MEASURED`; `FAILED` only in the event, with `errorLines`.
 - **Details** (`details[].group`): `FILE`; `VIDEO`; `AUDIO`; `SUBTITLE`; `TIMECODE`; `DATA`; `ATTACHMENT`; `CHAPTERS`.
-- **Errors** (`error.code`, with the exit code): `BAD_ARGUMENT` 5, not valid; `NOT_FOUND` 5; `BUSY` 5, not now; `UNKNOWN_METHOD` 5, the window is another version; `FFMPEG_MISSING` 6; `UNAUTHORIZED` 2, the window refused or did not answer; `NOT_RUNNING` 2, none open and none could be; `APP_CLOSED` 4; `TIMEOUT` 3, the jobs go on; `UNEXPECTED` 5, the client went wrong.
-- **Events** (`events`' `event`, with `time` but on `APP_CLOSING`, and these fields): `SNAPSHOT` `{videos: [Video], jobs: [Job], paused, busy}`, first; `VIDEO_ADDED` a Video; `VIDEO_READY` a Video; `VIDEO_UNREADABLE` a Video; `VIDEO_REMOVED` `{video}`; `JOB_ADDED` a Job; `JOB_CHECKING` `{job, attempt}`; `JOB_STARTED` a Job; `JOB_PROGRESS` `{job, fraction, remainingSeconds?}`; `JOB_FINISHED` a Job; `JOB_REMOVED` `{job}`; `QUEUE_PAUSED`; `QUEUE_RESUMED`; `QUEUE_IDLE` nothing more to do; `COMPARE_FINISHED` as `compare` answers, or with `errorLines`; `APP_CLOSING` the window closes.
+- **Errors** (`error.code`, with the exit code): `BAD_ARGUMENT` 5, not valid; `NOT_FOUND` 5; `BUSY` 5, not now; `UNKNOWN_METHOD` 5, another version; `FFMPEG_MISSING` 6; `UNAUTHORIZED` 2, refused or no answer; `NOT_RUNNING` 2; `APP_CLOSED` 4; `TIMEOUT` 3, the jobs go on; `UNEXPECTED` 5, the client went wrong.
+- **Events** (`events`' `event`, with `time` but on `APP_CLOSING`, and these fields): `SNAPSHOT` `{videos: [Video], jobs: [Job], paused: bool, busy: bool}`, first; `VIDEO_ADDED` a Video; `VIDEO_READY` a Video; `VIDEO_UNREADABLE` a Video; `VIDEO_REMOVED` `{video: int}`; `JOB_ADDED` a Job; `JOB_CHECKING` `{job: int, attempt: int}`; `JOB_STARTED` a Job; `JOB_PROGRESS` `{job: int, fraction: number, remainingSeconds?: number}`; `JOB_FINISHED` a Job; `JOB_REMOVED` `{job: int}`; `QUEUE_PAUSED`; `QUEUE_RESUMED`; `QUEUE_IDLE` nothing more to do; `COMPARE_FINISHED` as `compare` answers, or with `errorLines`; `APP_CLOSING` the window closes.
 
 ## Goals
 
 Which to choose: `archive` keeps the picture as it is in a smaller file, the usual choice to save space without loss; `space` also makes it at most 1080p and 30 fps, for calls, screen recordings and the like; `resolve.studio` to edit in DaVinci Resolve Studio, `resolve.free` in the free one (the picture converted too: much larger); the others by name.
 
-By name or full id; choices default first; options only where they make a difference (see `goals`). No picture: `UNSUPPORTED` but for `audio` and `privacy`. `help goals` has the words in full.
+By name or full id; choices default first. No picture: `UNSUPPORTED` but for `audio` and `privacy`. `help goals` has the words in full.
 
 - `--goal archive` (`archive.master`): Archive, no quality loss. Camera videos far smaller, looking the same; one not worth it is left as it is (`NOT_WORTH_IT`). `--opt codec=` `av1` Smallest file (default), `hevc` Works everywhere. `--opt speed=` `cpu` Thorough (default), `gpu` Fast.
 - `--goal space` (`space.small`): Save space, good enough. Much smaller, still good to watch; every video is converted.
@@ -123,12 +121,12 @@ By name or full id; choices default first; options only where they make a differ
 Queue every video over 2 GB in ~/Videos and say when done (look at `find`'s list first; none: tell the person):
 
 ```sh
-find ~/Videos -type f -size +2G \( -iname '*.mov' -o -iname '*.mp4' -o -iname '*.mts' -o -iname '*.mkv' \) \
-  -not -path '*/Converted/*' -print0 | xargs -0 vidctrl-client queue add --goal archive --json
+find ~/Videos -type f -size +2G \( -iname '*.mov' -o -iname '*.mp4' \) -not -path '*/Converted/*' \
+  -print0 | xargs -0 vidctrl-client queue add --goal archive --json
 vidctrl-client wait 0 1 2 --json   # in the background; the ids from each answer's `added`
 ```
 
-Then tell the person each `outputPath` and `needsALook`, and on exit 1 each failed job's `errorLines` (`vidctrl-client queue --json`).
+Videos in `alreadyQueued` have jobs already: find them with `vidctrl-client queue --json` and wait for them too. Then tell the person each `outputPath` and `needsALook`, and on exit 1 each failed job's `errorLines`.
 
 Samples first, then the whole:
 

@@ -43,7 +43,13 @@ void main() {
   final document = manualDocument(client: 'vidctrl-client');
 
   test('the manual is short enough for an agent to read in one go', () {
-    expect(utf8.encode(text).length, lessThanOrEqualTo(16000));
+    expect(
+      utf8.encode(text).length,
+      lessThanOrEqualTo(16000),
+      reason:
+          'Keep `manual` within 16000 bytes: shorten an entry; details '
+          'belong in `help <command>`.',
+    );
   });
 
   test('the manual covers every command the client knows', () {
@@ -205,9 +211,8 @@ void main() {
 
   test('the manual says what the name in its examples stands for', () {
     final intro = text.substring(0, text.indexOf('## Quick start'));
+    expect(intro, contains('by its full path'));
     expect(intro, contains("as the window's prompt has it"));
-    expect(intro, contains(r'`"C:\…\vidctrl-client.exe"` on Windows'));
-    expect(intro, contains(r'`& "C:\…\vidctrl-client.exe"`'));
   });
 
   test('the manual, help and usage are typed for the system asked for', () {
@@ -229,10 +234,13 @@ void main() {
     );
   });
 
-  test('--help is a short list that points to the manual', () {
+  test('--help is a short list that points to the manual and help', () {
     expect(
       usage().trimRight(),
-      endsWith('Run `vidctrl-client manual` for the full guide.'),
+      endsWith(
+        'Run `vidctrl-client manual` for the guide; `vidctrl-client help '
+        '<command>` for a command\'s details.',
+      ),
     );
     expect(usage().split('\n').length, lessThanOrEqualTo(40));
   });
@@ -361,6 +369,23 @@ void main() {
       contains('- `BELOW_TARGET`: ${outcomeWords(OutcomeCodes.belowTarget)}'),
     );
     expect(text, contains('-check'));
+  });
+
+  test('the manual\'s code lists part codes by ; alone', () {
+    final part = text.substring(
+      text.indexOf('## Codes'),
+      text.indexOf('## Goals'),
+    );
+    for (final line in part.split('\n').where((l) => l.startsWith('- **'))) {
+      final codes = line.substring(line.indexOf('): ') + 3);
+      for (final entry in codes.split('; ')) {
+        expect(entry, startsWith('`'), reason: line);
+      }
+    }
+  });
+
+  test('the manual says an option not offered here takes the default', () {
+    expect(text, contains('so a script may name the defaults everywhere'));
   });
 
   test('what a help points to is in it or in the manual', () {

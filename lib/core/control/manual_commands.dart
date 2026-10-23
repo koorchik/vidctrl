@@ -433,7 +433,7 @@ List<CommandDoc> commandDocs(
         'Adds files, and the videos in folders, to the list, and waits until '
         'each is read. Results in `Converted` count too: give files, not a '
         'folder of results.',
-    answer: '`{videos: [{path, id?, result}]}`',
+    answer: '`{videos: [{path, id?: int, result}]}`',
     codes: ['addResult'],
     about: [
       'A folder adds the videos in it and in its folders, by their '
@@ -511,8 +511,8 @@ List<CommandDoc> commandDocs(
         'How a video, or a done job\'s result, is encoded, track by track; '
         '`--raw`: ffprobe\'s report.',
     answer:
-        '`{info: Video, details: [{group, number, title, rows}]}` or '
-        '`{info, raw}`',
+        '`{info: Video, details: [{group, number: int, title, rows: [[string]]}]}` or '
+        '`{info: Video, raw: object}`',
     codes: ['detailGroup'],
     about: [
       'As "Video details" in the window: how the file is encoded, track by '
@@ -650,15 +650,16 @@ List<CommandDoc> commandDocs(
     arguments: '<videos…>',
     summary: 'queues videos with a goal, as Add to queue does',
     brief:
-        'Queues each readable video, adding unlisted paths (folders give '
-        'their videos). Without `--goal`, the panel\'s: name it. `--out '
+        'Queues each readable video, adding unlisted paths and the '
+        'videos in folders. Without `--goal`, the panel\'s: name it. `--out '
         '<folder>`: every result there; `--out next`: beside each video, in '
         '`--subfolder` (`Converted`); neither: the panel\'s folder. A like '
         'waiting job is not queued twice; nothing is if an argument is wrong '
         'or none can be (exit 5).',
     answer:
-        '`{goal, options, added: [Job], alreadyQueued: [int], skipped: '
-        '[{video, reason}]}`',
+        '`{goal, options: {option: choice}, added: [Job], alreadyQueued: '
+        '[int], skipped: [{video: int or string, reason}]}` '
+        '(`alreadyQueued`: video ids)',
     codes: ['addResult'],
     about: [
       'Videos given by a path that is not in the list yet are added first, '
@@ -1167,7 +1168,7 @@ List<CommandDoc> commandDocs(
     area: CommandArea.help,
     summary: 'prints the guide to every command, goal and code',
     brief: 'This guide.',
-    answer: '`{commands, goals, exitCodes, events, codes}`',
+    answer: '`{commands: […], goals: […], events: […], exitCodes: {…}, codes: {…}}`',
     about: [
       'It needs no window and opens none. Each command\'s examples, text '
           'output and JSON sample are in its help: `$c help <command>`.',

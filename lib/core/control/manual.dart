@@ -98,7 +98,8 @@ String usage({String client = 'vidctrl-client', String? os}) {
     ],
     '',
     'Every command takes --json, --no-start and --help.',
-    'Run `$c manual` for the full guide.',
+    'Run `$c manual` for the guide; `$c help <command>` for a command\'s '
+        'details.',
     '',
   ].join('\n');
 }
@@ -136,12 +137,9 @@ String manual({
   return [
     '# vidctrl-client',
     '',
-    '`vidctrl-client` controls the open VidCtrl window. Below, `$c` '
-        'stands for the program as you '
-        'run it: by its full path when not on the `PATH`, quoted as the '
-        "window's prompt has it: `'/opt/VidCtrl/vidctrl-client'`, "
-        '`"C:\\…\\vidctrl-client.exe"` on Windows, '
-        '`& "C:\\…\\vidctrl-client.exe"` in PowerShell.',
+    'In this guide, `$c` '
+        'stands for the program as you run it: when it is not on the '
+        "`PATH`, by its full path, quoted as the window's prompt has it.",
     '',
     '## Quick start',
     '',
@@ -279,9 +277,8 @@ String _about(String c) =>
 A window that converts videos by goal; `$c` changes what it shows, as the person would with the mouse.
 
 - **Videos**: the window's list. `add` is like dropping a file there; each file is listed once, and videos just added become the selection.
-- **Goals**: what to make of a video, by the panel's ids (see "Goals").
 - **Jobs**: `queue add` makes one per video, a snapshot of video, goal, options and folder that later changes do not touch. The queue starts by itself and goes in order.
-- **The window shows everything**; the person may act there too (pause, add, take jobs out), and this program sees it.
+- **The window shows everything**; the person may act there too, and this program sees it.
 - **Nothing converts without the window.** Every command but `status`, `manual` and `help` opens one if none is ("Starting VidCtrl…" on stderr, up to 30 s); closing it stops conversions. Two commands at once may each open one: run `$c queue` first, then `events` in the background.
 - **Results** are new files, by default in `Converted` beside each video, named with the settings (`beach.mov` gives `Converted/beach_av1-crf35.mp4`, a second ` (2)`), written as a hidden `.part` until whole.
 - **Samples**: 10 seconds from the start or middle, with the whole's settings, into `Samples` there (`beach_av1-crf35_sample10s.mp4`, `_sample10s-mid`).
@@ -294,8 +291,7 @@ String _never(String c) =>
 
 $neverDeletes
 
-- No command changes, moves or renames a file, nor closes the window or changes its panel's goal, remembered settings, look or language.
-- $filesRule Leave every file to the person.
+- No command changes, moves or renames a file, nor closes the window or changes its panel's goal, remembered settings, look or language. Leave every file to the person.
 ''';
 
 // ---- Commands ------------------------------------------------------------
@@ -316,10 +312,12 @@ String _commandsPart(String c, Map<String, GoalWords> words) => [
   '`$c <command> [arguments] [options]`. All take `--json` (one JSON '
       'document; `events`: one per line), `--no-start` (exit 2, not open the '
       'window) and `--help`. Videos by id or path, jobs by id; one `--opt` '
-      'per option. A goal, option or choice unknown or not offered here (see '
-      '`goals`) is refused, naming the valid ones, but for the choice the '
-      'goal makes here anyway. Errors: stderr and an exit code (see '
-      '"Waiting"). `→` is the `--json` answer.',
+      'per option. An unknown goal, option or choice is refused, naming the '
+      'valid ones. An option this computer does not offer (see `goals`) is '
+      'taken only with the choice the goal makes here anyway (`--opt '
+      'speed=cpu` without a GPU encoder), so a script may name the defaults '
+      'everywhere. Errors: stderr and an exit code (see "Waiting"). `→` is '
+      'the `--json` answer.',
   '',
   for (final doc in commandDocs(c, words))
     '- `${_usageLine(doc)}`: ${doc.brief} → ${doc.answer}',
@@ -397,7 +395,7 @@ final _errorCodes = [
   ),
   (
     ControlErrorKind.unknownMethod.code,
-    '5, the window is another version',
+    '5, another version',
     'the open window is of another version and does not know the request '
         '(exit 5)',
   ),
@@ -408,13 +406,13 @@ final _errorCodes = [
   ),
   (
     ControlErrorKind.unauthorized.code,
-    '2, the window refused or did not answer',
+    '2, refused or no answer',
     'the window is open but refused the connection or did not answer; no '
         'other window is started (exit 2)',
   ),
   (
     ControlErrorKind.notRunning.code,
-    '2, none open and none could be',
+    '2',
     'the window is not open and could not be opened (exit 2)',
   ),
   (
@@ -439,14 +437,14 @@ final _errorCodes = [
 String _jsonPart() => '''
 ## JSON
 
-Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never words; goal, option and choice ids as `--goal` and `--opt` take them. `[X]` is a list; `?` marks a field left out when not known; only `cancel` gives `null`. Untyped fields are strings.
+Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never words; goal, option and choice ids as `--goal` and `--opt` take them. `[X]` is a list; `?` marks a field left out when not known; only `cancel` gives `null`. Here and in the `→` answers, an untyped field is a string.
 
 - Video: `id` int, `path`, `status`, `sizeBytes`? int, `durationSeconds`? number, `width`? int, `height`? int, `videoCodec`?, `audioCodecs` [string], `hdr` bool, `preview`? Preview.
 - Preview: `goal`, `plan`, `expectedBytes`? int, `measured` bool (by encoding pieces), `measuring` bool, `closeness`?.
 - Job: `id` int, `videoId` int, `path`, `goal`, `options` {option: choice} (as made here: report these), `sample`?, `status`, `fraction`? 0-1, `remainingSeconds`? number, `attempt`? int, `outputPath`?, `outputBytes`? int, `quality`? Quality, `needsALook` bool, `errorLines` [string].
 - Quality: `outcome`, `value`? int (lower is better), `standardValue`? int, `vmaf`? number, `xpsnr`? number (of the poorest piece), `share` number (expected size / original's).
 - Outcome: `jobId` int, `path`, `status`, `outputPath`?, `needsALook` bool.
-- Status: `state`, `version`, `busy` bool, `paused` bool, `jobs` {status: count}.
+- Status: `state`, `version`, `busy` bool, `paused` bool, `jobs` {status: int}.
 - Goal: `id` (`archive.master`), `scenario`, `title`, `subtitle`, `options` [{`id`, `title`, `defaultChoice`, `advanced` bool, `choices` [{`id`, `label`, `hint`}]}].
 - Error, on stderr: `{"error": {"code", "message"}}`; read `code`, the message is for people.
 ''';
@@ -613,7 +611,7 @@ const _jobStatuses = [
   ),
   (
     JobStatusCodes.skipped,
-    'nothing written; not a failure',
+    'nothing written, not a failure',
     'Nothing was written: the video already met the goal, the goal can do '
         'nothing with it (plan `UNSUPPORTED`), or converting would hardly '
         'make it smaller (outcome `NOT_WORTH_IT`). Counts as finished, not '
@@ -701,7 +699,7 @@ const _outcomeNotes = {
         'for it.',
   ),
   OutcomeCodes.belowTarget: (
-    'short even at the best: named `…-check`, `needsALook`, still `DONE`; '
+    'short even at the best: named `…-check`, `needsALook`, still `DONE`, '
         'ask the person to look by eye',
     'Converted anyway, and the result\'s name ends in `-check`. '
         'Tell the person to look at it by eye beside the original. The job is '
@@ -914,8 +912,8 @@ final List<CodeKind> codeKinds = [
 String _codesPart(String c) => [
   '## Codes',
   '',
-  'Each kind, where it is found, and its codes; `$c help <command>` has '
-      'them in full.',
+  'Where each kind is found, then its codes; in full in `$c help '
+      '<command>`.',
   '',
   for (final kind in codeKinds)
     '- **${kind.title}** (${kind.where}): '
@@ -989,9 +987,8 @@ String _goalsPart(String c, Map<String, GoalWords> words) => [
       'the free one (the picture converted too: much larger); the others by '
       'name.',
   '',
-  'By name or full id; choices default first; options only where they make '
-      'a difference (see `goals`). No picture: `UNSUPPORTED` but for `audio` '
-      'and `privacy`. `help goals` has the words in full.',
+  'By name or full id; choices default first. No picture: `UNSUPPORTED` '
+      'but for `audio` and `privacy`. `help goals` has the words in full.',
   '',
   for (final scenario in scenarios)
     for (final preset in scenario.presets) _goalLine(scenario, preset, words),
@@ -1161,7 +1158,7 @@ const _events = [
         '`paused` (bool), `busy` (bool)',
     'How everything stands; first, '
         'unless `--since-now`.',
-    '`{videos: [Video], jobs: [Job], paused, busy}`, first',
+    '`{videos: [Video], jobs: [Job], paused: bool, busy: bool}`, first',
   ),
   (Events.videoAdded, 'a Video', 'A video came into the list.', 'a Video'),
   (Events.videoReady, 'a Video', 'It has been read.', 'a Video'),
@@ -1176,7 +1173,7 @@ const _events = [
     '`video` (int)',
     'It was taken off the list; its '
         'file stays on disk.',
-    '`{video}`',
+    '`{video: int}`',
   ),
   (Events.jobAdded, 'a Job', 'A job came into the queue.', 'a Job'),
   (
@@ -1184,7 +1181,7 @@ const _events = [
     '`job` (int), `attempt` (int)',
     'Choosing its '
         'quality: this try.',
-    '`{job, attempt}`',
+    '`{job: int, attempt: int}`',
   ),
   (Events.jobStarted, 'a Job', 'Converting it begins.', 'a Job'),
   (
@@ -1193,7 +1190,7 @@ const _events = [
         '`remainingSeconds` (number, optional)',
     'How far it is; at most once '
         'a second for each job.',
-    '`{job, fraction, remainingSeconds?}`',
+    '`{job: int, fraction: number, remainingSeconds?: number}`',
   ),
   (
     Events.jobFinished,
@@ -1207,7 +1204,7 @@ const _events = [
     '`job` (int)',
     'It was taken out of the queue; any '
         'result stays on disk.',
-    '`{job}`',
+    '`{job: int}`',
   ),
   (
     Events.queuePaused,
@@ -1312,11 +1309,11 @@ String _recipes(String c) =>
 Queue every video over 2 GB in ~/Videos and say when done (look at `find`'s list first; none: tell the person):
 
 ```sh
-$_videoFind -print0 | xargs -0 $c queue add --goal archive --json
+find ~/Videos -type f -size +2G \\( -iname '*.mov' -o -iname '*.mp4' \\) -not -path '*/Converted/*' \\\n  -print0 | xargs -0 $c queue add --goal archive --json
 $c wait 0 1 2 --json   # in the background; the ids from each answer's `added`
 ```
 
-Then tell the person each `outputPath` and `needsALook`, and on exit 1 each failed job's `errorLines` (`$c queue --json`).
+Videos in `alreadyQueued` have jobs already: find them with `$c queue --json` and wait for them too. Then tell the person each `outputPath` and `needsALook`, and on exit 1 each failed job's `errorLines`.
 
 Samples first, then the whole:
 
