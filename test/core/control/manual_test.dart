@@ -107,35 +107,62 @@ void main() {
       );
     });
 
-    test('on Windows called with & in PowerShell, with its own escapes', () {
+    test('on Windows in double quotes, which Git Bash, cmd and PowerShell '
+        'read, with a line on PowerShell\'s &', () {
+      const client = r'C:\Program Files\VidCtrl\vidctrl-client.exe';
+      expect(shellWord(client, os: 'windows'), '"$client"');
+      final start = quickStart(client, os: 'windows');
+      expect(start, contains('`"$client" manual`'));
+      expect(start, contains('`"$client" wait`'));
       expect(
-        shellWord(
-          r'C:\Program Files\VidCtrl\vidctrl-client.exe',
-          os: 'windows',
+        start,
+        contains(
+          '- In PowerShell, put & before a quoted path: '
+          '`& "$client" manual`.\n',
         ),
-        r'& "C:\Program Files\VidCtrl\vidctrl-client.exe"',
       );
-      expect(
-        shellWord(r'C:\Users\alice\$work`s\vidctrl-client.exe', os: 'windows'),
-        r'& "C:\Users\alice\`$work``s\vidctrl-client.exe"',
-      );
-      expect(
-        quickStart(r'C:\VidCtrl\vidctrl-client.exe', os: 'windows'),
-        contains(r'`& "C:\VidCtrl\vidctrl-client.exe" manual`'),
-      );
+      expect(speaksOfDeleting(start), isFalse);
     });
 
-    test('a plain name stays as it is', () {
+    test('a plain name stays as it is, with no word on PowerShell', () {
       for (final os in ['linux', 'macos', 'windows']) {
         expect(shellWord('vidctrl-client', os: os), 'vidctrl-client');
+        expect(
+          quickStart('vidctrl-client', os: os),
+          isNot(contains('PowerShell')),
+        );
       }
+      expect(
+        quickStart('/opt/vidctrl/vidctrl-client', os: 'linux'),
+        isNot(contains('PowerShell')),
+      );
     });
   });
 
   test('the manual says what the name in its examples stands for', () {
     final intro = text.substring(0, text.indexOf('## Quick start'));
-    expect(intro, contains('full path'));
-    expect(intro, contains('& "C:'));
+    expect(intro, contains("as the window's prompt has it"));
+    expect(intro, contains(r'`"C:\…\vidctrl-client.exe"` on Windows'));
+    expect(intro, contains(r'`& "C:\…\vidctrl-client.exe"`'));
+  });
+
+  test('the manual, help and usage are typed for the system asked for', () {
+    expect(
+      manual(client: 'vidctrl-client', os: 'windows'),
+      manual(client: 'vidctrl-client', os: 'linux'),
+    );
+    expect(
+      usage(client: '/opt/vidctrl/vidctrl-client', os: 'linux'),
+      contains("Usage: '/opt/vidctrl/vidctrl-client' <command>"),
+    );
+    expect(
+      commandHelp(
+        'wait',
+        client: r'C:\VidCtrl\vidctrl-client.exe',
+        os: 'windows',
+      ),
+      contains(r'"C:\VidCtrl\vidctrl-client.exe" wait'),
+    );
   });
 
   test('--help is a short list that points to the manual', () {

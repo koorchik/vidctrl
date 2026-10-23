@@ -22,11 +22,17 @@ String? clientExecutable({
   return exists(client) ? client : null;
 }
 
+/// The system the app runs on (`Platform.operatingSystem`), whose terminal
+/// the prompt is typed for; tests set another.
+final operatingSystemProvider = Provider<String>(
+  (ref) => Platform.operatingSystem,
+);
+
 /// The `vidctrl-client` beside this app, or null.
 final clientExecutableProvider = Provider<String?>(
   (ref) => clientExecutable(
     appExecutable: Platform.resolvedExecutable,
-    os: Platform.operatingSystem,
+    os: ref.watch(operatingSystemProvider),
     exists: (path) => File(path).existsSync(),
   ),
 );

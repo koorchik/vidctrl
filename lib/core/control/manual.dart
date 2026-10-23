@@ -34,15 +34,13 @@ typedef GoalWords = ({
 
 /// [client] as it is typed in the terminal of [os] (`Platform.operatingSystem`)
 /// to run it: a plain name as it is, a path quoted. On Linux and macOS in
-/// single quotes, so a `$` in it does not expand. On Windows for
-/// PowerShell, its default terminal, which runs a quoted path only after
-/// `&`; there `` ` `` and `$` are escaped with `` ` ``.
+/// single quotes, so a `$` in it does not expand. On Windows in double
+/// quotes, which Git Bash (where Claude Code runs its commands), cmd and
+/// PowerShell all read; PowerShell also needs `&` before a quoted path,
+/// which [quickStart] says.
 String shellWord(String client, {required String os}) {
   if (RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(client)) return client;
-  if (os == 'windows') {
-    final escaped = client.replaceAllMapped(RegExp(r'[`$]'), (m) => '`${m[0]}');
-    return '& "$escaped"';
-  }
+  if (os == 'windows') return '"$client"';
   return "'${client.replaceAll("'", r"'\''")}'";
 }
 
@@ -51,19 +49,24 @@ String shellWord(String client, {required String os}) {
 /// client prints with no arguments, and the prompt the window gives to copy.
 String quickStart(String client, {required String os}) {
   final c = shellWord(client, os: os);
+  final powerShell = os == 'windows' && c != client
+      ? '- In PowerShell, put & before a quoted path: `& $c manual`.\n'
+      : '';
   return '''
 VidCtrl is open on this computer, and the person watches its window. The program `$c` controls it: it adds videos to the window's list and queues conversions there.
 
 - Run `$c manual` first: it explains every command, the goals and what the results mean. Add `--json` to a command to read its answer as JSON.
-- Finding the videos is your job (with `find`, `du` or the like). Give their paths to `$c add`, or straight to `$c queue add --goal <goal>`.
+$powerShell- Finding the videos is your job (with `find`, `du` or the like). Give their paths to `$c add`, or straight to `$c queue add --goal <goal>`.
 - The window converts one video at a time, and that can take hours. To know when it ends, run `$c wait` in the background (or follow `$c events`), and tell the person when it returns: each result, and any marked "worth a look by eye".
 - $filesRule "Remove" only takes a video off the list or a job out of the queue.
 ''';
 }
 
-/// The short list `--help` prints.
-String usage({String client = 'vidctrl-client'}) {
-  final c = shellWord(client, os: Platform.operatingSystem);
+/// The short list `--help` prints. Its examples are typed for [os]'s
+/// terminal (this system's by default), as are [commandHelp]'s and
+/// [manual]'s.
+String usage({String client = 'vidctrl-client', String? os}) {
+  final c = shellWord(client, os: os ?? Platform.operatingSystem);
   final docs = commandDocs(c);
   final width = docs
       .map((d) => _synopsis(d).length)
@@ -87,8 +90,12 @@ String usage({String client = 'vidctrl-client'}) {
 
 /// One command's part of the manual, with the shapes its JSON answer is
 /// made of. [command] is one of `clientCommands`.
-String commandHelp(String command, {String client = 'vidctrl-client'}) {
-  final c = shellWord(client, os: Platform.operatingSystem);
+String commandHelp(
+  String command, {
+  String client = 'vidctrl-client',
+  String? os,
+}) {
+  final c = shellWord(client, os: os ?? Platform.operatingSystem);
   final doc = commandDocs(c).where((d) => d.name == command).firstOrNull;
   if (doc == null) throw ArgumentError.value(command, 'command');
   final text = [
@@ -102,9 +109,11 @@ String commandHelp(String command, {String client = 'vidctrl-client'}) {
 /// The whole manual, in Markdown.
 String manual({
   required String client,
+  String? os,
   Map<String, GoalWords> words = manualGoalWords,
 }) {
-  final c = shellWord(client, os: Platform.operatingSystem);
+  os ??= Platform.operatingSystem;
+  final c = shellWord(client, os: os);
   return [
     '# vidctrl-client',
     '',
@@ -114,13 +123,13 @@ String manual({
     '',
     'In the examples, `$c` stands for the program as you run it: by its '
         'name when it is on the `PATH`, otherwise by its full path, quoted '
-        "as the quick start has it: `'/opt/VidCtrl/vidctrl-client'` on "
-        'Linux and macOS, `& "C:\\…\\vidctrl-client.exe"` in PowerShell on '
-        'Windows.',
+        "as the window's prompt has it: `'/opt/VidCtrl/vidctrl-client'` on "
+        'Linux and macOS, `"C:\\…\\vidctrl-client.exe"` on Windows, with '
+        '`&` before it in PowerShell: `& "C:\\…\\vidctrl-client.exe"`.',
     '',
     '## Quick start',
     '',
-    quickStart(client, os: Platform.operatingSystem),
+    quickStart(client, os: os),
     _about(c),
     _never(c),
     _commandsPart(c, words),

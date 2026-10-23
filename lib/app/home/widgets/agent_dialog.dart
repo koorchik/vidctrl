@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,10 +30,12 @@ class AgentDialog extends ConsumerStatefulWidget {
 class _AgentDialogState extends ConsumerState<AgentDialog> {
   _Copied? _copied;
   Timer? _forget;
+  final _scroll = ScrollController();
 
   @override
   void dispose() {
     _forget?.cancel();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -60,7 +61,7 @@ class _AgentDialogState extends ConsumerState<AgentDialog> {
         : agentPrompt(
             clientPath: client,
             languageName: agentLanguageNames[l10n.localeName] ?? 'English',
-            os: Platform.operatingSystem,
+            os: ref.watch(operatingSystemProvider),
           );
     const mono = TextStyle(fontFamily: monoFontFamily, fontSize: 12.5);
     final box = BoxDecoration(
@@ -81,7 +82,7 @@ class _AgentDialogState extends ConsumerState<AgentDialog> {
       ),
     );
 
-    // Room for the whole prompt at the smallest window.
+    // Tight, to leave the prompt as much room as a small window allows.
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
       contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
@@ -127,18 +128,25 @@ class _AgentDialogState extends ConsumerState<AgentDialog> {
             Flexible(
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
                 decoration: box,
-                child: SingleChildScrollView(
-                  child: prompt == null
-                      ? Text(l10n.agentMissing)
-                      : SelectableText(
-                          prompt,
-                          style: mono.copyWith(height: 1.35),
-                        ),
+                // Always shown, so a prompt cut off at a small window is
+                // plainly one to scroll.
+                child: Scrollbar(
+                  controller: _scroll,
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
+                    controller: _scroll,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    child: prompt == null
+                        ? Text(l10n.agentMissing)
+                        : SelectableText(
+                            prompt,
+                            style: mono.copyWith(height: 1.35),
+                          ),
+                  ),
                 ),
               ),
             ),

@@ -2,7 +2,7 @@
 
 `vidctrl-client` controls the open VidCtrl window from a terminal, a script or an AI agent. `vidctrl-client manual` prints this guide; `vidctrl-client help <command>` prints one command's part.
 
-In the examples, `vidctrl-client` stands for the program as you run it: by its name when it is on the `PATH`, otherwise by its full path, quoted as the quick start has it: `'/opt/VidCtrl/vidctrl-client'` on Linux and macOS, `& "C:\…\vidctrl-client.exe"` in PowerShell on Windows.
+In the examples, `vidctrl-client` stands for the program as you run it: by its name when it is on the `PATH`, otherwise by its full path, quoted as the window's prompt has it: `'/opt/VidCtrl/vidctrl-client'` on Linux and macOS, `"C:\…\vidctrl-client.exe"` on Windows, with `&` before it in PowerShell: `& "C:\…\vidctrl-client.exe"`.
 
 ## Quick start
 

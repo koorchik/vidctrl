@@ -63,16 +63,23 @@ void main() {
       expect(speaksOfDeleting(text), isFalse);
     });
 
-    test('on Windows the program is called as PowerShell needs it', () {
+    test('on Windows the path is in double quotes, with PowerShell\'s & '
+        'said once', () {
       final text = agentPrompt(
         clientPath: r'C:\Apps\VidCtrl\vidctrl-client.exe',
         languageName: 'English',
         os: 'windows',
       );
+      expect(text, contains(r'`"C:\Apps\VidCtrl\vidctrl-client.exe" wait`'));
       expect(
         text,
-        contains(r'`& "C:\Apps\VidCtrl\vidctrl-client.exe" manual`'),
+        contains(
+          '- In PowerShell, put & before a quoted path: '
+          r'`& "C:\Apps\VidCtrl\vidctrl-client.exe" manual`.',
+        ),
       );
+      expect('&'.allMatches(text), hasLength(2));
+      expect(speaksOfDeleting(text), isFalse);
     });
 
     test('the README shows the same prompt', () {
@@ -135,11 +142,7 @@ void main() {
     await tester.tap(find.text('Copy').first);
     await tester.pump();
     expect(copied, [
-      agentPrompt(
-        clientPath: _client,
-        languageName: 'English',
-        os: Platform.operatingSystem,
-      ),
+      agentPrompt(clientPath: _client, languageName: 'English', os: 'linux'),
     ]);
     expect(find.text('Copied'), findsOneWidget);
     await tester.pump(const Duration(seconds: 2));
@@ -149,6 +152,20 @@ void main() {
     await tester.tap(find.byTooltip('Copy'));
     await tester.pump();
     expect(copied.last, _client);
+  });
+
+  testWidgets('on Windows the window copies the path in double quotes', (
+    tester,
+  ) async {
+    const client = r'C:\Apps\VidCtrl\vidctrl-client.exe';
+    await pumpApp(tester, FakeEnvironment(clientPath: client, os: 'windows'));
+    final copied = _catchClipboard(tester);
+    await _openFromHeader(tester);
+
+    await tester.tap(find.text('Copy').first);
+    await tester.pump();
+    expect(copied.single, contains('`"$client" manual`'));
+    expect(copied.single, contains('`& "$client" manual`'));
   });
 
   testWidgets('in Ukrainian the window copies a prompt asking for Ukrainian', (
@@ -227,20 +244,26 @@ void main() {
 
     // The prompt scrolls in its box at the smallest window, where a long
     // path may not leave room for all of it; everything else is in view.
-    // From the size the window opens at, the whole prompt shows.
+    // From the size the window opens at, the whole prompt shows, with
+    // Windows' longer path and its line on PowerShell too.
     final cases = [
       for (final look in Look.values)
-        for (final locale in const [Locale('en'), Locale('uk')])
+        for (final locale in const [Locale('en'), Locale('uk')]) ...[
           for (final size in const [minimumWindowSize, defaultWindowSize])
-            (look: look, locale: locale, size: size),
+            (look: look, locale: locale, size: size, os: 'linux'),
+          (look: look, locale: locale, size: defaultWindowSize, os: 'windows'),
+        ],
     ];
-    for (final (:look, :locale, :size) in cases) {
+    for (final (:look, :locale, :size, :os) in cases) {
       testWidgets('${size.width.round()} x ${size.height.round()}, '
-          '${locale.languageCode}, ${look.name}', (tester) async {
+          '${locale.languageCode}, ${look.name}, $os', (tester) async {
         await pumpApp(
           tester,
           FakeEnvironment(
-            clientPath: '/home/alice/Apps/vidctrl/vidctrl-client',
+            os: os,
+            clientPath: os == 'windows'
+                ? r'C:\Users\alice\Apps\VidCtrl\vidctrl-client.exe'
+                : '/home/alice/Apps/vidctrl/vidctrl-client',
           ),
           locale: locale,
           look: look,
@@ -267,6 +290,12 @@ void main() {
         );
         if (size == defaultWindowSize) {
           expect(prompt.position.maxScrollExtent, 0);
+        } else {
+          // At least five lines of it in view, less the box's padding.
+          expect(
+            prompt.position.viewportDimension - 20,
+            greaterThanOrEqualTo(5 * 12.5 * 1.35),
+          );
         }
       });
     }

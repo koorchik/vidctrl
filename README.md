@@ -192,7 +192,8 @@ beside the "i"; the About menu has it too) opens a small window with:
 
 - the text to paste into your agent, with **Copy** beside it. It has the
   program's full path in it, quoted the way the system's terminal needs it
-  (on Windows for PowerShell: `& "C:\…\vidctrl-client.exe"`);
+  (on Windows `"C:\…\vidctrl-client.exe"`, with a line saying that
+  PowerShell wants `&` before it);
 - where the program is, with its own **Copy** and **Show in folder**;
 - which agents can use it: one that runs commands can; a chat that cannot
   run commands cannot; one in a sandbox must be allowed to run the program

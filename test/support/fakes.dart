@@ -453,6 +453,7 @@ class FakeEnvironment {
     this.build = const BuildInfo(),
     this.releases,
     this.clientPath = '/opt/vidctrl/vidctrl-client',
+    this.os = 'linux',
   });
 
   final Capabilities capabilities;
@@ -466,6 +467,10 @@ class FakeEnvironment {
 
   /// Where vidctrl-client is beside the app; null for a build without it.
   final String? clientPath;
+
+  /// The system the app takes itself to run on (`Platform.operatingSystem`),
+  /// whatever the tests run on; Linux by default.
+  final String os;
 
   /// Where the FFmpeg in use was found; the copy inside the app by default.
   final FfmpegPaths ffmpegPaths;
@@ -497,6 +502,7 @@ class FakeEnvironment {
     buildInfoProvider.overrideWithValue(build),
     releaseSourceProvider.overrideWithValue(releases),
     clientExecutableProvider.overrideWithValue(clientPath),
+    operatingSystemProvider.overrideWithValue(os),
   ];
 }
 
