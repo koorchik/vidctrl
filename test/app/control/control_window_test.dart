@@ -48,7 +48,6 @@ void main() {
         const Duration(milliseconds: 20),
         (_) => tester.pump(),
       );
-      addTearDown(pumping.cancel);
       await control.start(file: controlFile(folder));
       client = await connectIfLive(controlFile(folder));
       final answer = await client!.call(Methods.videosAdd, {
@@ -58,6 +57,7 @@ void main() {
       await client!.call(Methods.queueAdd, {
         'videos': [id],
       });
+      pumping.cancel();
     });
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));

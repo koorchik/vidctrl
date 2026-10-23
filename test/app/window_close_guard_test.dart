@@ -1,12 +1,23 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vidctrl/app/control/control_controller.dart';
 import 'package:vidctrl/app/home/home_screen.dart';
+import 'package:vidctrl/app/providers.dart';
+import 'package:vidctrl/app/queue/queue_controller.dart';
 import 'package:vidctrl/app/window_close_guard.dart';
 
 import '../support/fakes.dart';
 import '../support/pump_app.dart';
+
+/// A control server that fails when asked to stop.
+class _FailingControl extends ControlController {
+  @override
+  Future<void> stop() async => throw const FileSystemException('gone');
+}
 
 void main() {
   const plugin = MethodChannel('window_manager');
@@ -83,6 +94,33 @@ void main() {
 
     expect(timesDestroyed(), 1);
   });
+
+  testWidgets(
+    'a control server that cannot stop does not keep FFmpeg running',
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          ...env.overrides,
+          controlProvider.overrideWith(_FailingControl.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const WindowCloseGuard(child: SizedBox()),
+        ),
+      );
+      await container.read(environmentProvider.future);
+      container.read(controlProvider);
+      container.read(queueProvider);
+
+      await closeWindow(tester);
+
+      expect(container.read(queueProvider).paused, isTrue);
+      expect(timesDestroyed(), 1);
+    },
+  );
 
   testWidgets('with nothing converting the window closes without a question', (
     tester,

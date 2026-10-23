@@ -56,8 +56,13 @@ class _WindowCloseGuardState extends ConsumerState<WindowCloseGuard>
     try {
       // Clients are told first, and the endpoint file goes, so none connects
       // to a window that is closing.
+      // Whatever goes wrong there must not keep FFmpeg from being stopped.
       if (ref.exists(controlProvider)) {
-        await ref.read(controlProvider.notifier).stop();
+        try {
+          await ref.read(controlProvider.notifier).stop();
+        } on Object catch (error) {
+          debugPrint('The control server did not stop: $error');
+        }
       }
       // FFmpeg has to stop before the app goes: left alone it would carry on
       // converting, and the unfinished file would stay behind.

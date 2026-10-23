@@ -49,6 +49,12 @@ Future<void> main() async {
   // Lets `vidctrl-client` control this window. A window that cannot serve
   // (no folder to write to) still works for its user.
   unawaited(
-    container.read(controlProvider.notifier).start().catchError((Object _) {}),
+    container
+        .read(controlProvider.notifier)
+        .start()
+        .catchError(
+          (Object error) =>
+              debugPrint('The control server did not start: $error'),
+        ),
   );
 }
