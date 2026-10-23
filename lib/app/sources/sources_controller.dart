@@ -90,8 +90,13 @@ class SourcesController extends Notifier<SourcesState> {
 
   /// Adds files, and the videos inside any folders. A file already in the
   /// list is not added again. The newly added videos become the selection,
-  /// so they can be queued straight away.
-  Future<List<int>> addPaths(Iterable<String> paths) async {
+  /// so they can be queued straight away. Returns the ids of every file the
+  /// paths stand for, those listed before included, once the new ones are
+  /// inspected; with [waitForProbes] false, as soon as they are listed.
+  Future<List<int>> addPaths(
+    Iterable<String> paths, {
+    bool waitForProbes = true,
+  }) async {
     final files = await expandDroppedPaths(paths);
     final known = {for (final video in state.videos) video.path: video.id};
     final ids = <int>[];
@@ -124,8 +129,12 @@ class SourcesController extends Notifier<SourcesState> {
       for (var i = 0; i < _probeConcurrency; i++) worker(),
     ]);
     _probes.add(probing);
-    await probing;
-    _probes.remove(probing);
+    final probed = probing.whenComplete(() => _probes.remove(probing));
+    if (waitForProbes) {
+      await probed;
+    } else {
+      unawaited(probed);
+    }
     return ids;
   }
 
