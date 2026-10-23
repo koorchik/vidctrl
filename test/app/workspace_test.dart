@@ -976,6 +976,22 @@ void main() {
       expect(jobs(), hasLength(1));
     });
 
+    test('a video given twice in one call is queued once', () async {
+      await sources().addPaths(['/videos/a.mp4']);
+      final a = sourceState().ready.single;
+      final settings = container.read(recipeProvider);
+
+      final result = queue().addVideos(
+        [a, a],
+        recipe: settings.recipe,
+        output: settings.output,
+      );
+
+      expect(result.added, hasLength(1));
+      expect(result.alreadyQueued, [a.id]);
+      expect(jobs(), hasLength(1));
+    });
+
     test('adding paths tells which videos they are, those already listed '
         'included', () async {
       final first = await sources().addPaths(['/videos/a.mp4']);

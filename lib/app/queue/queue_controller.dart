@@ -84,7 +84,10 @@ class QueueController extends Notifier<QueueState> {
     final added = <QueueJob>[];
     final alreadyQueued = <int>[];
     for (final video in videos) {
-      if (_alreadyQueued(video.id, recipe, output)) {
+      // The same recipe and output for every video here, so a repeated id is
+      // a duplicate of the job just made for it.
+      if (added.any((job) => job.sourceId == video.id) ||
+          _alreadyQueued(video.id, recipe, output)) {
         alreadyQueued.add(video.id);
         continue;
       }
