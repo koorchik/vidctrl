@@ -240,8 +240,7 @@ String _commandsPart(String c, Map<String, GoalWords> words) => [
       'valid ones named. So is an option this computer does not offer '
       '(`$c goals` lists those it does), unless its choice is the one the '
       'goal makes here anyway: `--opt speed=cpu` where the graphics card '
-      'cannot encode, `--opt codec=hevc` where FFmpeg cannot make AV1. A '
-      'script may name the defaults on every computer.',
+      'cannot encode. A script may name the defaults on every computer.',
   '- Errors go to stderr, as a line for people, or with `--json` as '
       '`{"error": {"kind": "...", "message": "..."}}`; the exit code tells '
       'what kind (see "Exit codes"). The kinds:',
@@ -397,7 +396,7 @@ A job in the queue.
 - `videoId` (int): the video it was made from, which may be off the list by now.
 - `path` (string): that video's file.
 - `goal` (string): the goal's full id.
-- `options` (object): every option of the goal and the choice it really makes on this computer: `codec` is `hevc` where FFmpeg cannot make AV1, `speed` is `cpu` where the graphics card cannot encode. Tell the person these, not what was asked.
+- `options` (object): every option of the goal and the choice it really makes on this computer: `speed` is `cpu` where the graphics card cannot encode that format. Tell the person these, not what was asked.
 - `sample` (string, optional): `start` or `middle` for a sample.
 - `status` (string): see "Job statuses"; `statusText` (string) in words.
 - `fraction` (number, optional): how far it is, 0 to 1, while converting.

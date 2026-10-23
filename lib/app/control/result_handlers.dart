@@ -79,7 +79,7 @@ Future<Object?> jobCompare(
   } else if (!wait) {
     return {'started': true};
   } else {
-    await _until(ref, qualityProvider, (_) => !comparing());
+    await _until(ref, [qualityProvider], () => !comparing());
   }
   return switch (ref.read(qualityProvider)[job.id]) {
     final QualityMeasured measured => comparisonJson(job.id, measured),
@@ -226,15 +226,20 @@ Future<Object?> videosEstimate(
         plan.video is! VideoEncode) {
       continue;
     }
-    if (ref.read(queueProvider).busy) throw _converting;
     final key = estimateKey(video.path, recipe);
+    bool converting() => ref.read(queueProvider).busy;
+    bool measuring() => ref.read(estimateCacheProvider).measuring.contains(key);
+    // No more FFmpeg at once than the window would run.
+    await _until(ref, [
+      estimateCacheProvider,
+      queueProvider,
+    ], () => converting() || measuring() || estimates.room(plan) > 0);
+    if (converting()) throw _converting;
     await estimates.measure(key, info, plan, raise: raise);
     // The window may have been measuring it already.
-    await _until(
-      ref,
-      estimateCacheProvider,
-      (cache) => !cache.measuring.contains(key),
-    );
+    await _until(ref, [estimateCacheProvider], () => !measuring());
+    // Converting stops measuring: what it left unmeasured is not known.
+    if (converting()) throw _converting;
   }
   return {
     'videos': [
@@ -254,19 +259,25 @@ bool _flag(Map<String, Object?> params, String key, {required bool or}) {
   return value;
 }
 
-/// Completes once [provider]'s state is [done].
-Future<void> _until<T>(
+/// Completes once [done], checked whenever one of [providers] changes.
+Future<void> _until(
   Ref ref,
-  ProviderListenable<T> provider,
-  bool Function(T state) done,
+  List<ProviderListenable<Object?>> providers,
+  bool Function() done,
 ) {
-  if (done(ref.read(provider))) return Future.value();
+  if (done()) return Future.value();
   final reached = Completer<void>();
-  late final ProviderSubscription<T> subscription;
-  subscription = ref.listen<T>(provider, (_, state) {
-    if (reached.isCompleted || !done(state)) return;
-    subscription.close();
+  final subscriptions = <ProviderSubscription<Object?>>[];
+  void check(Object? _, Object? _) {
+    if (reached.isCompleted || !done()) return;
+    for (final subscription in subscriptions) {
+      subscription.close();
+    }
     reached.complete();
-  });
+  }
+
+  for (final provider in providers) {
+    subscriptions.add(ref.listen<Object?>(provider, check));
+  }
   return reached.future;
 }

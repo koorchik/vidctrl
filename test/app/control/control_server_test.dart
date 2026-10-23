@@ -1237,6 +1237,38 @@ void main() {
       );
     });
 
+    test('compare of a job being compared joins that comparison', () async {
+      final (_, client) = await startControlled(env);
+      final id = await converted(client, 'hd.mp4');
+
+      final first = client.call(Methods.jobCompare, {'job': id});
+      await until(() => env.qualityMeter.started.isNotEmpty);
+      final again = client.call(Methods.jobCompare, {'job': id});
+      expect(
+        await client.call(Methods.jobCompare, {'job': id, 'wait': false}),
+        {'started': true},
+      );
+      env.qualityMeter.last.finish(43);
+
+      expect(await first, containsPair('closeness', 'same'));
+      expect(await again, await first);
+      expect(env.qualityMeter.started, hasLength(1));
+    });
+
+    test('compare stopped in the window says so', () async {
+      final (container, client) = await startControlled(env);
+      final id = await converted(client, 'hd.mp4');
+
+      final answer = client.call(Methods.jobCompare, {'job': id});
+      await until(() => env.qualityMeter.started.isNotEmpty);
+      await container.read(qualityProvider.notifier).cancel();
+
+      await expectLater(
+        answer,
+        _failsWith(ControlErrorKind.badArgument, contains('stopped')),
+      );
+    });
+
     test('compare while another runs is busy; a failed one says why', () async {
       final (_, client) = await startControlled(env);
       final first = await converted(client, 'hd.mp4');
@@ -1414,6 +1446,63 @@ void main() {
       final preview = ((await answer)['videos'] as List).single as Map;
       expect(preview['preview'], containsPair('measured', true));
       expect(env.estimator.measured, [a]);
+    });
+
+    test('estimate stopped by a conversion starting is busy', () async {
+      env.estimator.hold = true;
+      final (_, client) = await startControlled(env);
+      final a = video('a.mp4');
+      await client.call(Methods.videosAdd, {
+        'paths': [a],
+      });
+
+      final answer = client.call(Methods.videosEstimate, {
+        'videos': [a],
+        'goal': 'space',
+      });
+      await until(() => env.estimator.measured.contains(a));
+      // Converting stops the measuring, as in the window.
+      await queue(client, 'b.mp4');
+
+      await expectLater(answer, _failsWith(ControlErrorKind.busy));
+      expect(env.estimator.cancels, greaterThan(0));
+    });
+
+    test('estimate waits for room, as the window does', () async {
+      env.estimator.hold = true;
+      final (container, client) = await startControlled(env);
+      final names = ['x.mp4', 'y.mp4', 'z.mp4', 'a.mp4'];
+      await client.call(Methods.videosAdd, {
+        'paths': [for (final name in names) video(name)],
+      });
+      final plan = findPreset('space.small')!;
+      final estimates = container.read(estimateCacheProvider.notifier);
+      // Three at once is the most the window ever measures.
+      for (final video in container.read(sourcesProvider).videos.take(3)) {
+        unawaited(
+          estimates.measure(
+            estimateKey(video.path, const Recipe(presetId: 'space.small')),
+            video.info!,
+            plan.plan(video.info!, const {}, softwareOnly),
+          ),
+        );
+      }
+      await until(() => env.estimator.measured.length == 3);
+      final a = p.join(folder.path, 'a.mp4');
+
+      final answer = client.call(Methods.videosEstimate, {
+        'videos': [a],
+        'goal': 'space',
+      });
+      await pumpEventQueue();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(env.estimator.measured, isNot(contains(a)));
+      env.estimator.hold = false;
+      env.estimator.release();
+
+      final preview = ((await answer as Map)['videos'] as List).single as Map;
+      expect(preview['preview'], containsPair('measured', true));
+      expect(env.estimator.measured.last, a);
     });
 
     test('estimate while videos are converted is busy', () async {

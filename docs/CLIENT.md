@@ -42,7 +42,7 @@ How every command works:
 - `--help` prints the command's part of this guide.
 - Videos are given by id or by path, jobs by id. A reference made only of digits is an id: a file named `3` in the current folder is given as `./3`.
 - Paths may be relative or start with `~`: the client makes them absolute from the current folder before sending them.
-- A goal is given by its id (`--goal archive`), its options with `--opt option=choice`, once for each (`--opt codec=hevc --opt speed=gpu`). An unknown goal, option or choice is refused with the valid ones named. So is an option this computer does not offer (`vidctrl-client goals` lists those it does), unless its choice is the one the goal makes here anyway: `--opt speed=cpu` where the graphics card cannot encode, `--opt codec=hevc` where FFmpeg cannot make AV1. A script may name the defaults on every computer.
+- A goal is given by its id (`--goal archive`), its options with `--opt option=choice`, once for each (`--opt codec=hevc --opt speed=gpu`). An unknown goal, option or choice is refused with the valid ones named. So is an option this computer does not offer (`vidctrl-client goals` lists those it does), unless its choice is the one the goal makes here anyway: `--opt speed=cpu` where the graphics card cannot encode. A script may name the defaults on every computer.
 - Errors go to stderr, as a line for people, or with `--json` as `{"error": {"kind": "...", "message": "..."}}`; the exit code tells what kind (see "Exit codes"). The kinds:
   - `badArgument`: a command, goal, option, choice or value that is not valid (exit 5).
   - `notFound`: no such video or job (exit 5).
@@ -180,7 +180,7 @@ Errors:
 
 Measures how large videos would come out with a goal.
 
-As the window does for the videos selected in its panel: it encodes a few short pieces of each video and compares them with the original, so it knows how large the result would be and how close it would look; Archive also chooses each video's quality, as before converting it. It answers once every video is measured, one after the other: seconds to a minute or so each. A size the goal knows without measuring (a copy) is given at once.
+As the window does for the videos selected in its panel: it encodes a few short pieces of each video and compares them with the original, so it knows how large the result would be and how close it would look; Archive also chooses each video's quality, as before converting it. It answers once every video is measured, one after the other: seconds to a minute or so each. A size the goal knows without measuring (a copy) is given at once. When the window is already measuring as many videos as it does at once, it waits its turn.
 
 Only while the queue is idle, as in the window: measuring and converting would share the processor. Without `--goal`, the goal shown in the window's panel. What it measured stays in the window: `vidctrl-client videos --goal <goal>` gives it again, and the window's list shows it for the goal of its panel.
 
@@ -211,7 +211,7 @@ With `--json`: `videos` (list of Video), as given, each that could be read with 
 
 Errors:
 
-- While the queue converts: `busy`, exit 5 ("Videos are being converted; the window measures when the queue is idle."). Measure before queuing, or after `vidctrl-client wait`.
+- While the queue converts, or when converting starts before it has measured them all: `busy`, exit 5 ("Videos are being converted; the window measures when the queue is idle."). Measure before queuing, or after `vidctrl-client wait`.
 - A video that is not in the list (`vidctrl-client add` it first), one FFmpeg cannot open, or an unknown goal, option or choice: exit 5.
 
 ### `vidctrl-client remove <videos…>`
@@ -592,13 +592,13 @@ Job 1: Done. /home/alice/Videos/party.mov
   Worth a look by eye: even the best quality falls a little short somewhere (crf 20, usual 35; VMAF 93.8; XPSNR 40.2 dB). Expected at 52% of the original's size.
   Its name ends in -check: look at it beside the original.
 The command, as "Show the command" in the window gives it:
-  ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4
+  ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -svtav1-params tune=0:enable-variance-boost=1:enable-qm=1:qm-min=0:keyint=10s:scd=1 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -metadata major_brand= -metadata minor_version= -metadata compatible_brands= -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4
 ```
 
 With `--json`: `job` (Job); `command` (string, optional): with `--command`, left out for a job that runs nothing (one that ended skipped or is kept as it is).
 
 ```json
-{"job":{"id":1,"videoId":1,"path":"/home/alice/Videos/party.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"done","statusText":"Done","outputPath":"/home/alice/Videos/Converted/party_av1-crf20-check.mp4","outputBytes":2100000000,"quality":{"outcome":"belowTarget","outcomeText":"Worth a look by eye: even the best quality falls a little short somewhere","value":20,"standardValue":35,"vmaf":93.8,"xpsnr":40.2,"share":0.52},"needsALook":true,"errorLines":[]},"command":"ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4"}
+{"job":{"id":1,"videoId":1,"path":"/home/alice/Videos/party.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"done","statusText":"Done","outputPath":"/home/alice/Videos/Converted/party_av1-crf20-check.mp4","outputBytes":2100000000,"quality":{"outcome":"belowTarget","outcomeText":"Worth a look by eye: even the best quality falls a little short somewhere","value":20,"standardValue":35,"vmaf":93.8,"xpsnr":40.2,"share":0.52},"needsALook":true,"errorLines":[]},"command":"ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -svtav1-params tune=0:enable-variance-boost=1:enable-qm=1:qm-min=0:keyint=10s:scd=1 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -metadata major_brand= -metadata minor_version= -metadata compatible_brands= -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4"}
 ```
 
 Errors:
@@ -894,7 +894,7 @@ A job in the queue.
 - `videoId` (int): the video it was made from, which may be off the list by now.
 - `path` (string): that video's file.
 - `goal` (string): the goal's full id.
-- `options` (object): every option of the goal and the choice it really makes on this computer: `codec` is `hevc` where FFmpeg cannot make AV1, `speed` is `cpu` where the graphics card cannot encode. Tell the person these, not what was asked.
+- `options` (object): every option of the goal and the choice it really makes on this computer: `speed` is `cpu` where the graphics card cannot encode that format. Tell the person these, not what was asked.
 - `sample` (string, optional): `start` or `middle` for a sample.
 - `status` (string): see "Job statuses"; `statusText` (string) in words.
 - `fraction` (number, optional): how far it is, 0 to 1, while converting.

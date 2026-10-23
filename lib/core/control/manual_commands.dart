@@ -1,6 +1,11 @@
 import 'dart:convert';
 
+import '../ffmpeg/capabilities.dart';
+import '../ffmpeg/command_builder.dart';
+import '../ffmpeg/command_text.dart';
+import '../media/media_info.dart';
 import '../media/video_files.dart' show videoExtensions;
+import '../scenarios/archive.dart';
 import '../scenarios/registry.dart';
 import '../scenarios/scenario.dart';
 import 'client_text.dart';
@@ -254,12 +259,47 @@ final _waitAnswer = {
   ],
 };
 
-/// What "Show the command" shows for [_checkedJob].
-const _command =
-    "ffmpeg -hide_banner -i $_folder/party.mov -map 0:v:0 -map '0:a?' "
-    '-map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -pix_fmt yuv420p10le '
-    '-c:a copy -movflags +faststart+use_metadata_tags -f mp4 '
-    '$_folder/Converted/party_av1-crf20-check.mp4';
+/// What "Show the command" shows for [_checkedJob], made as the window
+/// makes it: party.mov, a 4K camera video, converted by Archive at the
+/// quality chosen for it, with VidCtrl's own FFmpeg.
+final _command = () {
+  const info = MediaInfo(
+    path: '$_folder/party.mov',
+    formatName: 'mov,mp4,m4a,3gp,3g2,mj2',
+    duration: Duration(minutes: 31, seconds: 12),
+    sizeBytes: 4040000000,
+    video: VideoStream(
+      index: 0,
+      codec: 'hevc',
+      width: 3840,
+      height: 2160,
+      pixFmt: 'yuv420p10le',
+      averageFrameRate: 25,
+      nominalFrameRate: 25,
+    ),
+    audio: [
+      AudioStream(index: 1, codec: 'aac', channels: 2, sampleRate: 48000),
+    ],
+  );
+  final capabilities = Capabilities(
+    ffmpegVersion: '8.1',
+    encoders: const {'libsvtav1', 'libx265', 'aac'},
+    svtAv1Params: svtAv1ParamCandidates.first,
+  );
+  const archive = ArchivePreset();
+  final plan = archive.withQuality(
+    archive.plan(info, const {}, capabilities),
+    _checkedJob.quality!.value,
+    belowTarget: true,
+  );
+  final args = buildFfmpegArgs(
+    input: info.path,
+    output: _checkedJob.outputPath!,
+    plan: plan,
+    forDisplay: true,
+  );
+  return singleLineCommand('ffmpeg', args, shell: ShellStyle.posix);
+}();
 
 final _jobAnswer = {'job': _checkedJob.toJson(), 'command': _command};
 
@@ -437,7 +477,9 @@ List<CommandDoc> commandDocs(
           'close it would look; Archive also chooses each video\'s quality, '
           'as before converting it. It answers once every video is '
           'measured, one after the other: seconds to a minute or so each. A '
-          'size the goal knows without measuring (a copy) is given at once.',
+          'size the goal knows without measuring (a copy) is given at once. '
+          'When the window is already measuring as many videos as it does '
+          'at once, it waits its turn.',
       'Only while the queue is idle, as in the window: measuring and '
           'converting would share the processor. Without `--goal`, the goal '
           'shown in the window\'s panel. What it measured stays in the '
@@ -460,9 +502,10 @@ List<CommandDoc> commandDocs(
     ],
     shapes: ['Video', 'Preview'],
     errors: [
-      'While the queue converts: `busy`, exit 5 ("Videos are being '
-          'converted; the window measures when the queue is idle."). '
-          'Measure before queuing, or after `$c wait`.',
+      'While the queue converts, or when converting starts before it has '
+          'measured them all: `busy`, exit 5 ("Videos are being converted; '
+          'the window measures when the queue is idle."). Measure before '
+          'queuing, or after `$c wait`.',
       'A video that is not in the list (`$c add` it first), one FFmpeg '
           'cannot open, or an unknown goal, option or choice: exit 5.',
     ],
