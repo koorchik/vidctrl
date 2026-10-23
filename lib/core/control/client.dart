@@ -18,10 +18,9 @@ import 'views.dart';
 // asks it one thing (or follows it), prints the answer and says by its exit
 // code how it went.
 
-/// The commands the client knows, as typed.
+/// The commands the client knows, as typed, in the order `--help` lists
+/// them.
 const clientCommands = <String>[
-  'status',
-  'goals',
   'add',
   'videos',
   'remove',
@@ -36,8 +35,10 @@ const clientCommands = <String>[
   'pause',
   'resume',
   'cancel',
+  'status',
   'wait',
   'events',
+  'goals',
   'manual',
   'help',
 ];

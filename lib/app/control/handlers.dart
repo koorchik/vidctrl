@@ -8,7 +8,6 @@ import 'package:path/path.dart' as p;
 import '../../core/control/listener.dart';
 import '../../core/control/protocol.dart';
 import '../../core/control/views.dart';
-import '../../core/control/words.dart';
 import '../../core/estimate/size_estimator.dart';
 import '../../core/scenarios/registry.dart';
 import '../../l10n/app_localizations.dart';
@@ -17,12 +16,12 @@ import '../estimates/estimate_cache.dart';
 import '../home/scenario_texts.dart';
 import '../providers.dart';
 import '../queue/queue_controller.dart';
-import '../queue/queue_state.dart';
 import '../recipe/recipe.dart';
 import '../sources/sources_controller.dart';
 import 'app_views.dart';
 import 'arguments.dart';
 import 'events.dart';
+import 'queue_handlers.dart';
 import 'waiter.dart';
 
 // What the window does for each request of `vidctrl-client`. Every method
@@ -42,15 +41,15 @@ const _methods = <String, _Method>{
   Methods.videosRemove: _videosRemove,
   Methods.queueList: _queueList,
   Methods.queueAdd: _queueAdd,
-  Methods.queueRemove: _queueRemove,
-  Methods.queueMove: _queueMove,
-  Methods.queueRetry: _queueRetry,
-  Methods.queueClearFinished: _queueClearFinished,
-  Methods.queuePause: _queuePause,
-  Methods.queueResume: _queueResume,
-  Methods.queueCancel: _queueCancel,
-  Methods.queueConvertAnyway: _queueConvertAnyway,
-  Methods.queueConvertWhole: _queueConvertWhole,
+  Methods.queueRemove: queueRemove,
+  Methods.queueMove: queueMove,
+  Methods.queueRetry: queueRetry,
+  Methods.queueClearFinished: queueClearFinished,
+  Methods.queuePause: queuePause,
+  Methods.queueResume: queueResume,
+  Methods.queueCancel: queueCancel,
+  Methods.queueConvertAnyway: queueConvertAnyway,
+  Methods.queueConvertWhole: queueConvertWhole,
 };
 
 /// A method that goes on beyond its answer, or answers only later.
@@ -422,214 +421,6 @@ Future<Object?> _queueAdd(
     'skipped': skipped,
   };
 }
-
-// ---- Queue controls -----------------------------------------------------
-//
-// Each as the queue pane's button or menu does it, with what the window
-// offers there: only a waiting job is dragged, only a failed or cancelled
-// one tried again.
-
-/// The job [params] names under [key].
-QueueJob _job(Ref ref, Map<String, Object?> params, [String key = 'job']) =>
-    _jobById(ref, params[key], key);
-
-QueueJob _jobById(Ref ref, Object? id, String key) {
-  if (id is! int) throw badArgument('"$key" takes job ids, not "$id".');
-  for (final job in ref.read(queueProvider).jobs) {
-    if (job.id == id) return job;
-  }
-  throw ControlError(
-    ControlErrorKind.notFound,
-    'There is no job $id in the queue.',
-  );
-}
-
-/// Takes jobs out of the queue, as each one's remove does; a result already
-/// written stays on disk.
-Future<Object?> _queueRemove(
-  Ref ref,
-  AppEnvironment env,
-  Map<String, Object?> params,
-) async {
-  // All are checked before any is taken out.
-  final ids = {
-    for (final id in listParam(params, 'jobs')) _jobById(ref, id, 'jobs').id,
-  };
-  final queue = ref.read(queueProvider.notifier);
-  for (final id in ids) {
-    await queue.remove(id);
-  }
-  return {'removed': ids.toList()};
-}
-
-/// Moves a waiting job to a place in the queue, 1 being the first.
-Future<Object?> _queueMove(
-  Ref ref,
-  AppEnvironment env,
-  Map<String, Object?> params,
-) async {
-  final job = _job(ref, params);
-  final position = params['position'];
-  if (position is! int) {
-    throw badArgument('"position" is a place in the queue, 1 for the first.');
-  }
-  if (job.status != JobStatus.waiting) {
-    throw badArgument(
-      'Job ${job.id} is not waiting; only a waiting job can be moved, as in '
-      'the window.',
-    );
-  }
-  final jobs = ref.read(queueProvider).jobs;
-  ref
-      .read(queueProvider.notifier)
-      .reorder(
-        jobs.indexWhere((j) => j.id == job.id),
-        (position - 1).clamp(0, jobs.length - 1),
-      );
-  return {
-    'jobs': [
-      for (final job in ref.read(queueProvider).jobs) jobView(job).toJson(),
-    ],
-  };
-}
-
-Future<Object?> _queueRetry(
-  Ref ref,
-  AppEnvironment env,
-  Map<String, Object?> params,
-) async {
-  final job = _job(ref, params);
-  if (!job.canRetry) {
-    throw badArgument(
-      'Job ${job.id} is ${statusWords(job.status.name).toLowerCase()}; only '
-      'a job that failed or was cancelled can be tried again.',
-    );
-  }
-  ref.read(queueProvider.notifier).retry(job.id);
-  return {'job': jobView(_job(ref, params)).toJson()};
-}
-
-/// Takes the done and skipped jobs out of the queue, as "Clear finished"
-/// does; their results stay on disk.
-Future<Object?> _queueClearFinished(
-  Ref ref,
-  AppEnvironment env,
-  Map<String, Object?> params,
-) async {
-  final finished = [
-    for (final job in ref.read(queueProvider).jobs)
-      if (job.isFinished) job.id,
-  ];
-  ref.read(queueProvider.notifier).clearFinished();
-  return {'removed': finished};
-}
-
-Future<Object?> _queuePause(
-  Ref ref,
-  AppEnvironment env,
-  Map<String, Object?> params,
-) async {
-  ref.read(queueProvider.notifier).pause();
-  return {'paused': ref.read(queueProvider).paused};
-}
-
-Future<Object?> _queueResume(
-  Ref ref,
-  AppEnvironment env,
-  Map<String, Object?> params,
-) async {
-  ref.read(queueProvider.notifier).resume();
-  return {'paused': ref.read(queueProvider).paused};
-}
-
-/// Cancels the job under way, as its cancel button does; answers once it
-/// has stopped.
-Future<Object?> _queueCancel(
-  Ref ref,
-  AppEnvironment env,
-  Map<String, Object?> params,
-) async {
-  final named = params['job'] == null ? null : _job(ref, params);
-  final active = ref.read(queueProvider).activeJob;
-  if (named != null && named.id != active?.id) {
-    throw badArgument(
-      'Job ${named.id} is not converting; `vidctrl-client queue remove '
-      '${named.id}` takes it out of the queue.',
-    );
-  }
-  if (active == null) return {'cancelled': null};
-  // A job just starting has no conversion to stop yet; it is asked again
-  // until it has stopped.
-  while (ref.read(queueProvider).activeJob?.id == active.id) {
-    await ref.read(queueProvider.notifier).cancelActive();
-    await _untilEnded(ref, active.id, within: const Duration(seconds: 1));
-  }
-  final ended = ref
-      .read(queueProvider)
-      .jobs
-      .where((job) => job.id == active.id)
-      .firstOrNull;
-  if (ended?.status == JobStatus.cancelled) return {'cancelled': active.id};
-  // It ended otherwise first, or was taken out of the queue meanwhile.
-  return {'cancelled': null, if (ended != null) 'job': jobView(ended).toJson()};
-}
-
-/// Completes once job [id] is no longer under way, or after [within].
-Future<void> _untilEnded(Ref ref, int id, {required Duration within}) {
-  final done = Completer<void>();
-  late final ProviderSubscription<QueueState> subscription;
-  Timer? timer;
-  void end() {
-    if (done.isCompleted) return;
-    subscription.close();
-    timer?.cancel();
-    done.complete();
-  }
-
-  subscription = ref.listen<QueueState>(queueProvider, (_, queue) {
-    if (queue.activeJob?.id != id) end();
-  });
-  timer = Timer(within, end);
-  if (ref.read(queueProvider).activeJob?.id != id) end();
-  return done.future;
-}
-
-/// "Convert anyway" of a job whose video was kept as it is.
-Future<Object?> _queueConvertAnyway(
-  Ref ref,
-  AppEnvironment env,
-  Map<String, Object?> params,
-) async {
-  final job = _job(ref, params);
-  if (job.status != JobStatus.skipped || !job.keptAsIs) {
-    throw badArgument(
-      'Job ${job.id} was not kept as it is; only a job that ended skipped '
-      'with the outcome notWorthIt can be converted anyway.',
-    );
-  }
-  return _addedBy(ref.read(queueProvider.notifier).convertAnyway(job.id));
-}
-
-/// "Convert the whole video" of a sample job.
-Future<Object?> _queueConvertWhole(
-  Ref ref,
-  AppEnvironment env,
-  Map<String, Object?> params,
-) async {
-  final job = _job(ref, params);
-  if (!job.isSample) {
-    throw badArgument(
-      'Job ${job.id} is not a sample; it converts the whole video already.',
-    );
-  }
-  return _addedBy(ref.read(queueProvider.notifier).convertWhole(job.id));
-}
-
-/// The job a control added, or none when an identical one is pending.
-Map<String, Object?> _addedBy(QueueJob? added) => {
-  'added': [if (added != null) jobView(added).toJson()],
-  'alreadyQueued': added == null,
-};
 
 // ---- Following ----------------------------------------------------------
 

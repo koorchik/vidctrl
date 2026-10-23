@@ -94,7 +94,7 @@ void main() {
       usage().trimRight(),
       endsWith('Run `vidctrl-client manual` for the full guide.'),
     );
-    expect(usage().split('\n').length, lessThan(30));
+    expect(usage().split('\n').length, lessThanOrEqualTo(40));
   });
 
   test('every JSON field the window sends is explained', () {

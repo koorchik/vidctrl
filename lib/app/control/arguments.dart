@@ -8,6 +8,8 @@ import '../../core/scenarios/archive.dart';
 import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
 import '../home/scenario_texts.dart';
+import '../queue/queue_controller.dart';
+import '../queue/queue_state.dart';
 import '../recipe/recipe.dart';
 import '../recipe/recipe_controller.dart';
 import '../sources/sources_controller.dart';
@@ -36,6 +38,21 @@ String absolutePath(Object? path, String key) {
 /// A video's id, or its path made plain.
 Object videoReference(Object? reference) =>
     reference is int ? reference : absolutePath(reference, 'videos');
+
+/// The job [params] names under [key].
+QueueJob jobFrom(Ref ref, Map<String, Object?> params, [String key = 'job']) =>
+    jobById(ref, params[key], key);
+
+QueueJob jobById(Ref ref, Object? id, String key) {
+  if (id is! int) throw badArgument('"$key" takes job ids, not "$id".');
+  for (final job in ref.read(queueProvider).jobs) {
+    if (job.id == id) return job;
+  }
+  throw ControlError(
+    ControlErrorKind.notFound,
+    'There is no job $id in the queue.',
+  );
+}
 
 SourceVideo? findVideo(SourcesState state, Object reference) {
   if (reference is int) return state.byId(reference);

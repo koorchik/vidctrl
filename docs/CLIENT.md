@@ -56,62 +56,6 @@ How every command works:
   - `unexpected`: the client itself went wrong; the message says how (exit 5).
 - Start the window before running commands side by side: two commands started at the same moment with no window open can each open one. Any command but `status` opens it, for example `vidctrl-client queue`; then run `vidctrl-client events` in the background beside the others.
 
-### `vidctrl-client status`
-
-Whether VidCtrl is open, and how its queue stands.
-
-It never opens the window. A window that has just opened is `starting` while it looks for FFmpeg, then `ready`, or `ffmpegMissing` when it found none.
-
-Examples:
-
-```sh
-vidctrl-client status
-vidctrl-client status --json
-```
-
-It prints, for example:
-
-```
-VidCtrl 1.2.0 is open and ready.
-The queue is converting: 1 done, 1 converting, 1 waiting.
-
-# When the window is not open:
-VidCtrl is not running.
-```
-
-With `--json`: `{"running": false}` when the window is not open; otherwise `running` (bool, true) and a Status.
-
-```json
-{"running":true,"state":"ready","version":"1.2.0","busy":true,"paused":false,"jobs":{"done":1,"running":1,"waiting":1}}
-```
-
-### `vidctrl-client goals`
-
-The goals and their options, as this computer offers them.
-
-The same goals as "Goals" below, with only the options this computer can use: the speed of Archive, for one, is offered only where the graphics card can encode. An option left out here is refused by `queue add`, but for the choice the goal makes here anyway.
-
-Examples:
-
-```sh
-vidctrl-client goals
-vidctrl-client goals --json
-```
-
-It prints, for example:
-
-```
-Archive, no quality loss: --goal archive
-  Format: --opt codec=…
-    Smallest file: av1 (the default). Plays on computers (Macs from M1) and newer devices: iPhone 15 Pro and later, TVs from about 2020.
-    Works everywhere: hevc. The same look in a file up to a third larger. Plays almost everywhere, older iPhones, Macs and TVs included.
-  Speed: --opt speed=…
-    Thorough: cpu (the default). The processor encodes: slower, and the file is the smallest.
-    Fast: gpu. The graphics card encodes: several times faster. Busy footage comes out the same size, calm footage up to 2.5 times larger.
-```
-
-With `--json`: `goals` (list of Goal), in the order of the panel.
-
 ### `vidctrl-client add <paths…>`
 
 Adds videos to the list, as dropping them on the window does.
@@ -534,6 +478,35 @@ Errors:
 
 - A job that is not in the queue, or not the one converting: exit 5, and nothing is cancelled.
 
+### `vidctrl-client status`
+
+Whether VidCtrl is open, and how its queue stands.
+
+It never opens the window. A window that has just opened is `starting` while it looks for FFmpeg, then `ready`, or `ffmpegMissing` when it found none.
+
+Examples:
+
+```sh
+vidctrl-client status
+vidctrl-client status --json
+```
+
+It prints, for example:
+
+```
+VidCtrl 1.2.0 is open and ready.
+The queue is converting: 1 done, 1 converting, 1 waiting.
+
+# When the window is not open:
+VidCtrl is not running.
+```
+
+With `--json`: `{"running": false}` when the window is not open; otherwise `running` (bool, true) and a Status.
+
+```json
+{"running":true,"state":"ready","version":"1.2.0","busy":true,"paused":false,"jobs":{"done":1,"running":1,"waiting":1}}
+```
+
 ### `vidctrl-client wait [jobs…]`
 
 Waits until the jobs are finished, and says how each ended.
@@ -607,6 +580,33 @@ With `--json`: one JSON object per line: `event` (string), `time` (string, UTC, 
 ```json
 {"event":"job-progress","time":"2026-10-23T14:05:09.120Z","job":1,"fraction":0.42,"remainingSeconds":1260.0}
 ```
+
+### `vidctrl-client goals`
+
+The goals and their options, as this computer offers them.
+
+The same goals as "Goals" below, with only the options this computer can use: the speed of Archive, for one, is offered only where the graphics card can encode. An option left out here is refused by `queue add`, but for the choice the goal makes here anyway.
+
+Examples:
+
+```sh
+vidctrl-client goals
+vidctrl-client goals --json
+```
+
+It prints, for example:
+
+```
+Archive, no quality loss: --goal archive
+  Format: --opt codec=…
+    Smallest file: av1 (the default). Plays on computers (Macs from M1) and newer devices: iPhone 15 Pro and later, TVs from about 2020.
+    Works everywhere: hevc. The same look in a file up to a third larger. Plays almost everywhere, older iPhones, Macs and TVs included.
+  Speed: --opt speed=…
+    Thorough: cpu (the default). The processor encodes: slower, and the file is the smallest.
+    Fast: gpu. The graphics card encodes: several times faster. Busy footage comes out the same size, calm footage up to 2.5 times larger.
+```
+
+With `--json`: `goals` (list of Goal), in the order of the panel.
 
 ### `vidctrl-client manual`
 
