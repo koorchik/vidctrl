@@ -1,5 +1,7 @@
 import '../../core/control/views.dart';
+import '../../core/ffmpeg/capabilities.dart';
 import '../../core/quality/quality_search.dart';
+import '../../core/scenarios/archive.dart';
 import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
 import '../queue/queue_state.dart';
@@ -26,7 +28,9 @@ VideoView videoView(SourceVideo video, {GoalPreview? preview}) {
   );
 }
 
-JobView jobView(QueueJob job) {
+/// [job] as a client reads it, its options as they are applied with
+/// [capabilities].
+JobView jobView(QueueJob job, Capabilities capabilities) {
   final progress = job.isActive ? job.progress : null;
   final remaining = progress?.remaining;
   final result = job.result;
@@ -35,7 +39,7 @@ JobView jobView(QueueJob job) {
     videoId: job.sourceId,
     path: job.path,
     goal: job.recipe.presetId,
-    options: appliedOptions(job.recipe),
+    options: appliedOptions(job.recipe, capabilities),
     sample: job.recipe.isSample ? job.recipe.sample.name : null,
     status: job.status.name,
     fraction: progress?.fraction,
@@ -63,11 +67,34 @@ QualityView _qualityView(QualityChoice choice) => QualityView(
 
 double _seconds(Duration d) => d.inMilliseconds / 1000;
 
-/// Every option of [recipe]'s goal, as its preset applies them.
-Map<String, String> appliedOptions(Recipe recipe) {
+/// Every option of [recipe]'s goal, with the choice its preset makes on a
+/// computer with [capabilities].
+Map<String, String> appliedOptions(Recipe recipe, Capabilities capabilities) {
   final preset = findPreset(recipe.presetId)!;
   return {
     for (final option in preset.options)
-      option.id: preset.choice(recipe.values, option.id),
+      option.id: appliedChoice(preset, option.id, recipe.values, capabilities),
+  };
+}
+
+/// The choice [preset] really makes for [optionId] with [values] on a
+/// computer with [capabilities]: the archive writes HEVC where this FFmpeg
+/// cannot make AV1, and uses the processor where the graphics card cannot
+/// encode that format. Otherwise the choice given, or the default.
+String appliedChoice(
+  Preset preset,
+  String optionId,
+  OptionValues values,
+  Capabilities capabilities,
+) {
+  final chosen = preset.choice(values, optionId);
+  if (preset is! ArchivePreset) return chosen;
+  final format = ArchivePreset.formatFor(values, capabilities);
+  return switch (optionId) {
+    ArchivePreset.codec => format,
+    ArchivePreset.speed
+        when ArchivePreset.gpuEncoder(capabilities, format) == null =>
+      'cpu',
+    _ => chosen,
   };
 }

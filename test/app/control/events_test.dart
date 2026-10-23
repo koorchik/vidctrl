@@ -18,6 +18,7 @@ void main() {
       final events = queueEvents(
         const QueueState(),
         QueueState(jobs: [waitingJob(1)]),
+        softwareOnly,
       );
 
       expect(names(events), [Events.jobAdded]);
@@ -30,8 +31,10 @@ void main() {
       final running = QueueState(jobs: [runningJob(1)], busy: true);
       final done = QueueState(jobs: [doneJob(1)], busy: true);
 
-      expect(names(queueEvents(waiting, running)), [Events.jobStarted]);
-      final finished = queueEvents(running, done);
+      expect(names(queueEvents(waiting, running, softwareOnly)), [
+        Events.jobStarted,
+      ]);
+      final finished = queueEvents(running, done, softwareOnly);
       expect(names(finished), [Events.jobFinished]);
       expect(finished.single.data, containsPair('status', 'done'));
       expect(
@@ -43,7 +46,9 @@ void main() {
         jobs: [queueJob(1, JobStatus.skipped)],
         busy: true,
       );
-      expect(names(queueEvents(waiting, skipped)), [Events.jobFinished]);
+      expect(names(queueEvents(waiting, skipped, softwareOnly)), [
+        Events.jobFinished,
+      ]);
     });
 
     test('a failed or cancelled job is finished too', () {
@@ -52,6 +57,7 @@ void main() {
       final events = queueEvents(
         running,
         QueueState(jobs: [failedJob(1), cancelledJob(2)]),
+        softwareOnly,
       );
 
       expect(names(events), [Events.jobFinished, Events.jobFinished]);
@@ -66,14 +72,16 @@ void main() {
         jobs: [queueJob(1, JobStatus.running, attempt: 2)],
       );
 
-      final events = queueEvents(first, second);
+      final events = queueEvents(first, second, softwareOnly);
 
       expect(names(events), [Events.jobChecking]);
       expect(events.single.data, {'job': 1, 'attempt': 2});
-      expect(names(queueEvents(QueueState(jobs: [waitingJob(1)]), first)), [
-        Events.jobStarted,
-        Events.jobChecking,
-      ]);
+      expect(
+        names(
+          queueEvents(QueueState(jobs: [waitingJob(1)]), first, softwareOnly),
+        ),
+        [Events.jobStarted, Events.jobChecking],
+      );
     });
 
     test('progress gives job-progress with the part done', () {
@@ -82,6 +90,7 @@ void main() {
         QueueState(
           jobs: [queueJob(1, JobStatus.running, progress: progressAt(0.25))],
         ),
+        softwareOnly,
       );
 
       expect(names(events), [Events.jobProgress]);
@@ -96,6 +105,7 @@ void main() {
       final events = queueEvents(
         QueueState(jobs: [doneJob(1), waitingJob(2)]),
         QueueState(jobs: [waitingJob(2)]),
+        softwareOnly,
       );
 
       expect(names(events), [Events.jobRemoved]);
@@ -106,15 +116,19 @@ void main() {
       const running = QueueState(busy: true);
       const paused = QueueState(busy: true, paused: true);
 
-      expect(names(queueEvents(running, paused)), [Events.queuePaused]);
-      expect(names(queueEvents(paused, running)), [Events.queueResumed]);
+      expect(names(queueEvents(running, paused, softwareOnly)), [
+        Events.queuePaused,
+      ]);
+      expect(names(queueEvents(paused, running, softwareOnly)), [
+        Events.queueResumed,
+      ]);
     });
 
     test('the queue running out gives queue-idle', () {
       final busy = QueueState(jobs: [runningJob(1)], busy: true);
       final idle = QueueState(jobs: [doneJob(1)]);
 
-      expect(names(queueEvents(busy, idle)), [
+      expect(names(queueEvents(busy, idle, softwareOnly)), [
         Events.jobFinished,
         Events.queueIdle,
       ]);
@@ -122,7 +136,7 @@ void main() {
 
     test('nothing changed gives nothing', () {
       final state = QueueState(jobs: [runningJob(1)], busy: true);
-      expect(queueEvents(state, state), isEmpty);
+      expect(queueEvents(state, state, softwareOnly), isEmpty);
     });
   });
 

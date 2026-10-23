@@ -1,5 +1,6 @@
 import '../../core/control/protocol.dart';
 import '../../core/control/words.dart';
+import '../../core/ffmpeg/capabilities.dart';
 import '../quality/quality_controller.dart';
 import '../queue/queue_state.dart';
 import '../sources/sources_controller.dart';
@@ -23,14 +24,21 @@ Map<String, Object?> eventParams(Map<String, Object?> data) => {
 };
 
 /// What changed in the queue from [before] to [after]: for each job in
-/// order, then for the queue as a whole.
-List<ControlEvent> queueEvents(QueueState before, QueueState after) {
+/// order, then for the queue as a whole. Jobs are told with their options as
+/// they are applied with [capabilities].
+List<ControlEvent> queueEvents(
+  QueueState before,
+  QueueState after,
+  Capabilities capabilities,
+) {
   final earlier = {for (final job in before.jobs) job.id: job};
   final events = <ControlEvent>[];
   for (final job in after.jobs) {
     var was = earlier[job.id];
     if (was == null) {
-      events.add(ControlEvent(Events.jobAdded, jobView(job).toJson()));
+      events.add(
+        ControlEvent(Events.jobAdded, jobView(job, capabilities).toJson()),
+      );
       // As if it had come in waiting, so a job that is further along by now
       // is told the rest too.
       was = job.copyWith(
@@ -41,7 +49,9 @@ List<ControlEvent> queueEvents(QueueState before, QueueState after) {
     }
     if (identical(was, job)) continue;
     if (was.status == JobStatus.waiting && job.status == JobStatus.running) {
-      events.add(ControlEvent(Events.jobStarted, jobView(job).toJson()));
+      events.add(
+        ControlEvent(Events.jobStarted, jobView(job, capabilities).toJson()),
+      );
     }
     if (job.attempt case final attempt? when attempt != was.attempt) {
       events.add(
@@ -62,7 +72,9 @@ List<ControlEvent> queueEvents(QueueState before, QueueState after) {
       );
     }
     if (job.status != was.status && _ended(job.status)) {
-      events.add(ControlEvent(Events.jobFinished, jobView(job).toJson()));
+      events.add(
+        ControlEvent(Events.jobFinished, jobView(job, capabilities).toJson()),
+      );
     }
   }
   final now = {for (final job in after.jobs) job.id};

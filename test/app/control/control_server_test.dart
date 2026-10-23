@@ -560,6 +560,30 @@ void main() {
       );
     });
 
+    test('a job says the choices it really makes: HEVC without AV1, the '
+        'processor without a graphics card encoder', () async {
+      env = FakeEnvironment(
+        capabilities: const Capabilities(
+          ffmpegVersion: 'test',
+          encoders: {'libx265', 'libx264', 'aac'},
+          filters: {'xpsnr'},
+        ),
+      );
+      final (_, client) = await startControlled(env);
+      final id = await addVideo(client, video('a.mp4'));
+
+      final answer = await client.call(Methods.queueAdd, {
+        'videos': [id],
+        'goal': 'archive',
+      }) as Map;
+
+      const made = {'codec': 'hevc', 'speed': 'cpu'};
+      expect(answer['options'], made);
+      expect((answer['added'] as List).single, containsPair('options', made));
+      final listed = await client.call(Methods.queueList) as Map;
+      expect((listed['jobs'] as List).single, containsPair('options', made));
+    });
+
     test('the same job twice is reported as already queued', () async {
       final (container, client) = await startControlled(env);
       final id = await addVideo(client, video('a.mp4'));

@@ -339,7 +339,9 @@ Future<Object?> _queueList(
   return {
     'paused': queue.paused,
     'busy': queue.busy,
-    'jobs': [for (final job in queue.jobs) jobView(job).toJson()],
+    'jobs': [
+      for (final job in queue.jobs) jobView(job, env.capabilities).toJson(),
+    ],
   };
 }
 
@@ -415,8 +417,10 @@ Future<Object?> _queueAdd(
       .addVideos(ready, recipe: recipe, output: output);
   return {
     'goal': recipe.presetId,
-    'options': appliedOptions(recipe),
-    'added': [for (final job in result.added) jobView(job).toJson()],
+    'options': appliedOptions(recipe, env.capabilities),
+    'added': [
+      for (final job in result.added) jobView(job, env.capabilities).toJson(),
+    ],
     'alreadyQueued': result.alreadyQueued,
     'skipped': skipped,
   };
@@ -436,6 +440,10 @@ Future<Object?> _subscribe(
   if (snapshot is! bool) throw badArgument('"snapshot" is true or false.');
   if (snapshot) {
     final queue = ref.read(queueProvider);
+    final capabilities = ref
+        .read(environmentProvider)
+        .requireValue
+        .capabilities;
     peer.notify(
       Events.snapshot,
       eventParams({
@@ -443,7 +451,9 @@ Future<Object?> _subscribe(
           for (final video in ref.read(sourcesProvider).videos)
             videoView(video).toJson(),
         ],
-        'jobs': [for (final job in queue.jobs) jobView(job).toJson()],
+        'jobs': [
+          for (final job in queue.jobs) jobView(job, capabilities).toJson(),
+        ],
         'paused': queue.paused,
         'busy': queue.busy,
       }),

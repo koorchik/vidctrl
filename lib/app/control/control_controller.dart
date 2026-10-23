@@ -115,9 +115,13 @@ class ControlController extends Notifier<ControlState>
   /// request answered while stopping must not follow again.
   void _follow() {
     if (_listener == null || _following != null) return;
+    final capabilities = ref
+        .read(environmentProvider)
+        .requireValue
+        .capabilities;
     _following = [
       ref.listen<QueueState>(queueProvider, (before, after) {
-        _tell(queueEvents(before ?? const QueueState(), after));
+        _tell(queueEvents(before ?? const QueueState(), after, capabilities));
         _updateWaits(after);
       }),
       ref.listen<SourcesState>(

@@ -398,7 +398,7 @@ A job in the queue.
 - `videoId` (int): the video it was made from, which may be off the list by now.
 - `path` (string): that video's file.
 - `goal` (string): the goal's full id.
-- `options` (object): every option of the goal and its choice.
+- `options` (object): every option of the goal and the choice it really makes on this computer: `codec` is `hevc` where FFmpeg cannot make AV1, `speed` is `cpu` where the graphics card cannot encode. Tell the person these, not what was asked.
 - `sample` (string, optional): `start` or `middle` for a sample.
 - `status` (string): see "Job statuses"; `statusText` (string) in words.
 - `fraction` (number, optional): how far it is, 0 to 1, while converting.

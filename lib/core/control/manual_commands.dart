@@ -413,7 +413,8 @@ List<CommandDoc> commandDocs(
     text: queueAddText(_queueAddAnswer),
     json: [
       '`goal` (string): the goal\'s id; `options` (object): every option of '
-          'the goal and its choice; `added` (list of Job): the new jobs; '
+          'the goal and the choice made on this computer, as in Job; '
+          '`added` (list of Job): the new jobs; '
           '`alreadyQueued` (list of int): the videos that were queued '
           'already; `skipped` (list): `video` (int or string, as given) and '
           '`reason` (string: `unreadable` or `notFound`).',

@@ -57,7 +57,8 @@ Future<Object?> queueMove(
       );
   return {
     'jobs': [
-      for (final job in ref.read(queueProvider).jobs) jobView(job).toJson(),
+      for (final job in ref.read(queueProvider).jobs)
+        jobView(job, env.capabilities).toJson(),
     ],
   };
 }
@@ -75,7 +76,7 @@ Future<Object?> queueRetry(
     );
   }
   ref.read(queueProvider.notifier).retry(job.id);
-  return {'job': jobView(jobFrom(ref, params)).toJson()};
+  return {'job': jobView(jobFrom(ref, params), env.capabilities).toJson()};
 }
 
 /// Takes the done and skipped jobs out of the queue, as "Clear finished"
@@ -140,7 +141,10 @@ Future<Object?> queueCancel(
       .firstOrNull;
   if (ended?.status == JobStatus.cancelled) return {'cancelled': active.id};
   // It ended otherwise first, or was taken out of the queue meanwhile.
-  return {'cancelled': null, if (ended != null) 'job': jobView(ended).toJson()};
+  return {
+    'cancelled': null,
+    if (ended != null) 'job': jobView(ended, env.capabilities).toJson(),
+  };
 }
 
 /// Completes once job [id] is no longer under way, or after [within].
@@ -176,7 +180,7 @@ Future<Object?> queueConvertAnyway(
       'with the outcome notWorthIt can be converted anyway.',
     );
   }
-  return _addedBy(ref.read(queueProvider.notifier).convertAnyway(job.id));
+  return _addedBy(env, ref.read(queueProvider.notifier).convertAnyway(job.id));
 }
 
 /// "Convert the whole video" of a sample job.
@@ -191,11 +195,11 @@ Future<Object?> queueConvertWhole(
       'Job ${job.id} is not a sample; it converts the whole video already.',
     );
   }
-  return _addedBy(ref.read(queueProvider.notifier).convertWhole(job.id));
+  return _addedBy(env, ref.read(queueProvider.notifier).convertWhole(job.id));
 }
 
 /// The job a control added, or none when an identical one is pending.
-Map<String, Object?> _addedBy(QueueJob? added) => {
-  'added': [if (added != null) jobView(added).toJson()],
+Map<String, Object?> _addedBy(AppEnvironment env, QueueJob? added) => {
+  'added': [if (added != null) jobView(added, env.capabilities).toJson()],
   'alreadyQueued': added == null,
 };

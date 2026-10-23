@@ -4,7 +4,6 @@ import 'package:path/path.dart' as p;
 import '../../core/control/protocol.dart';
 import '../../core/ffmpeg/capabilities.dart';
 import '../../core/output/output_namer.dart';
-import '../../core/scenarios/archive.dart';
 import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
 import '../home/scenario_texts.dart';
@@ -13,6 +12,7 @@ import '../queue/queue_state.dart';
 import '../recipe/recipe.dart';
 import '../recipe/recipe_controller.dart';
 import '../sources/sources_controller.dart';
+import 'app_views.dart';
 
 // Reading what a client asked for: every value is checked, and a wrong one
 // is refused with the valid ones named.
@@ -150,7 +150,8 @@ OptionValues _options(
     // As on the panel, which does not show the row here; naming what
     // happens anyway changes nothing, so a script may name it everywhere.
     if (!offered.contains(option)) {
-      final anyway = _madeAnyway(preset, option, capabilities);
+      // What it makes with its defaults: the row is not shown with them.
+      final anyway = appliedChoice(preset, option.id, const {}, capabilities);
       if (value != anyway) {
         throw badArgument(
           'The option ${option.id} of ${preset.id} cannot be chosen on this '
@@ -164,18 +165,6 @@ OptionValues _options(
   }
   return values;
 }
-
-/// The choice [preset] makes for [option] on a computer where the panel
-/// never shows it: the format this FFmpeg can make for the archive's (HEVC
-/// without AV1), the default otherwise (the processor without a graphics
-/// card encoder).
-String _madeAnyway(
-  Preset preset,
-  PresetOption option,
-  Capabilities capabilities,
-) => preset is ArchivePreset && option.id == ArchivePreset.codec
-    ? ArchivePreset.formatFor(const {}, capabilities)
-    : option.defaultChoice;
 
 /// Whether the panel shows [option], with the goal's defaults or with one
 /// other option changed: the archive's speed row appears only once HEVC is

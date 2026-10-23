@@ -221,7 +221,7 @@ Video 0: In the queue already, with this goal and folder.
 Not queued, video 3: it cannot be read.
 ```
 
-With `--json`: `goal` (string): the goal's id; `options` (object): every option of the goal and its choice; `added` (list of Job): the new jobs; `alreadyQueued` (list of int): the videos that were queued already; `skipped` (list): `video` (int or string, as given) and `reason` (string: `unreadable` or `notFound`).
+With `--json`: `goal` (string): the goal's id; `options` (object): every option of the goal and the choice made on this computer, as in Job; `added` (list of Job): the new jobs; `alreadyQueued` (list of int): the videos that were queued already; `skipped` (list): `video` (int or string, as given) and `reason` (string: `unreadable` or `notFound`).
 
 ```json
 {"goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"added":[{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"waiting","statusText":"Waiting","needsALook":false,"errorLines":[]}],"alreadyQueued":[0],"skipped":[{"video":3,"reason":"unreadable"}]}
@@ -727,7 +727,7 @@ A job in the queue.
 - `videoId` (int): the video it was made from, which may be off the list by now.
 - `path` (string): that video's file.
 - `goal` (string): the goal's full id.
-- `options` (object): every option of the goal and its choice.
+- `options` (object): every option of the goal and the choice it really makes on this computer: `codec` is `hevc` where FFmpeg cannot make AV1, `speed` is `cpu` where the graphics card cannot encode. Tell the person these, not what was asked.
 - `sample` (string, optional): `start` or `middle` for a sample.
 - `status` (string): see "Job statuses"; `statusText` (string) in words.
 - `fraction` (number, optional): how far it is, 0 to 1, while converting.
