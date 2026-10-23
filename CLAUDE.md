@@ -39,6 +39,11 @@ tool/fetch_ffmpeg.sh linux                            # the pinned FFmpeg into t
 dart run tool/convert.dart --list                     # the engine without the UI
 dart run tool/convert.dart archive.master clip.mov --dry-run
 dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for the archive
+
+# With a window open (flutter run), drive it from another terminal; add
+# --json to any command, and see the client's own help for the commands:
+dart run bin/vidctrl_client.dart --help
+VIDCTRL_APP=build/linux/x64/release/bundle/vidctrl dart run bin/vidctrl_client.dart status   # VIDCTRL_APP points the client at a development build
 ```
 
 - Several `--exclude-tags` flags do not combine; use the `"a || b"` form.
@@ -210,6 +215,26 @@ Output names carry the settings through each preset's `nameSuffix`
 The screen (`home/`) is a header (`app_header`) and three panes over those
 providers: `videos_pane`, `queue_pane`, `recipe_pane`. `home/scenario_texts.dart` maps scenario, preset
 and option ids to words; the engine knows them only by id.
+
+### Control by `vidctrl-client`
+
+A running window serves a JSON-RPC control server so a program or an agent can
+drive it the way a person does: `lib/core/control/` is the transport (plain
+Dart: `package:json_rpc_2` over a loopback socket, a `hello` with a token as
+the first message, the endpoint file, the protocol's names), and
+`lib/app/control/` is the server (`controlProvider`, started by `main.dart`
+and stopped first when the window closes). Every method goes through the
+notifiers the buttons use (`SourcesController`, `QueueController`,
+`EstimateCache`, `QualityController`), so the window shows what a client does
+and the rules (plans, quality search, one job at a time) are the same. The
+first window to start owns the endpoint file `control.json` (Linux
+`$XDG_RUNTIME_DIR/vidctrl/`, else `~/.cache/vidctrl/`; macOS under
+`~/Library/Application Support/app.camctrl.vidctrl/`; Windows
+`%LOCALAPPDATA%\VidCtrl\`), mode 0600, holding port, token, pid, version and
+protocol; it is removed when the window closes. The client program
+(`dart run bin/vidctrl_client.dart …`, `vidctrl-client` once compiled) imports
+only `lib/core/`; `VIDCTRL_APP` names the app it starts when no window is
+open, for a development build.
 
 ### The seam for tests
 

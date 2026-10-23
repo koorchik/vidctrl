@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../l10n/app_localizations.dart';
+import 'control/control_controller.dart';
 import 'estimates/estimate_cache.dart';
 import 'quality/quality_controller.dart';
 import 'queue/queue_controller.dart';
@@ -53,6 +54,11 @@ class _WindowCloseGuardState extends ConsumerState<WindowCloseGuard>
     }
     _leaving = true;
     try {
+      // Clients are told first, and the endpoint file goes, so none connects
+      // to a window that is closing.
+      if (ref.exists(controlProvider)) {
+        await ref.read(controlProvider.notifier).stop();
+      }
       // FFmpeg has to stop before the app goes: left alone it would carry on
       // converting, and the unfinished file would stay behind.
       if (ref.exists(queueProvider)) {

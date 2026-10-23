@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -5,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app/app.dart';
+import 'app/control/control_controller.dart';
 import 'app/home/home_screen.dart';
 import 'app/licenses.dart';
 import 'app/settings.dart';
@@ -32,12 +35,20 @@ Future<void> main() async {
     p.join((await getApplicationSupportDirectory()).path, 'settings.json'),
   );
 
+  final container = ProviderContainer(
+    overrides: [settingsStoreProvider.overrideWithValue(settings)],
+  );
   runApp(
-    ProviderScope(
-      overrides: [settingsStoreProvider.overrideWithValue(settings)],
+    UncontrolledProviderScope(
+      container: container,
       child: const VideoConverterApp(
         home: WindowCloseGuard(child: HomeScreen()),
       ),
     ),
+  );
+  // Lets `vidctrl-client` control this window. A window that cannot serve
+  // (no folder to write to) still works for its user.
+  unawaited(
+    container.read(controlProvider.notifier).start().catchError((Object _) {}),
   );
 }
