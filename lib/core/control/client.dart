@@ -40,11 +40,13 @@ class ClientIo {
     required this.executable,
     AppLauncher? launcher,
     EndpointFile? endpoint,
+    String? os,
     this.startTimeout = const Duration(seconds: 30),
-  }) : launcher =
+  }) : os = os ?? Platform.operatingSystem,
+       launcher =
            launcher ??
            AppLauncher(
-             os: Platform.operatingSystem,
+             os: os ?? Platform.operatingSystem,
              clientExecutable: executable,
              environment: environment,
            ),
@@ -53,6 +55,9 @@ class ClientIo {
 
   final StringSink out;
   final StringSink err;
+
+  /// A `Platform.operatingSystem` value: how paths are written.
+  final String os;
   final Map<String, String> environment;
 
   /// Relative paths on the command line are taken from here.
@@ -420,17 +425,15 @@ Object _video(String reference, ClientIo io) =>
 
 /// [path] from the working directory, with `~` for the home folder.
 String _absolute(String path, ClientIo io) {
-  final home = Platform.isWindows
-      ? io.environment['USERPROFILE']
-      : io.environment['HOME'];
+  final windows = io.os == 'windows';
+  final paths = windows ? p.windows : p.posix;
+  final home = io.environment[windows ? 'USERPROFILE' : 'HOME'];
   final tilde =
-      path == '~' ||
-      path.startsWith('~/') ||
-      Platform.isWindows && path.startsWith(r'~\');
+      path == '~' || path.startsWith('~/') || windows && path.startsWith(r'~\');
   if (home != null && tilde) {
-    path = p.join(home, path.length > 2 ? path.substring(2) : '');
+    path = paths.join(home, path.length > 2 ? path.substring(2) : '');
   }
-  return p.normalize(p.join(io.workingDirectory, path));
+  return paths.normalize(paths.join(io.workingDirectory, path));
 }
 
 Map<String, Object?> _object(Object? value) =>

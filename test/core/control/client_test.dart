@@ -28,16 +28,21 @@ Map<String, Object?> _status(String state) => {
 /// nothing, unless [answers] says otherwise, and refuses any other method
 /// [answers] does not name.
 class _FakeApp {
-  _FakeApp._(this.listener, this.calls);
+  _FakeApp._(this.listener, this.calls, this.subscribers);
 
   final ControlListener listener;
   final List<(String, Map<String, Object?>)> calls;
+
+  /// The clients that asked for events: the window tells events to these
+  /// only.
+  final List<ControlPeer> subscribers;
 
   static Future<_FakeApp> start(
     EndpointFile file, [
     Map<String, _Answer> answers = const {},
   ]) async {
     final calls = <(String, Map<String, Object?>)>[];
+    final subscribers = <ControlPeer>[];
     final all = <String, _Answer>{
       Methods.status: (_, _) => _status('ready'),
       Methods.subscribe: (_, _) => const <String, Object?>{},
@@ -47,6 +52,7 @@ class _FakeApp {
       token: 't',
       handler: (method, params, peer) async {
         calls.add((method, params));
+        if (method == Methods.subscribe) subscribers.add(peer);
         final answer = all[method];
         if (answer == null) {
           throw ControlError(ControlErrorKind.unknownMethod, 'No $method.');
@@ -64,7 +70,7 @@ class _FakeApp {
         protocol: controlProtocol,
       ),
     );
-    return _FakeApp._(listener, calls);
+    return _FakeApp._(listener, calls, subscribers);
   }
 
   Map<String, Object?> paramsOf(String method) =>
@@ -114,6 +120,9 @@ Future<_Run> _run(
   AppLauncher? launcher,
   StringBuffer? out,
   StringBuffer? err,
+  String os = 'linux',
+  Map<String, String> environment = const {'HOME': '/home/alice'},
+  String workingDirectory = '/home/alice/work',
 }) async {
   out ??= StringBuffer();
   err ??= StringBuffer();
@@ -122,9 +131,10 @@ Future<_Run> _run(
     ClientIo(
       out: out,
       err: err,
-      environment: const {'HOME': '/home/alice'},
-      workingDirectory: '/home/alice/work',
+      environment: environment,
+      workingDirectory: workingDirectory,
       executable: '/opt/vidctrl/vidctrl-client',
+      os: os,
       launcher: launcher ?? _FakeLauncher(),
       endpoint: _endpoint,
     ),
@@ -197,6 +207,48 @@ void main() {
       'paths': ['/videos/a.mov'],
       'wait': false,
     });
+  });
+
+  test('on Windows, paths are made absolute the Windows way', () async {
+    final app = await _FakeApp.start(_endpoint, {
+      Methods.videosAdd: (params, _) => {
+        'videos': [
+          for (final (i, path) in (params['paths'] as List).indexed)
+            {'path': path, 'id': i + 1, 'result': 'added'},
+        ],
+      },
+      Methods.queueAdd: (params, _) => {
+        'goal': 'archive.master',
+        'options': <String, String>{},
+        'added': <Object?>[],
+        'alreadyQueued': <int>[],
+        'skipped': <Object?>[],
+      },
+    });
+    Future<_Run> run(List<String> args) => _run(
+      args,
+      os: 'windows',
+      environment: const {'USERPROFILE': r'C:\Users\alice'},
+      workingDirectory: r'C:\work',
+    );
+    final add = await run([
+      'add',
+      'clip.mov',
+      r'~\Videos',
+      '~/Docs',
+      r'.\x\..\y.mp4',
+      r'D:\films\a.mkv',
+    ]);
+    expect(add.exitCode, 0, reason: add.err);
+    expect(app.paramsOf(Methods.videosAdd)['paths'], [
+      r'C:\work\clip.mov',
+      r'C:\Users\alice\Videos',
+      r'C:\Users\alice\Docs',
+      r'C:\work\y.mp4',
+      r'D:\films\a.mkv',
+    ]);
+    await run(['queue', 'add', '1', '--out', r'..\done']);
+    expect(app.paramsOf(Methods.queueAdd)['out'], r'C:\done');
   });
 
   test('queue add sends goal, options, sample and folder as given', () async {
@@ -326,14 +378,21 @@ void main() {
 
   test('wait prints each outcome as it is known', () async {
     final answer = Completer<void>();
-    await _FakeApp.start(_endpoint, {
+    late _FakeApp app;
+    app = await _FakeApp.start(_endpoint, {
       Methods.wait: (_, peer) async {
+        // As the window does: the waiting client is told the queue is
+        // paused, and only subscribed ones are told events.
         peer.notify(Events.queuePaused, const {});
-        peer.notify(
-          Events.jobFinished,
-          _job(1, 'done', outputPath: '/videos/Converted/clip1.mp4'),
-        );
-        peer.notify(Events.queuePaused, const {});
+        expect(app.subscribers, hasLength(1));
+        expect(app.subscribers.single, isNot(same(peer)));
+        for (final subscriber in app.subscribers) {
+          subscriber.notify(
+            Events.jobFinished,
+            _job(1, 'done', outputPath: '/videos/Converted/clip1.mp4'),
+          );
+          subscriber.notify(Events.queuePaused, const {});
+        }
         await answer.future;
         return {
           'outcomes': [_outcome(1, 'done'), _outcome(2, 'done')],
