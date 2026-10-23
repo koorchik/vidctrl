@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
@@ -9,6 +10,7 @@ import 'client_text.dart';
 import 'connection.dart';
 import 'endpoint.dart';
 import 'launcher.dart';
+import 'manual.dart';
 import 'protocol.dart';
 import 'views.dart';
 
@@ -27,6 +29,8 @@ const clientCommands = <String>[
   'queue add',
   'wait',
   'events',
+  'manual',
+  'help',
 ];
 
 /// What the client reads and writes, so tests can stand in for the
@@ -74,9 +78,33 @@ class ClientIo {
 
 const _pollEvery = Duration(milliseconds: 250);
 
-/// Runs the command [args] names and returns the code to exit with.
-Future<int> runClient(List<String> args, ClientIo io) async {
+/// Runs the command [args] names and returns the code to exit with. An
+/// error nobody expected ends it with one line on stderr, not a trace.
+Future<int> runClient(List<String> args, ClientIo io) {
   final output = _Output(io, json: args.contains('--json'));
+  final code = Completer<int>();
+  void end(int exitCode) {
+    if (!code.isCompleted) code.complete(exitCode);
+  }
+
+  runZonedGuarded(() async => end(await _runClient(args, io, output)), (
+    error,
+    _,
+  ) {
+    if (code.isCompleted) return;
+    final first = '$error'.split('\n').first;
+    end(
+      output.failWith(
+        'unexpected',
+        'vidctrl-client stopped on an unexpected error: $first',
+        ExitCode.badArguments,
+      ),
+    );
+  });
+  return code.future;
+}
+
+Future<int> _runClient(List<String> args, ClientIo io, _Output output) async {
   final ArgResults top;
   final _Command? command;
   try {
@@ -88,9 +116,10 @@ Future<int> runClient(List<String> args, ClientIo io) async {
     return output.fail(e);
   }
   if (command == null) {
-    io.out.write(_usage);
+    io.out.write(quickStart('vidctrl-client'));
     return ExitCode.ok;
   }
+  if (command.offline) return command.run(null, output);
   final noStart = [
     top,
     ?top.command,
@@ -196,18 +225,30 @@ class _Output {
 }
 
 /// A command ready to run: [run] gets no connection only for `status` when
-/// no window is open.
+/// no window is open, and for an [offline] one.
 class _Command {
-  _Command(this.name, this.run);
+  _Command(this.name, this.run) : offline = false;
+
+  /// Prints [text] and needs no window.
+  _Command.text(this.name, String text)
+    : offline = true,
+      run = ((_, output) async {
+        output.io.out.write(text);
+        return ExitCode.ok;
+      });
 
   final String name;
   final Future<int> Function(ControlConnection? connection, _Output output) run;
+
+  /// Answers without the window: it is neither asked nor opened.
+  final bool offline;
 }
 
 // ---- Parsing -----------------------------------------------------------
 
 ArgParser _withGlobals(ArgParser parser) => parser
   ..addFlag('json', negatable: false, help: 'Print the answer as JSON.')
+  ..addFlag('help', abbr: 'h', negatable: false, help: 'Print the guide.')
   ..addFlag(
     'no-start',
     negatable: false,
@@ -245,35 +286,27 @@ ArgParser _parser() {
     ..addCommand(
       'events',
       _withGlobals(ArgParser())..addFlag('since-now', negatable: false),
-    );
+    )
+    ..addCommand('manual', _withGlobals(ArgParser()))
+    ..addCommand('help', _withGlobals(ArgParser()));
 }
-
-const _usage = '''
-vidctrl-client adds videos to the open VidCtrl window and follows its queue.
-
-  status               whether VidCtrl is open, and how its queue stands
-  goals                the goals and their options
-  add <paths…>         adds videos to the list, as dropping them does
-                       (--no-wait: do not wait until each has been read)
-  videos               the videos in the list (--goal g --opt option=choice:
-                       what that goal would do to each)
-  remove <videos…>     takes videos off the list; the files stay on disk
-  queue                the jobs in the queue
-  queue add <videos…>  queues videos (--goal, --opt, --sample start|middle,
-                       --out next|<folder>, --subfolder Name)
-  wait [jobs…]         waits until the jobs are finished (--timeout seconds)
-  events               tells what happens in the window as it happens
-                       (--since-now: without how things stand first)
-
-Videos are given by their number or their path, jobs by their number.
-Every command takes --json, and --no-start not to start VidCtrl.
-''';
 
 _Command? _command(ArgResults top, ClientIo io) {
   final command = top.command;
+  // `--help` after a command gives that command's part of the manual.
+  final asked = [top, ?command, ?command?.command];
+  if (asked.any((results) => results.flag('help'))) {
+    final name = [for (final r in asked.skip(1)) r.name].join(' ');
+    return name.isEmpty
+        ? _Command.text('help', usage())
+        : _Command.text('help', commandHelp(name));
+  }
   if (command == null) {
     if (top.rest.isNotEmpty) {
-      throw _bad('There is no command "${top.rest.first}".');
+      throw _bad(
+        'There is no command "${top.rest.first}". Run `vidctrl-client '
+        '--help` for the commands.',
+      );
     }
     return null;
   }
@@ -371,7 +404,8 @@ _Command? _command(ArgResults top, ClientIo io) {
       ];
       final timeout = command.option('timeout');
       final seconds = timeout == null ? null : double.tryParse(timeout);
-      if (timeout != null && (seconds == null || seconds <= 0)) {
+      if (timeout != null &&
+          (seconds == null || !seconds.isFinite || seconds <= 0)) {
         throw _bad('--timeout takes a number of seconds, not "$timeout".');
       }
       return _Command(
@@ -383,7 +417,8 @@ _Command? _command(ArgResults top, ClientIo io) {
           jobs: jobs.isEmpty ? null : jobs,
           timeout: seconds == null
               ? null
-              : Duration(milliseconds: (seconds * 1000).round()),
+              // Longer than that is as good as no limit, and fits a Duration.
+              : Duration(milliseconds: (min(seconds, 1e9) * 1000).round()),
         ),
       );
     case 'events':
@@ -392,6 +427,24 @@ _Command? _command(ArgResults top, ClientIo io) {
         'events',
         (c, o) => _events(c!, o, sinceNow: command.flag('since-now')),
       );
+    case 'manual':
+      noArguments();
+      return _Command.text(
+        'manual',
+        top.flag('json') || command.flag('json')
+            ? '${jsonEncode(manualJson())}\n'
+            : manual(client: 'vidctrl-client'),
+      );
+    case 'help':
+      final name = args.join(' ');
+      if (name.isEmpty) return _Command.text('help', usage());
+      if (!clientCommands.contains(name)) {
+        throw _bad(
+          'There is no command "$name". Commands: '
+          '${clientCommands.join(', ')}.',
+        );
+      }
+      return _Command.text('help', commandHelp(name));
   }
   throw _bad('There is no command "${command.name}".');
 }

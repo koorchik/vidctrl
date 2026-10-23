@@ -8,6 +8,7 @@ import 'package:vidctrl/core/control/client.dart';
 import 'package:vidctrl/core/control/endpoint.dart';
 import 'package:vidctrl/core/control/launcher.dart';
 import 'package:vidctrl/core/control/listener.dart';
+import 'package:vidctrl/core/control/manual.dart';
 import 'package:vidctrl/core/control/protocol.dart';
 import 'package:vidctrl/core/control/words.dart';
 
@@ -561,11 +562,81 @@ void main() {
     expect(jsonDecode(running.out), {'running': true, ..._status('ready')});
   });
 
-  test('no command prints what the commands are', () async {
-    final run = await _run([]);
+  test('--help prints what the commands are', () async {
+    final run = await _run(['--help']);
     expect(run.exitCode, ExitCode.ok);
+    expect(run.out, usage());
     for (final command in clientCommands) {
       expect(run.out, contains(command));
+    }
+  });
+
+  test('manual and help need no running app', () async {
+    final launcher = _FakeLauncher();
+    for (final (args, printed) in [
+      (<String>[], quickStart('vidctrl-client')),
+      (['manual'], manual(client: 'vidctrl-client')),
+      (['manual', '--json'], '${jsonEncode(manualJson())}\n'),
+      (['help'], usage()),
+      (['help', 'queue', 'add'], commandHelp('queue add')),
+      (['queue', 'add', '--help'], commandHelp('queue add')),
+      (['wait', '-h'], commandHelp('wait')),
+    ]) {
+      final run = await _run(args, launcher: launcher);
+      expect(run.exitCode, ExitCode.ok, reason: '$args ${run.err}');
+      expect(run.out, printed, reason: '$args');
+      expect(run.err, isEmpty, reason: '$args');
+    }
+    expect(launcher.starts, 0);
+    expect(_endpoint.read(), completion(isNull));
+
+    final unknown = await _run(['help', 'convert'], launcher: launcher);
+    expect(unknown.exitCode, ExitCode.badArguments);
+    expect(unknown.err, contains('queue add'));
+  });
+
+  test('a --timeout that is not a finite number is refused', () async {
+    final app = await _FakeApp.start(_endpoint, {
+      Methods.wait: (_, _) => {'outcomes': <Object?>[]},
+    });
+    for (final timeout in ['Infinity', '-Infinity', 'NaN', '0', '-1']) {
+      final run = await _run(['wait', '--timeout', timeout]);
+      expect(run.exitCode, ExitCode.badArguments, reason: timeout);
+      expect(run.err, contains('--timeout'), reason: timeout);
+    }
+    expect(app.asked(Methods.wait), isFalse);
+    // A very long one is as good as none.
+    final long = await _run(['wait', '--timeout', '1e300']);
+    expect(long.exitCode, ExitCode.ok, reason: long.err);
+  });
+
+  test('an unexpected error ends in one line, with exit 5', () async {
+    await _FakeApp.start(_endpoint, {
+      // Not the shape the client reads.
+      Methods.queueList: (_, _) => {'jobs': 'none'},
+      Methods.wait: (_, _) => {'outcomes': 'none'},
+      Methods.subscribe: (_, peer) {
+        Timer.run(() => peer.notify(Events.jobFinished, {'id': 'x'}));
+        return const <String, Object?>{};
+      },
+    });
+    for (final args in [
+      ['queue'],
+      ['events'],
+      ['wait', '--json'],
+    ]) {
+      final run = await _run(args);
+      expect(run.exitCode, ExitCode.badArguments, reason: '$args');
+      expect(run.err.trim().split('\n'), hasLength(1), reason: run.err);
+      expect(run.err, isNot(contains('#0')));
+      if (args.contains('--json')) {
+        expect(
+          (jsonDecode(run.err) as Map)['error'],
+          containsPair('kind', 'unexpected'),
+        );
+      } else {
+        expect(run.err, contains('unexpected error'));
+      }
     }
   });
 

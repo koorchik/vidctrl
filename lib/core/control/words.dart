@@ -11,8 +11,9 @@ const neverDeletes =
     'out of the queue, and the file stays on disk.';
 
 final _deleting = RegExp(
-  r'delet|\brm\b|\bunlink|\btrash|\berase|clean(ing)? up|'
-  r'remove the original|the original can go',
+  r'delet|\brm\b|\bunlink|\btrash|\berase|\bclean(ed|ing)?[ -]?up\b|'
+  r'\bremov(e|es|ed|ing) the (original|source|input)|the original can go|'
+  r'\bwip(e|es|ed|ing)\b|\bpurg|\bdiscard|\bdestro|get rid of|overwrit',
 );
 
 /// True when [text], once the two allowed rules are taken out, speaks of

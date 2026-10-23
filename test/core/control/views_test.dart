@@ -160,12 +160,48 @@ void main() {
     }
   });
 
-  test('the guard catches deleting but lets the two rules through', () {
-    expect(speaksOfDeleting('Delete the original when done.'), isTrue);
-    expect(speaksOfDeleting('then rm the source'), isTrue);
-    expect(
-      speaksOfDeleting('Confirm the format. $filesRule $neverDeletes'),
-      isFalse,
-    );
+  test('the guard catches every way of speaking of deleting', () {
+    for (final phrase in [
+      'Delete the original when done.',
+      'then rm the source',
+      'unlink the file',
+      'Move it to the Trash.',
+      'Erase the card.',
+      'The folder is cleaned up afterwards.',
+      'Run a cleanup.',
+      'Clean up the originals.',
+      'Cleaning up the folder.',
+      'This removes the original.',
+      'Removing the originals frees space.',
+      'Once removed the original is gone.',
+      'Remove the source.',
+      'Remove the input files.',
+      'The original can go now.',
+      'Wipe the folder.',
+      'Purge the old files.',
+      'Discard the originals.',
+      'It destroys the file.',
+      'Get rid of the big files.',
+      'The result overwrites the original.',
+      'Overwriting is allowed.',
+    ]) {
+      expect(speaksOfDeleting(phrase), isTrue, reason: phrase);
+    }
+  });
+
+  test('the guard lets the two rules and harmless words through', () {
+    for (final text in [
+      filesRule,
+      neverDeletes,
+      'Confirm the format.',
+      'The size may increase.',
+      'The original stays.',
+      'remove takes a video off the list',
+      'Remove personal data',
+      'Removes the hidden notes about place and date.',
+      'Confirm the format. $filesRule $neverDeletes',
+    ]) {
+      expect(speaksOfDeleting(text), isFalse, reason: text);
+    }
   });
 }
