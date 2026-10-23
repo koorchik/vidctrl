@@ -124,12 +124,16 @@ bool canComparePlan(ConversionPlan plan) {
 /// a file against itself far from `inf`. So both pictures lose the columns
 /// past the last multiple of 32 on the right (at most 31, the same in both,
 /// so the scores barely move) and are copied into fresh, packed frames.
+///
+/// With a [frameLog], each frame's score is written there too: VMAF's as
+/// CSV where it is measured, XPSNR's otherwise (`frameScores` reads both).
 List<String> comparisonArgs({
   required String original,
   required String result,
   SampleRange? range,
   String? vmafModel,
   int threads = 1,
+  String? frameLog,
 }) {
   const byOrder =
       'settb=1/30,setpts=N,crop=trunc(iw/32)*32:ih:0:0,format=yuv420p10le,'
@@ -153,12 +157,15 @@ List<String> comparisonArgs({
     '-lavfi',
     if (vmafModel == null)
       '[0:v:0]$byOrder[d];[1:v:0]$byOrder[r];[r][d]xpsnr=shortest=1'
+          '${frameLog == null ? '' : ':stats_file=${escapeFilterPath(frameLog)}'}'
     else ...[
       // Both measures see the same decoded frames: each file is read once.
       '[0:v:0]$byOrder,split[d][dv];[1:v:0]$byOrder,split[r][rv];'
           '[r][d]xpsnr=shortest=1[x];'
           '[dv][rv]libvmaf=model=version=$vmafModel'
-          ':n_threads=$threads:shortest=1[v]',
+          ':n_threads=$threads:shortest=1'
+          '${frameLog == null ? '' : ':log_fmt=csv:log_path=${escapeFilterPath(frameLog)}'}'
+          '[v]',
       '-map',
       '[x]',
       '-map',
@@ -167,6 +174,43 @@ List<String> comparisonArgs({
     '-f',
     'null',
     '-',
+  ];
+}
+
+/// [path] as the value of a filter option inside `-lavfi`. Filter options
+/// are separated by `:` and filters by `,` and `;`, so those and quotes and
+/// brackets are escaped, once for the option and again for the graph. On
+/// Windows the separators become `/`, which FFmpeg reads as well, so a
+/// drive's `C:` is the only colon left to escape.
+String escapeFilterPath(String path) {
+  String escape(String text, String special) => [
+    for (final char in text.split(''))
+      special.contains(char) ? '\\$char' : char,
+  ].join();
+  final option = escape(path.replaceAll('\\', '/'), "\\':");
+  return escape(option, "\\'[],;");
+}
+
+/// Each frame's score from a [frameLog] of [comparisonArgs], in order: VMAF
+/// from its CSV, XPSNR (brightness) from its statistics.
+List<double> frameScores(String log) {
+  final lines = log.split('\n').where((l) => l.trim().isNotEmpty).toList();
+  if (lines.isEmpty) return const [];
+  if (lines.first.startsWith('Frame,')) {
+    final column = lines.first.split(',').indexOf('vmaf');
+    if (column < 0) return const [];
+    return [
+      for (final line in lines.skip(1))
+        ?double.tryParse(line.split(',').elementAtOrNull(column) ?? ''),
+    ];
+  }
+  final pattern = RegExp(r'XPSNR y:\s*(inf|[\d.]+)');
+  return [
+    for (final line in lines)
+      if (pattern.firstMatch(line) case final match?)
+        match.group(1) == 'inf'
+            ? double.infinity
+            : double.parse(match.group(1)!),
   ];
 }
 

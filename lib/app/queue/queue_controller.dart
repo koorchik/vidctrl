@@ -8,6 +8,8 @@ import '../../core/estimate/size_estimator.dart';
 import '../../core/ffmpeg/command_builder.dart';
 import '../../core/media/media_info.dart';
 import '../../core/output/output_namer.dart';
+import '../../core/quality/quality_meter.dart';
+import '../../core/quality/quality_search.dart';
 import '../../core/queue/job_executor.dart';
 import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
@@ -28,6 +30,15 @@ class QueueController extends Notifier<QueueState> {
   late AppEnvironment _env;
   var _nextId = 0;
   ConversionHandle? _activeHandle;
+
+  /// The job measuring its video before converting, if one is.
+  int? _checkingJob;
+
+  /// Set when that measuring is to stop.
+  var _checkCancelled = false;
+
+  /// Set when it stopped for a pause: the job waits and measures again.
+  var _checkPaused = false;
 
   /// The loop working through the queue, while there is one.
   Future<void>? _loop;
@@ -93,9 +104,18 @@ class QueueController extends Notifier<QueueState> {
     required OutputSettings output,
     required Set<String> reserved,
     int? id,
+    QualityChoice? quality,
   }) {
-    final plan = findPreset(recipe.presetId)!
-        .plan(info, recipe.values, _env.capabilities);
+    final preset = findPreset(recipe.presetId)!;
+    var plan = preset.plan(info, recipe.values, _env.capabilities);
+    // Where the quality for this video is known, the job starts with it.
+    QualityChoice? choice;
+    if (preset case final RaisesQuality raise) {
+      choice = _forJob(quality ?? _knownChoice(info.path, recipe), recipe);
+      if (choice != null && choice.converts) {
+        plan = planWithChoice(raise, plan, choice);
+      }
+    }
     return QueueJob(
       id: id ?? _nextId++,
       sourceId: sourceId,
@@ -104,10 +124,36 @@ class QueueController extends Notifier<QueueState> {
       plan: plan,
       output: output,
       sample: sampleRangeFor(recipe.sample, info.duration),
-      outputPath: plan.producesOutput
+      // One left as it is writes nothing.
+      outputPath: plan.producesOutput && choice?.converts != false
           ? _outputPath(info, plan, recipe, output, reserved)
           : '',
+      quality: choice,
     );
+  }
+
+  /// The quality already chosen for [path] with [recipe]'s goal, by the
+  /// video list's measuring or an earlier job.
+  QualityChoice? _knownChoice(String path, Recipe recipe) => ref
+      .read(estimateCacheProvider)
+      .estimates[estimateKey(path, recipe)]
+      ?.choice;
+
+  /// [choice] for a job with [recipe]: a sample asked for is made even of a
+  /// video not worth converting, to show what converting would give.
+  QualityChoice? _forJob(QualityChoice? choice, Recipe recipe) =>
+      recipe.isSample && choice?.converts == false ? choice!.anyway() : choice;
+
+  /// The goal of [job] where it raises the quality of videos that need it,
+  /// and the job's result can be compared with its original to tell.
+  RaisesQuality? _raiserFor(QueueJob job) {
+    return switch (findPreset(job.recipe.presetId)) {
+      final RaisesQuality raise
+          when canComparePlan(job.plan) &&
+              _env.capabilities.hasFilter('xpsnr') =>
+        raise,
+      _ => null,
+    };
   }
 
   /// `<folder>/<name><settings tag>.<ext>`; samples go to a `Samples`
@@ -170,11 +216,75 @@ class QueueController extends Notifier<QueueState> {
       await _env.sleepInhibitor.release();
       if (ref.mounted) state = state.copyWith(busy: false);
     }
+    // Continued while the loop was ending.
+    if (ref.mounted && !_shuttingDown) _ensureRunning();
   }
 
-  Future<void> _convert(QueueJob job) async {
-    if (!job.plan.producesOutput) {
-      _update(job.id, (j) => j.copyWith(status: JobStatus.skipped));
+  Future<void> _convert(QueueJob queued) async {
+    if (!queued.plan.producesOutput) {
+      _update(queued.id, (j) => j.copyWith(status: JobStatus.skipped));
+      return;
+    }
+    var job = queued;
+    final raise = _raiserFor(job);
+    if (raise != null && job.quality == null) {
+      final choice = _forJob(
+        _knownChoice(job.path, job.recipe) ?? await _check(job, raise),
+        job.recipe,
+      );
+      if (!ref.mounted) return;
+      if (_checkPaused) {
+        _checkPaused = false;
+        _update(
+          job.id,
+          (j) => j.copyWith(status: JobStatus.waiting, clearAttempt: true),
+        );
+        return;
+      }
+      if (_checkCancelled) {
+        _checkCancelled = false;
+        _update(
+          job.id,
+          (j) => j.copyWith(status: JobStatus.cancelled, clearAttempt: true),
+        );
+        return;
+      }
+      _update(job.id, (j) {
+        if (choice == null) return j.copyWith(clearAttempt: true);
+        final plan = choice.converts
+            ? planWithChoice(raise, j.plan, choice)
+            : j.plan;
+        return j.copyWith(
+          plan: plan,
+          quality: choice,
+          clearAttempt: true,
+          // Named for the quality chosen; one left as it is writes nothing.
+          outputPath: choice.converts
+              ? _outputPath(
+                  j.info,
+                  plan,
+                  j.recipe,
+                  j.output,
+                  _reservedOutputs()..remove(j.outputPath),
+                )
+              : '',
+        );
+      });
+      final checked = _find(job.id);
+      // Removed while its video was measured.
+      if (checked == null) return;
+      job = checked;
+      // Paused meanwhile: it waits, its quality known.
+      if (state.paused) {
+        _update(job.id, (j) => j.copyWith(status: JobStatus.waiting));
+        return;
+      }
+    }
+    if (job.keptAsIs) {
+      _update(
+        job.id,
+        (j) => j.copyWith(status: JobStatus.skipped, outputPath: ''),
+      );
       return;
     }
     // Something may have appeared under that name since the job was added.
@@ -249,6 +359,34 @@ class QueueController extends Notifier<QueueState> {
     }
   }
 
+  /// Measures [job]'s video at the goal's standard quality and, where it
+  /// falls short, at better ones; the result is kept for the video list too.
+  /// Null when it could not be measured: the job then converts at the
+  /// standard quality.
+  Future<QualityChoice?> _check(QueueJob job, RaisesQuality raise) async {
+    _checkingJob = job.id;
+    _update(job.id, (j) => j.copyWith(status: JobStatus.running, attempt: 1));
+    try {
+      final estimate = await _env.estimator.estimate(
+        job.info,
+        job.plan,
+        raise: raise,
+        onAttempt: (attempt) =>
+            _update(job.id, (j) => j.copyWith(attempt: attempt)),
+      );
+      if (estimate != null && ref.mounted && !_checkCancelled) {
+        ref
+            .read(estimateCacheProvider.notifier)
+            .record(estimateKey(job.path, job.recipe), estimate);
+      }
+      return estimate?.choice;
+    } on Object {
+      return null;
+    } finally {
+      _checkingJob = null;
+    }
+  }
+
   // ---- Controls ---------------------------------------------------------
 
   /// Pauses the queue: the job under way is suspended (where the system
@@ -264,7 +402,11 @@ class QueueController extends Notifier<QueueState> {
       _ensureRunning();
     } else {
       state = state.copyWith(paused: true);
-      if (active != null && (_activeHandle?.pause() ?? false)) {
+      if (_checkingJob != null) {
+        // Measuring cannot be held midway; it starts again on continuing.
+        _checkPaused = true;
+        unawaited(_env.estimator.cancelAll());
+      } else if (active != null && (_activeHandle?.pause() ?? false)) {
         _update(active.id, (j) => j.copyWith(status: JobStatus.paused));
       }
     }
@@ -272,6 +414,11 @@ class QueueController extends Notifier<QueueState> {
 
   /// Cancels the job under way; the queue moves on to the next one.
   Future<void> cancelActive() async {
+    if (_checkingJob != null) {
+      _checkCancelled = true;
+      await _env.estimator.cancelAll();
+      return;
+    }
     if (state.activeJob?.status == JobStatus.paused) _activeHandle?.resume();
     await _activeHandle?.cancel();
   }
@@ -345,6 +492,29 @@ class QueueController extends Notifier<QueueState> {
     _ensureRunning();
   }
 
+  /// After a video was left as it is: converts it all the same, at the
+  /// quality found for it.
+  void convertAnyway(int jobId) {
+    final job = _find(jobId);
+    final quality = job?.quality;
+    if (job == null || quality == null || !job.keptAsIs) return;
+    if (_alreadyQueued(job.sourceId, job.recipe, job.output)) return;
+    state = state.copyWith(
+      jobs: [
+        ...state.jobs,
+        _makeJob(
+          sourceId: job.sourceId,
+          info: job.info,
+          recipe: job.recipe,
+          output: job.output,
+          reserved: _reservedOutputs(),
+          quality: quality.anyway(),
+        ),
+      ],
+    );
+    _ensureRunning();
+  }
+
   /// Puts a job's settings back into the panel and selects its video, to
   /// adjust them and queue again.
   void useSettings(int jobId) {
@@ -358,7 +528,8 @@ class QueueController extends Notifier<QueueState> {
 
   /// The FFmpeg arguments for [job] as shown to people.
   List<String>? commandFor(QueueJob job) {
-    if (!job.plan.producesOutput) return null;
+    // One left as it is runs nothing.
+    if (!job.plan.producesOutput || job.outputPath.isEmpty) return null;
     return buildFfmpegArgs(
       input: job.path,
       output: job.outputPath,

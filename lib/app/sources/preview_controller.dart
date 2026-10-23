@@ -13,14 +13,25 @@ import 'sources_controller.dart';
 
 /// What the panel's current settings would do to one selected video.
 class Preview {
-  const Preview({required this.plan, this.estimate, this.measuring = false});
+  const Preview({
+    required this.plan,
+    this.estimate,
+    this.measuring = false,
+    this.choosing = false,
+  });
 
-  /// The plan for the whole video.
+  /// The plan for the whole video, at the goal's standard quality.
   final ConversionPlan plan;
 
   /// Expected output of the whole video; null while unknown.
   final OutputEstimate? estimate;
   final bool measuring;
+
+  /// The standard quality fell short, and a better one is being looked for.
+  final bool choosing;
+
+  /// Whether converting leaves the video as it is, being hardly smaller.
+  bool get keptAsIs => estimate?.choice?.converts == false;
 }
 
 /// Previews by video id, for the selected videos only.
@@ -41,6 +52,10 @@ class PreviewController extends Notifier<Map<int, Preview>> {
     final preset = findPreset(recipe.presetId)!;
 
     final previews = <int, Preview>{};
+    final raise = switch (preset) {
+      final RaisesQuality raises => raises,
+      _ => null,
+    };
     final toMeasure = <(String, SourceVideo, ConversionPlan)>[];
     for (final video in videos) {
       final info = video.info!;
@@ -59,6 +74,7 @@ class PreviewController extends Notifier<Map<int, Preview>> {
         estimate: estimate,
         // One waiting for its turn is measured as soon as another is done.
         measuring: cache.measuring.contains(key) || (pending && !queueBusy),
+        choosing: cache.choosing(key),
       );
       if (pending) toMeasure.add((key, video, plan));
     }
@@ -71,7 +87,7 @@ class PreviewController extends Notifier<Map<int, Preview>> {
         final estimates = ref.read(estimateCacheProvider.notifier);
         for (final (key, video, plan) in toMeasure) {
           if (estimates.room(plan) <= 0) break;
-          unawaited(estimates.measure(key, video.info!, plan));
+          unawaited(estimates.measure(key, video.info!, plan, raise: raise));
         }
       });
     }

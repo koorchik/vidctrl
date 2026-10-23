@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vidctrl/app/estimates/estimate_cache.dart';
 import 'package:vidctrl/app/providers.dart';
 import 'package:vidctrl/app/quality/quality_controller.dart';
 import 'package:vidctrl/app/queue/queue_controller.dart';
@@ -24,7 +25,9 @@ import 'package:vidctrl/core/ffmpeg/runner.dart';
 import 'package:vidctrl/core/media/ffprobe.dart';
 import 'package:vidctrl/core/media/media_info.dart';
 import 'package:vidctrl/core/output/output_namer.dart';
+import 'package:vidctrl/core/quality/frame_grabber.dart';
 import 'package:vidctrl/core/quality/quality_meter.dart';
+import 'package:vidctrl/core/quality/quality_search.dart';
 import 'package:vidctrl/core/queue/job_executor.dart';
 import 'package:vidctrl/core/scenarios/archive.dart';
 import 'package:vidctrl/core/scenarios/extract_audio.dart';
@@ -731,6 +734,247 @@ void main() {
     );
   });
 
+  group('Choosing the quality', () {
+    bool hasVmaf() => capabilities.hasFilter('libvmaf');
+
+    SampleEstimator estimator(String folder) => SampleEstimator(
+      FfmpegRunner(media!.paths.ffmpeg),
+      workDir: Directory(media!.file(folder)),
+      compare: true,
+      vmaf: hasVmaf(),
+    );
+
+    /// PSNR between two PNGs, in dB.
+    Future<double> psnr(List<int> a, List<int> b) async {
+      final first = File(media!.file('psnr_a.png'))..writeAsBytesSync(a);
+      final second = File(media!.file('psnr_b.png'))..writeAsBytesSync(b);
+      final result = await Process.run(media!.paths.ffmpeg, [
+        '-hide_banner',
+        '-i',
+        first.path,
+        '-i',
+        second.path,
+        '-lavfi',
+        'psnr',
+        '-f',
+        'null',
+        '-',
+      ]);
+      final match = RegExp(r'average:(inf|[\d.]+)')
+          .firstMatch(result.stderr as String)!;
+      return match.group(1) == 'inf'
+          ? double.infinity
+          : double.parse(match.group(1)!);
+    }
+
+    test(
+      'a grainy video gets the poorest quality that looks the same',
+      () async {
+        if (unavailable()) return;
+        // Strong grain over a moving pattern, from a nearly lossless file: at
+        // the standard crf 35 it falls short (VMAF about 93), at 28 not.
+        final source = await media!.clip(
+          'grainy.mp4',
+          size: '640x360',
+          seconds: 4,
+          video: const [
+            '-c:v',
+            'libx264',
+            '-crf',
+            '10',
+            '-preset',
+            'ultrafast',
+          ],
+          filters: const ['noise=alls=50:allf=t+u'],
+        );
+        final info = await ffprobe.probe(source);
+        final plan = const ArchivePreset().plan(info, const {}, capabilities);
+        final attempts = <int>[];
+        final measuring = estimator('grainy_estimates');
+
+        final estimate = await measuring.estimate(
+          info,
+          plan,
+          raise: const ArchivePreset(),
+          onAttempt: attempts.add,
+        );
+
+        final choice = estimate!.choice!;
+        expect(choice.outcome, QualityOutcome.raised);
+        expect(choice.value, inInclusiveRange(21, 34));
+        expect(choice.chosen.looksTheSame, isTrue);
+        expect(choice.trials.first.value, 35);
+        expect(choice.trials.first.looksTheSame, isFalse);
+        expect(attempts.length, choice.trials.length);
+        expect(estimate.bytes, choice.chosen.bytes);
+        // Its hardest frame is known; it looks the same, so no piece is
+        // kept to show it.
+        expect(choice.chosen.hardest, isNotNull);
+        expect(choice.chosen.hardest!.encodedPiece, isNull);
+        expect(Directory(media!.file('grainy_estimates')).listSync(), isEmpty);
+      },
+    );
+
+    test(
+      'one still short at the best quality keeps its hardest piece to show',
+      () async {
+        if (unavailable()) return;
+        final source = await media!.clip(
+          'grainy_short.mp4',
+          size: '640x360',
+          seconds: 4,
+          video: const [
+            '-c:v',
+            'libx264',
+            '-crf',
+            '10',
+            '-preset',
+            'ultrafast',
+          ],
+          filters: const ['noise=alls=50:allf=t+u'],
+        );
+        final info = await ffprobe.probe(source);
+        final plan = const ArchivePreset().plan(info, const {}, capabilities);
+        final measuring = estimator('short_estimates');
+
+        // A best quality of 34 is not enough for this grain.
+        final estimate = await measuring.estimate(
+          info,
+          plan,
+          raise: const _NarrowRange(),
+        );
+
+        final choice = estimate!.choice!;
+        expect(choice.outcome, QualityOutcome.belowTarget);
+        expect(choice.value, 34);
+        final hardest = choice.chosen.hardest!;
+        expect(
+          Directory(media!.file('short_estimates')).listSync().single.path,
+          hardest.encodedPiece,
+        );
+        // The piece's frame is the original's.
+        final pair = await FrameGrabber(media!.paths.ffmpeg).pair(
+          original: source,
+          originalSeek: hardest.pieceStart,
+          result: hardest.encodedPiece!,
+          resultSeek: Duration.zero,
+          frame: hardest.frame,
+        );
+        expect(await psnr(pair!.original, pair.result), greaterThan(25));
+
+        await measuring.discardKept();
+        expect(Directory(media!.file('short_estimates')).listSync(), isEmpty);
+      },
+    );
+
+    test('a video that would barely shrink is left as it is', () async {
+      if (unavailable()) return;
+      // Already small: AV1 at the archive's quality comes out larger.
+      final source = await media!.clip(
+        'already_small.mp4',
+        size: '640x360',
+        seconds: 4,
+        video: const ['-c:v', 'libx264', '-crf', '30', '-preset', 'slow'],
+      );
+      final info = await ffprobe.probe(source);
+      final plan = const ArchivePreset().plan(info, const {}, capabilities);
+
+      final estimate = await estimator('small_estimates')
+          .estimate(info, plan, raise: const ArchivePreset());
+
+      expect(estimate!.choice!.outcome, QualityOutcome.notWorthIt);
+      expect(estimate.choice!.share, greaterThan(worthItShare));
+    });
+
+    test('stopping a search leaves nothing behind', () async {
+      if (unavailable()) return;
+      final source = await media!.clip(
+        'grainy_stopped.mp4',
+        size: '1280x720',
+        seconds: 4,
+        video: const ['-c:v', 'libx264', '-crf', '10', '-preset', 'ultrafast'],
+        filters: const ['noise=alls=50:allf=t+u'],
+      );
+      final info = await ffprobe.probe(source);
+      final plan = const ArchivePreset().plan(info, const {}, capabilities);
+      final measuring = estimator('stopped_search');
+      final attempts = <int>[];
+
+      final estimate = measuring.estimate(
+        info,
+        plan,
+        raise: const ArchivePreset(),
+        onAttempt: attempts.add,
+      );
+      // The second try: the first was measured and its piece kept.
+      while (attempts.length < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      await measuring.cancelAll();
+
+      expect(await estimate, isNull);
+      expect(Directory(media!.file('stopped_search')).listSync(), isEmpty);
+    });
+
+    test(
+      'the hardest frame of the result lines up with the original',
+      () async {
+        if (unavailable()) return;
+        // Long enough for the pieces to lie inside the video, not at its start.
+        final source = await media!.clip(
+          'to_frame.mp4',
+          size: '640x360',
+          seconds: 40,
+        );
+        final info = await ffprobe.probe(source);
+        final plan = const ArchivePreset().plan(info, const {}, capabilities);
+        final estimate = await estimator('frame_estimates')
+            .estimate(info, plan, raise: const ArchivePreset());
+        final hardest = estimate!.choice!.chosen.hardest!;
+        expect(hardest.pieceStart, greaterThan(Duration.zero));
+        final converted = await executor.start(jobFor(info, plan));
+        final output = (await converted.result).outputPath!;
+        final grabber = FrameGrabber(media!.paths.ffmpeg);
+
+        final original = (await grabber.grab(
+          source,
+          seek: hardest.pieceStart,
+          frame: hardest.frame,
+        ))!;
+        Future<List<int>> result(int frame) async => (await grabber.grab(
+          output,
+          seek: hardest.pieceStart,
+          frame: frame,
+        ))!;
+        final aligned = await psnr(original, await result(hardest.frame));
+        final neighbour = await psnr(original, await result(hardest.frame + 1));
+        expect(aligned, greaterThan(30));
+        expect(aligned, greaterThan(neighbour + 5));
+      },
+    );
+
+    test('8-bit and 10-bit pictures become alike', () async {
+      if (unavailable()) return;
+      final source = await media!.clip('eight_bit.mp4', seconds: 1);
+      final tenBit = media!.file('ten_bit.mkv');
+      await media!.ffmpeg([
+        '-i',
+        source,
+        '-c:v',
+        'ffv1',
+        '-pix_fmt',
+        'yuv420p10le',
+        tenBit,
+      ]);
+      final grabber = FrameGrabber(media!.paths.ffmpeg);
+
+      final eight = await grabber.grab(source, frame: 5);
+      final ten = await grabber.grab(tenBit, frame: 5);
+
+      expect(await psnr(eight!, ten!), greaterThan(50));
+    });
+  });
+
   group('Comparing with the original', () {
     QualityMeter meter() => QualityMeter(FfmpegRunner(media!.paths.ffmpeg));
     // Not every FFmpeg has VMAF; the ones VidCtrl ships do.
@@ -832,8 +1076,9 @@ void main() {
   });
 
   group('The queue, with real FFmpeg', () {
-    /// The app's state, wired to the real FFmpeg.
-    Future<ProviderContainer> app() async {
+    /// The app's state, wired to the real FFmpeg. With [compare], videos are
+    /// compared with their originals while measuring, as in the app.
+    Future<ProviderContainer> app({bool compare = false}) async {
       final container = ProviderContainer(
         overrides: [
           environmentProvider.overrideWith(
@@ -843,7 +1088,11 @@ void main() {
               executor: executor,
               capabilities: capabilities,
               sleepInhibitor: FakeSleepInhibitor(),
-              estimator: SampleEstimator(FfmpegRunner(media!.paths.ffmpeg)),
+              estimator: SampleEstimator(
+                FfmpegRunner(media!.paths.ffmpeg),
+                compare: compare,
+                vmaf: compare && capabilities.hasFilter('libvmaf'),
+              ),
               qualityMeter: QualityMeter(FfmpegRunner(media!.paths.ffmpeg)),
             ),
           ),
@@ -866,6 +1115,59 @@ void main() {
       subscription.close();
       return container.read(queueProvider).jobs;
     }
+
+    test('a grainy video is archived at the quality it needs', () async {
+      if (unavailable()) return;
+      final source = await media!.clip(
+        'queued_grainy.mp4',
+        size: '640x360',
+        seconds: 4,
+        video: const ['-c:v', 'libx264', '-crf', '10', '-preset', 'ultrafast'],
+        filters: const ['noise=alls=50:allf=t+u'],
+      );
+      final container = await app(compare: true);
+      await container.read(sourcesProvider.notifier).addPaths([source]);
+
+      container.read(queueProvider.notifier).addSelected();
+      final job = (await finished(container)).single;
+
+      expect(job.status, JobStatus.done, reason: '${job.result?.errorLines}');
+      expect(job.quality!.outcome, QualityOutcome.raised);
+      final crf = job.quality!.value!;
+      expect(crf, lessThan(35));
+      expect(p.basename(job.outputPath), 'queued_grainy_av1-crf$crf.mp4');
+      expect(File(job.outputPath).existsSync(), isTrue);
+      // What was found is not measured again for the list.
+      final key = estimateKey(source, job.recipe);
+      expect(
+        container.read(estimateCacheProvider).estimates[key]!.choice!.value,
+        crf,
+      );
+    });
+
+    test('a video that would hardly shrink is left alone', () async {
+      if (unavailable()) return;
+      final source = await media!.clip(
+        'queued_small.mp4',
+        size: '640x360',
+        seconds: 4,
+        video: const ['-c:v', 'libx264', '-crf', '30', '-preset', 'slow'],
+      );
+      final container = await app(compare: true);
+      await container.read(sourcesProvider.notifier).addPaths([source]);
+
+      container.read(queueProvider.notifier).addSelected();
+      final job = (await finished(container)).single;
+
+      expect(job.status, JobStatus.skipped);
+      expect(job.keptAsIs, isTrue);
+      expect(
+        Directory(p.join(media!.dir.path, 'Converted'))
+            .listSync()
+            .map((e) => p.basename(e.path)),
+        isNot(contains(startsWith('queued_small'))),
+      );
+    });
 
     test('a sample job lands in Samples, ten seconds long', () async {
       if (unavailable()) return;
@@ -1163,4 +1465,22 @@ void main() {
       expect(result.status, ConversionStatus.done);
     });
   });
+}
+
+/// The archive's quality with a best of 34: too little for strong grain, so
+/// a search ends short of the target.
+class _NarrowRange implements RaisesQuality {
+  const _NarrowRange();
+
+  @override
+  QualityRange? qualityRange(ConversionPlan plan) =>
+      const QualityRange(standard: 35, best: 34);
+
+  @override
+  ConversionPlan withQuality(
+    ConversionPlan plan,
+    int? value, {
+    bool belowTarget = false,
+  }) =>
+      const ArchivePreset().withQuality(plan, value, belowTarget: belowTarget);
 }

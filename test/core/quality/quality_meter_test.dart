@@ -120,6 +120,73 @@ void main() {
     });
   });
 
+  group('Scores frame by frame', () {
+    test('a log is asked for with VMAF as CSV', () {
+      final args = comparisonArgs(
+        original: '/videos/a.mov',
+        result: '/videos/a.mp4',
+        vmafModel: 'vmaf_v0.6.1',
+        frameLog: '/tmp/log.csv',
+      );
+
+      expect(
+        args[args.indexOf('-lavfi') + 1],
+        contains(
+          'libvmaf=model=version=vmaf_v0.6.1:n_threads=1:shortest=1'
+          ':log_fmt=csv:log_path=/tmp/log.csv[v]',
+        ),
+      );
+    });
+
+    test('without VMAF, the XPSNR statistics are the log', () {
+      final args = comparisonArgs(
+        original: '/videos/a.mov',
+        result: '/videos/a.mp4',
+        frameLog: '/tmp/log.txt',
+      );
+
+      expect(
+        args[args.indexOf('-lavfi') + 1],
+        endsWith('xpsnr=shortest=1:stats_file=/tmp/log.txt'),
+      );
+    });
+
+    test('a path is escaped for the filter graph', () {
+      expect(
+        escapeFilterPath("/tmp/it's [a],b;c:d/log.csv"),
+        r"/tmp/it\\\'s \[a\]\,b\;c\\:d/log.csv",
+      );
+    });
+
+    test('a Windows path keeps its drive', () {
+      expect(
+        escapeFilterPath(r'C:\Users\Ann\AppData\Local\Temp\log.csv'),
+        r'C\\:/Users/Ann/AppData/Local/Temp/log.csv',
+      );
+    });
+
+    test('VMAF is read from its column of the CSV', () {
+      const csv =
+          'Frame,integer_adm2,integer_motion,vmaf,\n'
+          '0,0.96,0.00,87.97,\n'
+          '1,0.95,0.77,87.44,\n';
+
+      expect(frameScores(csv), [87.97, 87.44]);
+    });
+
+    test('XPSNR is read from its statistics', () {
+      const log =
+          'n:    1  XPSNR y: 46.0236  XPSNR u: 53.7467  XPSNR v: 53.1902\n'
+          'n:    2  XPSNR y: inf  XPSNR u: inf  XPSNR v: inf\n';
+
+      expect(frameScores(log), [46.0236, double.infinity]);
+    });
+
+    test('an empty log has no scores', () {
+      expect(frameScores(''), isEmpty);
+    });
+  });
+
   group('Reading the score', () {
     test('the last luma score is taken', () {
       expect(

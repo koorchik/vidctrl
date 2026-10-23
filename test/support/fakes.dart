@@ -15,7 +15,9 @@ import 'dart:typed_data';
 import 'package:vidctrl/core/media/media_info.dart';
 import 'package:vidctrl/core/media/thumbnail.dart';
 import 'package:vidctrl/core/platform/sleep_inhibitor.dart';
+import 'package:vidctrl/core/quality/frame_grabber.dart';
 import 'package:vidctrl/core/quality/quality_meter.dart';
+import 'package:vidctrl/core/quality/quality_search.dart';
 import 'package:vidctrl/core/queue/job_executor.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
 import 'package:vidctrl/core/updates/releases.dart';
@@ -171,6 +173,14 @@ class FakeEstimator implements OutputEstimator {
   /// How close the samples came to the original; null for not compared.
   QualityScore? quality;
 
+  /// The quality chosen for a file, when the goal raises it. Each of its
+  /// tries is announced before the estimate ends.
+  final choices = <String, QualityChoice>{};
+
+  /// Files measured with the quality raised where needed, in order.
+  final raised = <String>[];
+  var discards = 0;
+
   /// When set, measuring fails.
   bool fail = false;
 
@@ -191,10 +201,20 @@ class FakeEstimator implements OutputEstimator {
   }
 
   @override
-  Future<OutputEstimate?> estimate(MediaInfo info, ConversionPlan plan) async {
+  Future<OutputEstimate?> estimate(
+    MediaInfo info,
+    ConversionPlan plan, {
+    RaisesQuality? raise,
+    void Function(int attempt)? onAttempt,
+  }) async {
     final calculated = estimateWithoutEncoding(info, plan);
     if (calculated != null) return calculated;
     measured.add(info.path);
+    final choice = raise == null ? null : choices[info.path];
+    if (raise != null) raised.add(info.path);
+    for (var attempt = 1; attempt <= (choice?.trials.length ?? 1); attempt++) {
+      onAttempt?.call(attempt);
+    }
     final generation = _generation;
     if (hold) {
       final waiting = Completer<void>();
@@ -202,6 +222,15 @@ class FakeEstimator implements OutputEstimator {
       await waiting.future;
     }
     if (fail || generation != _generation) return null;
+    if (choice != null) {
+      return OutputEstimate(
+        bytes: choice.chosen.bytes,
+        time: info.duration,
+        measured: true,
+        quality: choice.chosen.score,
+        choice: choice,
+      );
+    }
     return OutputEstimate(
       bytes: (info.sizeBytes * ratio).round(),
       time: info.duration,
@@ -216,6 +245,45 @@ class FakeEstimator implements OutputEstimator {
     _generation++;
     release();
   }
+
+  @override
+  Future<void> discardKept() async => discards++;
+}
+
+/// A choice as the archive's search makes it, for a video of [sourceBytes]
+/// (the size `clip()` gives). A video that falls short tried crf 35 first.
+QualityChoice fakeChoice(
+  QualityOutcome outcome, {
+  int sourceBytes = 750000000,
+}) {
+  QualityTrial trial(int crf, double vmaf, double share) => QualityTrial(
+    value: crf,
+    score: QualityScore(vmaf - 55, vmaf: vmaf),
+    bytes: (sourceBytes * share).round(),
+    pieces: 6,
+    hardest: HardestFrame(
+      pieceStart: const Duration(minutes: 2, seconds: 23),
+      pieceLength: const Duration(seconds: 3),
+      frame: 40,
+      encodedPiece: '/tmp/vidctrl_estimates/sample_$crf.mp4',
+    ),
+  );
+  final trials = switch (outcome) {
+    QualityOutcome.standard => [trial(35, 96.0, 0.2)],
+    QualityOutcome.raised => [
+      trial(35, 92.6, 0.2),
+      trial(20, 99.0, 0.6),
+      trial(26, 95.3, 0.35),
+    ],
+    QualityOutcome.belowTarget => [trial(35, 90.9, 0.2), trial(20, 92.8, 0.6)],
+    QualityOutcome.notWorthIt => [trial(35, 99.0, 0.9)],
+  };
+  return QualityChoice(
+    outcome: outcome,
+    trials: trials,
+    chosen: trials.last,
+    sourceBytes: sourceBytes,
+  );
 }
 
 /// A comparison that finishes only when the test says so.
@@ -284,6 +352,56 @@ class FakeQualityMeter implements QualityMeter {
   }
 }
 
+/// Hands out a small picture for every frame asked for, and records what
+/// was asked. With [fail] set, no frame can be read.
+class FakeFrameGrabber implements FrameGrabber {
+  bool fail = false;
+
+  /// What every frame looks like; a tiny grey square unless set.
+  Uint8List? picture;
+
+  /// What was grabbed: path, seek and frame.
+  final grabbed = <(String, Duration, int)>[];
+
+  @override
+  String get ffmpeg => 'ffmpeg';
+
+  @override
+  Duration get timeout => Duration.zero;
+
+  @override
+  Future<Uint8List?> grab(
+    String path, {
+    Duration seek = Duration.zero,
+    required int frame,
+  }) async {
+    grabbed.add((path, seek, frame));
+    return fail ? null : picture ?? tinyPng;
+  }
+
+  @override
+  Future<FramePair?> pair({
+    required String original,
+    required Duration originalSeek,
+    required String result,
+    required Duration resultSeek,
+    required int frame,
+  }) async {
+    final first = await grab(original, seek: originalSeek, frame: frame);
+    final second = await grab(result, seek: resultSeek, frame: frame);
+    if (first == null || second == null) return null;
+    return FramePair(original: first, result: second);
+  }
+}
+
+/// A 2 by 2 grey PNG.
+final tinyPng = Uint8List.fromList(const [
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 2, //
+  0, 0, 0, 2, 8, 0, 0, 0, 0, 87, 221, 82, 248, 0, 0, 0, 14, 73, 68, 65, 84, //
+  120, 156, 99, 104, 104, 96, 104, 104, 0, 0, 6, 6, 2, 1, 44, 193, 80, 215, //
+  0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+]);
+
 /// Hands out the same picture for every video.
 class FakeThumbnailer implements Thumbnailer {
   FakeThumbnailer(this.bytes);
@@ -337,6 +455,7 @@ class FakeEnvironment {
   final inhibitor = FakeSleepInhibitor();
   final estimator = FakeEstimator();
   final qualityMeter = FakeQualityMeter();
+  final frames = FakeFrameGrabber();
 
   late final environment = AppEnvironment(
     ffmpeg: ffmpegPaths,
@@ -347,6 +466,7 @@ class FakeEnvironment {
     estimator: estimator,
     qualityMeter: qualityMeter,
     thumbnailer: FakeThumbnailer(thumbnail),
+    frameGrabber: frames,
   );
 
   /// Overrides that make the app use this environment.

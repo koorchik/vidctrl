@@ -3,9 +3,11 @@ import 'package:vidctrl/app/home/widgets/recipe_pane.dart';
 import 'package:vidctrl/app/sources/preview_controller.dart';
 import 'package:vidctrl/app/sources/sources_controller.dart';
 import 'package:vidctrl/core/estimate/size_estimator.dart';
+import 'package:vidctrl/core/quality/quality_search.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
 
 import '../support/fake_media.dart';
+import '../support/fakes.dart';
 
 void main() {
   SourceVideo video(int id, {Duration length = const Duration(minutes: 1)}) =>
@@ -68,6 +70,30 @@ void main() {
 
     // One minute of video took two; four minutes take eight.
     expect(batch.time, const Duration(minutes: 8));
+  });
+
+  test('a video left as it is keeps its size and takes no time', () {
+    final kept = fakeChoice(QualityOutcome.notWorthIt);
+    final batch = batchEstimate(
+      [video(1), video(2)],
+      {
+        1: preview(150000000, time: const Duration(minutes: 2)),
+        2: Preview(
+          plan: const ConversionPlan(
+            kind: PlanKind.encode,
+            video: VideoEncode(encoder: 'libsvtav1', pixFmt: 'yuv420p10le'),
+          ),
+          estimate: OutputEstimate(
+            bytes: kept.chosen.bytes,
+            time: const Duration(minutes: 5),
+            choice: kept,
+          ),
+        ),
+      },
+    )!;
+
+    expect(batch.after, 150000000 + 750000000);
+    expect(batch.time, const Duration(minutes: 2));
   });
 
   test('nothing is claimed before anything is known', () {

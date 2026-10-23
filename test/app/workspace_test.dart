@@ -16,6 +16,7 @@ import 'package:vidctrl/app/sources/sources_controller.dart';
 import 'package:vidctrl/core/ffmpeg/capabilities.dart';
 import 'package:vidctrl/core/output/output_namer.dart';
 import 'package:vidctrl/core/quality/quality_meter.dart';
+import 'package:vidctrl/core/quality/quality_search.dart';
 import 'package:vidctrl/core/settings/settings_store.dart';
 
 import '../support/fake_media.dart';
@@ -597,7 +598,9 @@ void main() {
       await sources().addPaths(['/videos/b.mp4']);
       await settle();
 
-      expect(env.estimator.measured, ['/videos/a.mp4']);
+      // The job measures its own video before converting it; the list
+      // measures nothing.
+      expect(env.estimator.measured, isNot(contains('/videos/b.mp4')));
     });
 
     test('the measurement says how close the result will look', () async {
@@ -668,6 +671,216 @@ void main() {
       final preview = container.read(previewProvider)[video('a.mp4').id]!;
       expect(preview.estimate!.measured, isFalse);
       expect(env.estimator.measured, isEmpty);
+    });
+  });
+
+  group('choosing the quality', () {
+    String outputName() => p.basename(jobs().single.outputPath);
+
+    test('a job measures its video first when nothing is known', () async {
+      env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+        QualityOutcome.raised,
+      );
+      env.estimator.hold = true;
+      await sources().addPaths(['/videos/a.mp4']);
+      queue().addSelected();
+      await settle();
+
+      // Measuring, at its third try: nothing converts yet.
+      expect(jobs().single.status, JobStatus.running);
+      expect(jobs().single.attempt, 3);
+      expect(env.executor.started, isEmpty);
+
+      env.estimator.release();
+      await settle();
+
+      expect(jobs().single.attempt, isNull);
+      expect(jobs().single.quality!.outcome, QualityOutcome.raised);
+      expect(env.executor.last.job.plan.nameSuffix, '_av1-crf26');
+      expect(outputName(), 'a_av1-crf26.mp4');
+    });
+
+    test(
+      'the quality chosen in the list is used, not measured again',
+      () async {
+        env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+          QualityOutcome.raised,
+        );
+        await sources().addPaths(['/videos/a.mp4']);
+        await settle();
+        expect(env.estimator.raised, ['/videos/a.mp4']);
+
+        queue().addSelected();
+        // Named for it as soon as it is added.
+        expect(outputName(), 'a_av1-crf26.mp4');
+        await settle();
+
+        expect(env.estimator.raised, ['/videos/a.mp4']);
+        expect(env.executor.started, hasLength(1));
+      },
+    );
+
+    test('what a job measured is shown in the list too', () async {
+      env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+        QualityOutcome.belowTarget,
+      );
+      env.estimator.hold = true;
+      await sources().addPaths(['/videos/a.mp4']);
+      queue().addSelected();
+      await settle();
+      env.estimator.release();
+      await settle();
+
+      final preview = container.read(previewProvider)[video('a.mp4').id]!;
+      expect(preview.estimate!.choice!.outcome, QualityOutcome.belowTarget);
+    });
+
+    test(
+      'a result that falls short is converted, marked in its name',
+      () async {
+        env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+          QualityOutcome.belowTarget,
+        );
+        await sources().addPaths(['/videos/a.mp4']);
+        await settle();
+        queue().addSelected();
+        await settle();
+
+        expect(outputName(), 'a_av1-crf20-check.mp4');
+        expect(jobs().single.needsALook, isTrue);
+        expect(env.executor.started, hasLength(1));
+      },
+    );
+
+    test('a video that would hardly shrink is left as it is', () async {
+      env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+        QualityOutcome.notWorthIt,
+      );
+      await sources().addPaths(['/videos/a.mp4', '/videos/b.mp4']);
+      await settle();
+      queue().addSelected();
+      await settle();
+
+      expect(jobs().first.status, JobStatus.skipped);
+      expect(jobs().first.keptAsIs, isTrue);
+      // The queue went on with the next video.
+      expect(env.executor.startedNames, ['b.mp4']);
+    });
+
+    test('it can be converted anyway, at the quality found', () async {
+      env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+        QualityOutcome.notWorthIt,
+      );
+      await sources().addPaths(['/videos/a.mp4']);
+      await settle();
+      queue().addSelected();
+      await settle();
+
+      queue().convertAnyway(jobs().single.id);
+      await settle();
+
+      expect(jobs().last.keptAsIs, isFalse);
+      expect(jobs().last.quality!.outcome, QualityOutcome.standard);
+      expect(env.executor.startedNames, ['a.mp4']);
+      expect(p.basename(jobs().last.outputPath), 'a_av1-crf35.mp4');
+    });
+
+    test('a sample gets the quality of its whole video', () async {
+      env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+        QualityOutcome.belowTarget,
+      );
+      await sources().addPaths(['/videos/a.mp4']);
+      await settle();
+      recipe().setSample(SampleChoice.middle);
+      queue().addSelected();
+      await settle();
+
+      expect(outputName(), 'a_av1-crf20-check_sample10s-mid.mp4');
+    });
+
+    test('cancelling while the video is measured stops it there', () async {
+      env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+        QualityOutcome.raised,
+      );
+      env.estimator.hold = true;
+      await sources().addPaths(['/videos/a.mp4', '/videos/b.mp4']);
+      queue().addSelected();
+      await settle();
+
+      env.estimator.hold = false;
+      await queue().cancelActive();
+      await settle();
+
+      expect(jobs().first.status, JobStatus.cancelled);
+      expect(jobs().first.attempt, isNull);
+      // The queue went on with the next video.
+      expect(env.executor.startedNames, ['b.mp4']);
+    });
+
+    test('pausing while the video is measured stops it at once', () async {
+      env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+        QualityOutcome.raised,
+      );
+      env.estimator.hold = true;
+      await sources().addPaths(['/videos/a.mp4']);
+      queue().addSelected();
+      await settle();
+      final cancels = env.estimator.cancels;
+
+      queue().togglePause();
+      await settle();
+
+      expect(env.estimator.cancels, cancels + 1);
+      expect(jobs().single.status, JobStatus.waiting);
+      expect(jobs().single.attempt, isNull);
+      expect(env.executor.started, isEmpty);
+
+      // Continuing measures it again, then converts.
+      env.estimator.hold = false;
+      queue().togglePause();
+      await settle();
+
+      expect(env.executor.started, hasLength(1));
+      expect(outputName(), 'a_av1-crf26.mp4');
+    });
+
+    test(
+      'a sample of a video not worth converting is made all the same',
+      () async {
+        env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+          QualityOutcome.notWorthIt,
+        );
+        await sources().addPaths(['/videos/a.mp4']);
+        await settle();
+        recipe().setSample(SampleChoice.start);
+        queue().addSelected();
+        await settle();
+
+        expect(env.executor.started, hasLength(1));
+        expect(outputName(), 'a_av1-crf35_sample10s.mp4');
+      },
+    );
+
+    test('a video left as it is has no command to show', () async {
+      env.estimator.choices['/videos/a.mp4'] = fakeChoice(
+        QualityOutcome.notWorthIt,
+      );
+      await sources().addPaths(['/videos/a.mp4']);
+      await settle();
+      queue().addSelected();
+      await settle();
+
+      expect(queue().commandFor(jobs().single), isNull);
+      expect(queue().commandForVideo(video('a.mp4')), isNull);
+    });
+
+    test('other goals are not measured before converting', () async {
+      recipe().selectPreset('resolve.studio');
+      await sources().addPaths(['/videos/a.mp4']);
+      queue().addSelected();
+      await settle();
+
+      expect(env.estimator.raised, isEmpty);
     });
   });
 

@@ -1783,6 +1783,198 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'In the queue, in the ⋯ menu of a finished video, choose “Compare with the original”: the app compares the copy with its original and says in plain words how alike they are.'**
   String get archiveQualityYours;
+
+  /// No description provided for @choosingQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'choosing the quality…'**
+  String get choosingQuality;
+
+  /// No description provided for @jobCheckingQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the quality…'**
+  String get jobCheckingQuality;
+
+  /// No description provided for @jobChoosingQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Choosing the quality… try {attempt}'**
+  String jobChoosingQuality(int attempt);
+
+  /// No description provided for @qualityRaised.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality raised to look the same'**
+  String get qualityRaised;
+
+  /// No description provided for @qualityCheckByEye.
+  ///
+  /// In en, this message translates to:
+  /// **'Check by eye before deleting the original'**
+  String get qualityCheckByEye;
+
+  /// No description provided for @statusKeptAsIs.
+  ///
+  /// In en, this message translates to:
+  /// **'Will stay as it is'**
+  String get statusKeptAsIs;
+
+  /// No description provided for @qualityNotWorthIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Converting would save only {percent}%'**
+  String qualityNotWorthIt(int percent);
+
+  /// No description provided for @qualityNotSmaller.
+  ///
+  /// In en, this message translates to:
+  /// **'Converting would not make it smaller'**
+  String get qualityNotSmaller;
+
+  /// No description provided for @jobLeftAsIs.
+  ///
+  /// In en, this message translates to:
+  /// **'Left as it is'**
+  String get jobLeftAsIs;
+
+  /// No description provided for @convertAnyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Convert anyway'**
+  String get convertAnyway;
+
+  /// No description provided for @qualityDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'About this video\'s quality'**
+  String get qualityDetails;
+
+  /// No description provided for @toCheckByEye.
+  ///
+  /// In en, this message translates to:
+  /// **'check by eye: {count}'**
+  String toCheckByEye(int count);
+
+  /// No description provided for @qualityReportRaisedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality raised for this video'**
+  String get qualityReportRaisedTitle;
+
+  /// No description provided for @qualityReportRaised.
+  ///
+  /// In en, this message translates to:
+  /// **'At the archive\'s usual quality, the hardest part of this video would not quite look the same as the original. So it gets a better quality: the lowest at which every piece checked looks the same. The file is larger than usual, and nothing is lost.'**
+  String get qualityReportRaised;
+
+  /// No description provided for @qualityReportBelowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check this video by eye'**
+  String get qualityReportBelowTitle;
+
+  /// No description provided for @qualityReportBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'Even at the best quality the archive gives, the hardest part of this video differs a little from the original. This happens with film grain, noise or effects, which a smaller file cannot copy exactly. It does not mean the copy looks bad: compare the frame below, and keep the original if the difference matters to you.'**
+  String get qualityReportBelow;
+
+  /// No description provided for @qualityReportBelowGpu.
+  ///
+  /// In en, this message translates to:
+  /// **'This way of encoding has no better quality to try. Encoding on the processor (Thorough) raises it where a video needs it.'**
+  String get qualityReportBelowGpu;
+
+  /// No description provided for @qualityReportKeptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why this video stays as it is'**
+  String get qualityReportKeptTitle;
+
+  /// No description provided for @qualityReportKept.
+  ///
+  /// In en, this message translates to:
+  /// **'Converted, this video would keep {percent}% of its size, so it would free little space. The original is left as it is, untouched. To convert it all the same, choose “Convert anyway” in its ⋯ menu in the queue.'**
+  String qualityReportKept(int percent);
+
+  /// No description provided for @qualityReportKeptLarger.
+  ///
+  /// In en, this message translates to:
+  /// **'Converted, this video would come out larger than it is, so it would free no space. The original is left as it is, untouched. To convert it all the same, choose “Convert anyway” in its ⋯ menu in the queue.'**
+  String get qualityReportKeptLarger;
+
+  /// No description provided for @qualityPieces.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Judged by its only piece of 3 s} other{Judged by the poorest of {count} pieces of 3 s}}; it looks the same from VMAF 95'**
+  String qualityPieces(int count);
+
+  /// No description provided for @qualitySizeShare.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% of the original\'s size'**
+  String qualitySizeShare(int percent);
+
+  /// No description provided for @qualityChosen.
+  ///
+  /// In en, this message translates to:
+  /// **'← chosen'**
+  String get qualityChosen;
+
+  /// No description provided for @qualityFrameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The hardest frame checked, at {time}'**
+  String qualityFrameTitle(String time);
+
+  /// No description provided for @qualityFrameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'At its real size: one dot of the picture for one dot of your screen. Drag to look around; hold Space to see the original.'**
+  String get qualityFrameHint;
+
+  /// No description provided for @qualityFrameOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get qualityFrameOriginal;
+
+  /// No description provided for @qualityFrameResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Result'**
+  String get qualityFrameResult;
+
+  /// No description provided for @qualityFrameFit.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit to the window'**
+  String get qualityFrameFit;
+
+  /// No description provided for @qualityFrameLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Getting the frames…'**
+  String get qualityFrameLoading;
+
+  /// No description provided for @qualityFrameMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The frames could not be read: the file may have been moved or deleted.'**
+  String get qualityFrameMissing;
+
+  /// No description provided for @archiveQualityEachTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Each video is checked'**
+  String get archiveQualityEachTitle;
+
+  /// No description provided for @archiveQualityEach.
+  ///
+  /// In en, this message translates to:
+  /// **'Before converting, a few short pieces of each video are encoded and compared with the original, and the poorest one decides. If it falls short, that video gets a better quality, up to a limit past which files grow a lot for little. A video still short of it is converted all the same, and marked to be checked by eye. One that would keep more than four fifths of its size is left as it is.'**
+  String get archiveQualityEach;
 }
 
 class _AppLocalizationsDelegate

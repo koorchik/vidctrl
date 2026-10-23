@@ -28,6 +28,40 @@ abstract interface class Preset {
   );
 }
 
+/// A preset that gives one video a better quality than its standard one
+/// when measuring shows the standard one falls short of looking the same.
+abstract interface class RaisesQuality {
+  /// The quality numbers [plan]'s encoder can be given, from the plan's own
+  /// (the poorest allowed) to the best worth its size. Null where the encoder
+  /// has none to change, as on a graphics card.
+  QualityRange? qualityRange(ConversionPlan plan);
+
+  /// [plan] encoding at [value], or at its own quality when null. With
+  /// [belowTarget] the file name says the result needs a look: even the
+  /// best quality tried fell short.
+  ConversionPlan withQuality(
+    ConversionPlan plan,
+    int? value, {
+    bool belowTarget = false,
+  });
+}
+
+/// The quality numbers a search may try, lower being better, as with every
+/// constant-rate factor.
+class QualityRange {
+  const QualityRange({required this.standard, required this.best});
+
+  /// The plan's own number: the poorest allowed.
+  final int standard;
+
+  /// The best (lowest) number tried.
+  final int best;
+}
+
+/// Ends the file name of a result that fell short of looking the same even
+/// at the best quality tried: `clip_av1-crf20-check.mp4`.
+const belowTargetMarker = '-check';
+
 typedef OptionValues = Map<String, String>;
 
 /// A choice the user can make within a preset. The UI shows it as a segmented
@@ -259,6 +293,24 @@ class ConversionPlan {
   /// True when there is something to run.
   bool get producesOutput =>
       kind != PlanKind.skip && kind != PlanKind.unsupported;
+
+  /// The same plan with a different picture, and the name that goes with it.
+  ConversionPlan withVideo(VideoAction video, {String? nameSuffix}) =>
+      ConversionPlan(
+        kind: kind,
+        video: video,
+        audio: audio,
+        muxer: muxer,
+        extension: extension,
+        nameSuffix: nameSuffix ?? this.nameSuffix,
+        outputArgs: outputArgs,
+        keepMetadata: keepMetadata,
+        keepFileDate: keepFileDate,
+        firstAudioOnly: firstAudioOnly,
+        notes: notes,
+        estimatedBytes: estimatedBytes,
+        cost: cost,
+      );
 
   /// The same plan with different sound handling.
   ConversionPlan withAudio(AudioAction audio) => ConversionPlan(

@@ -980,4 +980,127 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get archiveQualityYours =>
       'У черзі, у меню ⋯ готового відео, виберіть «Порівняти з оригіналом»: застосунок порівняє копію з оригіналом і простими словами скаже, наскільки вони схожі.';
+
+  @override
+  String get choosingQuality => 'підбираємо якість…';
+
+  @override
+  String get jobCheckingQuality => 'Перевіряємо якість…';
+
+  @override
+  String jobChoosingQuality(int attempt) {
+    return 'Підбираємо якість… спроба $attempt';
+  }
+
+  @override
+  String get qualityRaised => 'Якість піднято, щоб виглядало як оригінал';
+
+  @override
+  String get qualityCheckByEye => 'Перевірте очима, перш ніж видаляти оригінал';
+
+  @override
+  String get statusKeptAsIs => 'Залишиться як є';
+
+  @override
+  String qualityNotWorthIt(int percent) {
+    return 'Перекодування зекономило б лише $percent%';
+  }
+
+  @override
+  String get qualityNotSmaller => 'Перекодування не зменшило б файл';
+
+  @override
+  String get jobLeftAsIs => 'Залишено як є';
+
+  @override
+  String get convertAnyway => 'Конвертувати все одно';
+
+  @override
+  String get qualityDetails => 'Про якість цього відео';
+
+  @override
+  String toCheckByEye(int count) {
+    return 'перевірити очима: $count';
+  }
+
+  @override
+  String get qualityReportRaisedTitle => 'Для цього відео якість піднято';
+
+  @override
+  String get qualityReportRaised =>
+      'Зі звичайною якістю архіву найскладніша частина цього відео трохи відрізнялася б від оригіналу. Тому воно отримує кращу якість: найменшу, з якою кожен перевірений шматок виглядає як оригінал. Файл більший, ніж зазвичай, зате нічого не втрачено.';
+
+  @override
+  String get qualityReportBelowTitle => 'Перевірте це відео очима';
+
+  @override
+  String get qualityReportBelow =>
+      'Навіть з найкращою якістю, яку дає архів, найскладніша частина цього відео трохи відрізняється від оригіналу. Так буває з плівковим зерном, шумом чи ефектами: менший файл не може повторити їх точно. Це не означає, що копія погана: порівняйте кадр нижче й залиште оригінал, якщо різниця для вас важлива.';
+
+  @override
+  String get qualityReportBelowGpu =>
+      'Цей спосіб кодування не має кращої якості, яку можна спробувати. Кодування процесором («Ретельно») піднімає її там, де відео цього потребує.';
+
+  @override
+  String get qualityReportKeptTitle => 'Чому це відео залишається як є';
+
+  @override
+  String qualityReportKept(int percent) {
+    return 'Після перекодування це відео зберегло б $percent% свого розміру, тож місця звільнилося б мало. Оригінал залишається як є, без змін. Щоб усе ж конвертувати його, виберіть «Конвертувати все одно» в його меню ⋯ у черзі.';
+  }
+
+  @override
+  String get qualityReportKeptLarger =>
+      'Після перекодування це відео стало б більшим, ніж зараз, тож місця не звільнилося б. Оригінал залишається як є, без змін. Щоб усе ж конвертувати його, виберіть «Конвертувати все одно» в його меню ⋯ у черзі.';
+
+  @override
+  String qualityPieces(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Оцінено за найгіршим із $count шматків по 3 с',
+      one: 'Оцінено за єдиним шматком по 3 с',
+    );
+    return '$_temp0; як оригінал — від VMAF 95';
+  }
+
+  @override
+  String qualitySizeShare(int percent) {
+    return '$percent% розміру оригіналу';
+  }
+
+  @override
+  String get qualityChosen => '← вибрано';
+
+  @override
+  String qualityFrameTitle(String time) {
+    return 'Найскладніший із перевірених кадрів, о $time';
+  }
+
+  @override
+  String get qualityFrameHint =>
+      'У справжньому розмірі: одна точка кадру на одну точку екрана. Перетягуйте, щоб роздивитися; утримуйте пробіл, щоб побачити оригінал.';
+
+  @override
+  String get qualityFrameOriginal => 'Оригінал';
+
+  @override
+  String get qualityFrameResult => 'Результат';
+
+  @override
+  String get qualityFrameFit => 'Вмістити у вікно';
+
+  @override
+  String get qualityFrameLoading => 'Дістаємо кадри…';
+
+  @override
+  String get qualityFrameMissing =>
+      'Не вдалося прочитати кадри: файл, можливо, переміщено чи видалено.';
+
+  @override
+  String get archiveQualityEachTitle => 'Кожне відео перевіряється';
+
+  @override
+  String get archiveQualityEach =>
+      'Перед конвертацією кілька коротких шматків кожного відео кодуються й порівнюються з оригіналом, і вирішує найгірший. Якщо він не дотягує, це відео отримує кращу якість — до межі, за якою файл росте сильно, а користі мало. Відео, якому й цього не досить, однаково конвертується, але позначається для перевірки очима. Відео, яке зберегло б понад чотири п’ятих свого розміру, залишається як є.';
 }

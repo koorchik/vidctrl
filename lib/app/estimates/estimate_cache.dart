@@ -17,21 +17,31 @@ class EstimateCacheState {
   const EstimateCacheState({
     this.estimates = const {},
     this.measuring = const {},
+    this.attempts = const {},
     this.failed = const {},
   });
 
   /// Whole-video estimates by [estimateKey].
   final Map<String, OutputEstimate> estimates;
   final Set<String> measuring;
+
+  /// The try under way where the quality is being chosen: 1 measures the
+  /// standard quality, from 2 on better ones are tried.
+  final Map<String, int> attempts;
   final Set<String> failed;
+
+  /// Whether a better quality is being looked for.
+  bool choosing(String key) => (attempts[key] ?? 0) > 1;
 
   EstimateCacheState copyWith({
     Map<String, OutputEstimate>? estimates,
     Set<String>? measuring,
+    Map<String, int>? attempts,
     Set<String>? failed,
   }) => EstimateCacheState(
     estimates: estimates ?? this.estimates,
     measuring: measuring ?? this.measuring,
+    attempts: attempts ?? this.attempts,
     failed: failed ?? this.failed,
   );
 }
@@ -61,8 +71,14 @@ class EstimateCache extends Notifier<EstimateCacheState> {
       state.measuring.length;
 
   /// Measures the expected size of [plan] on [info], unless it is known,
-  /// being measured, or could not be measured before.
-  Future<void> measure(String key, MediaInfo info, ConversionPlan plan) async {
+  /// being measured, or could not be measured before. With [raise], the
+  /// quality is raised where the standard one falls short.
+  Future<void> measure(
+    String key,
+    MediaInfo info,
+    ConversionPlan plan, {
+    RaisesQuality? raise,
+  }) async {
     if (state.estimates.containsKey(key) ||
         state.measuring.contains(key) ||
         state.failed.contains(key)) {
@@ -72,7 +88,16 @@ class EstimateCache extends Notifier<EstimateCacheState> {
     state = state.copyWith(measuring: {...state.measuring, key});
     OutputEstimate? estimate;
     try {
-      estimate = await _env.estimator.estimate(info, plan);
+      estimate = await _env.estimator.estimate(
+        info,
+        plan,
+        raise: raise,
+        onAttempt: (attempt) {
+          if (ref.mounted && generation == _generation) {
+            state = state.copyWith(attempts: {...state.attempts, key: attempt});
+          }
+        },
+      );
     } on Object {
       estimate = null;
     }
@@ -80,6 +105,7 @@ class EstimateCache extends Notifier<EstimateCacheState> {
     final stopped = generation != _generation;
     state = state.copyWith(
       measuring: {...state.measuring}..remove(key),
+      attempts: {...state.attempts}..remove(key),
       estimates: estimate == null ? null : {...state.estimates, key: estimate},
       // A stopped measurement is tried again later; a failed one is not.
       failed: estimate == null && !stopped ? {...state.failed, key} : null,
@@ -88,15 +114,34 @@ class EstimateCache extends Notifier<EstimateCacheState> {
 
   /// Records what a finished sample showed about the whole video. Ten seconds
   /// measure better than the automatic three-second pieces, so this wins.
-  /// The sample says nothing about closeness, so the measured one stays.
+  /// The sample says nothing about closeness, so the measured one stays,
+  /// with the quality chosen for the video.
   void learn(String key, OutputEstimate estimate) {
+    final known = state.estimates[key];
     final learned = OutputEstimate(
       bytes: estimate.bytes,
       time: estimate.time,
       measured: estimate.measured,
-      quality: estimate.quality ?? state.estimates[key]?.quality,
+      quality: estimate.quality ?? known?.quality,
+      choice: estimate.choice ?? known?.choice,
     );
     state = state.copyWith(estimates: {...state.estimates, key: learned});
+  }
+
+  /// Keeps an estimate made elsewhere, as when a job measured its video
+  /// before converting it.
+  void record(String key, OutputEstimate estimate) {
+    state = state.copyWith(
+      estimates: {...state.estimates, key: estimate},
+      failed: {...state.failed}..remove(key),
+    );
+  }
+
+  /// Stops measuring for good and deletes the pieces kept to show hardest
+  /// frames, as the app leaves. Completes once FFmpeg has exited.
+  Future<void> leave() async {
+    await stopMeasuring();
+    await _env.estimator.discardKept();
   }
 
   /// Stops measuring, so converting gets the whole processor. Completes once

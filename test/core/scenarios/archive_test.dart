@@ -263,6 +263,52 @@ void main() {
     });
   });
 
+  group('a better quality for one video', () {
+    test('AV1 may go from its standard 35 down to 20', () {
+      final range = preset.qualityRange(plan(clip()))!;
+
+      expect((range.standard, range.best), (35, 20));
+    });
+
+    test('HEVC from its standard 24 down to 16', () {
+      final range = preset.qualityRange(plan(clip(), {'codec': 'hevc'}))!;
+
+      expect((range.standard, range.best), (24, 16));
+    });
+
+    test('a graphics card has no number to change', () {
+      final result = plan(clip(), {'speed': 'gpu'}, withGpu({'av1_nvenc'}));
+
+      expect(preset.qualityRange(result), isNull);
+    });
+
+    test('the raised number is used and named', () {
+      final raised = preset.withQuality(plan(clip()), 23);
+
+      expect(video(raised).args, containsAllInOrder(['-crf', '23']));
+      expect(video(raised).args, isNot(contains('35')));
+      expect(raised.nameSuffix, '_av1-crf23');
+      // Everything else stays.
+      expect(raised.muxer, 'mp4');
+      expect(video(raised).args, contains('-svtav1-params'));
+    });
+
+    test('a result that needs a look says so in its name', () {
+      final marked = preset.withQuality(plan(clip()), 20, belowTarget: true);
+
+      expect(marked.nameSuffix, '_av1-crf20-check');
+    });
+
+    test('a graphics card result is only marked', () {
+      final gpu = plan(clip(), {'speed': 'gpu'}, withGpu({'av1_nvenc'}));
+
+      final marked = preset.withQuality(gpu, null, belowTarget: true);
+
+      expect(marked.nameSuffix, '_av1-nvenc-cq32-check');
+      expect(video(marked).args, video(gpu).args);
+    });
+  });
+
   test('a file without a picture is not handled', () {
     final result = plan(clip(video: null));
 

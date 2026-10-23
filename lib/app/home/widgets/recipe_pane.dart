@@ -8,6 +8,7 @@ import '../../../core/scenarios/archive.dart';
 import '../../../core/output/output_namer.dart';
 import '../../../core/scenarios/registry.dart';
 import '../../../core/scenarios/resolve_linux.dart';
+import '../../../core/quality/quality_meter.dart';
 import '../../../core/scenarios/scenario.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../format.dart';
@@ -23,6 +24,7 @@ import '../scenario_texts.dart';
 import '../size_change_text.dart';
 import '../technical_text.dart';
 import 'archive_quality_dialog.dart';
+import 'busy_mark.dart';
 import 'command_dialog.dart';
 import 'web_links.dart';
 
@@ -895,6 +897,16 @@ class _AddControls extends ConsumerWidget {
     final addableAll = queue.addable(all);
     final batch = batchEstimate(selected, previews);
     final measuring = selected.any((v) => previews[v.id]?.measuring ?? false);
+    final choosing = selected.any((v) => previews[v.id]?.choosing ?? false);
+    final comparing = selected.any((v) {
+      final plan = previews[v.id]?.plan;
+      return plan != null && canComparePlan(plan);
+    });
+    final working = choosing
+        ? l10n.choosingQuality
+        : comparing
+        ? l10n.estimatingQuality
+        : l10n.estimating;
 
     final String summary;
     String? larger;
@@ -915,7 +927,7 @@ class _AddControls extends ConsumerWidget {
     } else {
       summary = [
         l10n.videoCount(selected.length),
-        if (measuring) l10n.estimating,
+        if (measuring) working,
       ].join('  ·  ');
     }
 
@@ -930,15 +942,30 @@ class _AddControls extends ConsumerWidget {
             height: 36,
             child: Align(
               alignment: AlignmentDirectional.bottomStart,
-              child: SizeChangeText(
-                summary,
-                larger: larger,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Seen to be under way while sizes are still measured.
+                  if (measuring && addableSelected > 0) ...[
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 3),
+                      child: BusyMark(),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: SizeChangeText(
+                      summary,
+                      larger: larger,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -972,6 +999,7 @@ class _AddControls extends ConsumerWidget {
 ///
 /// Videos not measured yet are assumed to shrink like the measured ones, in
 /// proportion to their size, and to take time in proportion to their length.
+/// One left as it is keeps its size and takes no time.
 ({int before, int after, Duration? time})? batchEstimate(
   List<SourceVideo> videos,
   Map<int, Preview> previews,
@@ -986,16 +1014,20 @@ class _AddControls extends ConsumerWidget {
 
   final before = videos.fold(0, (sum, v) => sum + size(v));
   final knownBefore = known.fold(0, (sum, k) => sum + size(k.$1));
-  final knownAfter = known.fold(0, (sum, k) => sum + k.$2.bytes);
+  bool kept(SourceVideo v) => previews[v.id]?.keptAsIs ?? false;
+  final knownAfter = known.fold(
+    0,
+    (sum, k) => sum + (kept(k.$1) ? size(k.$1) : k.$2.bytes),
+  );
   // The ratio is taken first: byte counts multiplied together overflow.
   final after = knownBefore > 0
       ? (knownAfter * (before / knownBefore)).round()
       : knownAfter;
 
   // Only re-encodes take noticeable time; quick fixes take seconds.
-  final timed = known.where((k) => k.$2.time != null).toList();
+  final timed = known.where((k) => k.$2.time != null && !kept(k.$1)).toList();
   final encodes = videos.where(
-    (v) => previews[v.id]?.plan.kind == PlanKind.encode,
+    (v) => previews[v.id]?.plan.kind == PlanKind.encode && !kept(v),
   );
   final timedLength = timed.fold(0, (sum, k) => sum + length(k.$1));
   final encodeLength = encodes.fold(0, (sum, v) => sum + length(v));

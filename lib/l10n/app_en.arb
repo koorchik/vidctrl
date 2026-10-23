@@ -530,5 +530,58 @@
   "archiveQualityCheckedTitle": "Checked before every release",
   "archiveQualityChecked": "On Linux, Windows and macOS, an automatic check encodes a test video with the archive's default settings, with the same FFmpeg the app ships, and compares the result with the original. If the quality falls short, the version is not released.",
   "archiveQualityYoursTitle": "Your own video can be checked too",
-  "archiveQualityYours": "In the queue, in the ⋯ menu of a finished video, choose “Compare with the original”: the app compares the copy with its original and says in plain words how alike they are."
+  "archiveQualityYours": "In the queue, in the ⋯ menu of a finished video, choose “Compare with the original”: the app compares the copy with its original and says in plain words how alike they are.",
+  "choosingQuality": "choosing the quality…",
+  "jobCheckingQuality": "Checking the quality…",
+  "jobChoosingQuality": "Choosing the quality… try {attempt}",
+  "@jobChoosingQuality": {
+    "placeholders": {"attempt": {"type": "int"}}
+  },
+  "qualityRaised": "Quality raised to look the same",
+  "qualityCheckByEye": "Check by eye before deleting the original",
+  "statusKeptAsIs": "Will stay as it is",
+  "qualityNotWorthIt": "Converting would save only {percent}%",
+  "@qualityNotWorthIt": {
+    "placeholders": {"percent": {"type": "int"}}
+  },
+  "qualityNotSmaller": "Converting would not make it smaller",
+  "jobLeftAsIs": "Left as it is",
+  "convertAnyway": "Convert anyway",
+  "qualityDetails": "About this video's quality",
+  "toCheckByEye": "check by eye: {count}",
+  "@toCheckByEye": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "qualityReportRaisedTitle": "Quality raised for this video",
+  "qualityReportRaised": "At the archive's usual quality, the hardest part of this video would not quite look the same as the original. So it gets a better quality: the lowest at which every piece checked looks the same. The file is larger than usual, and nothing is lost.",
+  "qualityReportBelowTitle": "Check this video by eye",
+  "qualityReportBelow": "Even at the best quality the archive gives, the hardest part of this video differs a little from the original. This happens with film grain, noise or effects, which a smaller file cannot copy exactly. It does not mean the copy looks bad: compare the frame below, and keep the original if the difference matters to you.",
+  "qualityReportBelowGpu": "This way of encoding has no better quality to try. Encoding on the processor (Thorough) raises it where a video needs it.",
+  "qualityReportKeptTitle": "Why this video stays as it is",
+  "qualityReportKept": "Converted, this video would keep {percent}% of its size, so it would free little space. The original is left as it is, untouched. To convert it all the same, choose “Convert anyway” in its ⋯ menu in the queue.",
+  "@qualityReportKept": {
+    "placeholders": {"percent": {"type": "int"}}
+  },
+  "qualityReportKeptLarger": "Converted, this video would come out larger than it is, so it would free no space. The original is left as it is, untouched. To convert it all the same, choose “Convert anyway” in its ⋯ menu in the queue.",
+  "qualityPieces": "{count, plural, =1{Judged by its only piece of 3 s} other{Judged by the poorest of {count} pieces of 3 s}}; it looks the same from VMAF 95",
+  "@qualityPieces": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "qualitySizeShare": "{percent}% of the original's size",
+  "@qualitySizeShare": {
+    "placeholders": {"percent": {"type": "int"}}
+  },
+  "qualityChosen": "← chosen",
+  "qualityFrameTitle": "The hardest frame checked, at {time}",
+  "@qualityFrameTitle": {
+    "placeholders": {"time": {"type": "String"}}
+  },
+  "qualityFrameHint": "At its real size: one dot of the picture for one dot of your screen. Drag to look around; hold Space to see the original.",
+  "qualityFrameOriginal": "Original",
+  "qualityFrameResult": "Result",
+  "qualityFrameFit": "Fit to the window",
+  "qualityFrameLoading": "Getting the frames…",
+  "qualityFrameMissing": "The frames could not be read: the file may have been moved or deleted.",
+  "archiveQualityEachTitle": "Each video is checked",
+  "archiveQualityEach": "Before converting, a few short pieces of each video are encoded and compared with the original, and the poorest one decides. If it falls short, that video gets a better quality, up to a limit past which files grow a lot for little. A video still short of it is converted all the same, and marked to be checked by eye. One that would keep more than four fifths of its size is left as it is."
 }

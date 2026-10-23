@@ -4,6 +4,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/media/media_info.dart';
 import '../../../core/media/video_files.dart';
 import '../../../core/platform/open_external.dart';
 import '../../../core/quality/quality_meter.dart';
@@ -17,7 +18,9 @@ import '../../sources/sources_controller.dart';
 import '../../theme.dart';
 import '../headings.dart';
 import '../technical_text.dart';
+import 'busy_mark.dart';
 import 'closeness_line.dart';
+import 'quality_report.dart';
 import 'command_dialog.dart';
 import 'media_details_dialog.dart';
 
@@ -320,8 +323,8 @@ class _VideoTile extends ConsumerWidget {
                               : scheme.onSurfaceVariant,
                         ),
                       ),
-                      if (selected && preview != null)
-                        _PreviewLine(preview: preview),
+                      if (selected && preview != null && info != null)
+                        _PreviewLine(preview: preview, info: info),
                     ],
                   ),
                 ),
@@ -378,9 +381,10 @@ class _VideoTile extends ConsumerWidget {
 
 /// What the current settings would do to the video, in plain words.
 class _PreviewLine extends StatelessWidget {
-  const _PreviewLine({required this.preview});
+  const _PreviewLine({required this.preview, required this.info});
 
   final Preview preview;
+  final MediaInfo info;
 
   @override
   Widget build(BuildContext context) {
@@ -390,10 +394,18 @@ class _PreviewLine extends StatelessWidget {
     final success = SuccessColors.of(context);
     final format = Formatter(l10n);
     final estimate = preview.estimate;
-    final expected = estimate != null
-        ? '→ ${l10n.aboutSize(format.bytes(estimate.bytes))}'
+    final expected = preview.keptAsIs || estimate == null
+        ? null
+        : '→ ${l10n.aboutSize(format.bytes(estimate.bytes))}';
+    // What is being worked out, shown with a spinner.
+    final working = preview.keptAsIs || estimate != null
+        ? null
+        : preview.choosing
+        ? l10n.choosingQuality
         : preview.measuring
-        ? '· ${canComparePlan(preview.plan) ? l10n.estimatingQuality : l10n.estimating}'
+        ? (canComparePlan(preview.plan)
+              ? l10n.estimatingQuality
+              : l10n.estimating)
         : null;
 
     final (text, color) = switch (preview.plan.kind) {
@@ -409,6 +421,10 @@ class _PreviewLine extends StatelessWidget {
           _ => l10n.statusUnsupported,
         },
         scheme.error,
+      ),
+      PlanKind.encode when preview.keptAsIs => (
+        l10n.statusKeptAsIs,
+        scheme.onSurfaceVariant,
       ),
       PlanKind.encode => (
         [l10n.statusFullConversion, ?expected].join('  '),
@@ -432,15 +448,38 @@ class _PreviewLine extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(color: color),
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(color: color),
+                ),
+              ),
+              if (working != null) ...[
+                const SizedBox(width: 10),
+                const BusyMark(),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    working,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
-          if (estimate?.quality case final score?
-              when preview.plan.kind == PlanKind.encode)
-            ClosenessLine(score: score),
+          if (preview.plan.kind == PlanKind.encode)
+            if (estimate?.choice case final choice?)
+              QualityChoiceLine(choice: choice, original: info)
+            else if (estimate?.quality case final score?)
+              ClosenessLine(score: score),
           for (final note in notes)
             Text(
               note,

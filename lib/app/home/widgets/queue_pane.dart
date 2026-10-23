@@ -21,6 +21,7 @@ import '../scenario_texts.dart';
 import '../size_change_text.dart';
 import '../technical_text.dart';
 import 'closeness_line.dart';
+import 'quality_report.dart';
 import 'command_dialog.dart';
 import 'media_details_dialog.dart';
 
@@ -129,8 +130,12 @@ class QueuePane extends ConsumerWidget {
     }
     final (:before, :after) = _doneSizes(state);
     if (before == 0) return '';
+    final toLookAt = state.jobs
+        .where((j) => j.status == JobStatus.done && j.needsALook)
+        .length;
     return '${l10n.allDone}: ${l10n.savedSummary(format.bytes(before), format.bytes(after))}'
-        ', ${format.sizeChange(before, after)}';
+        ', ${format.sizeChange(before, after)}'
+        '${toLookAt > 0 ? '  ·  ${l10n.toCheckByEye(toLookAt)}' : ''}';
   }
 
   /// What the finished whole videos weighed before and after.
@@ -280,13 +285,22 @@ class _JobTile extends ConsumerWidget {
                     color: _statusColor(context),
                   ),
                 ),
-                if (check != null)
-                  _QualityLine(check: check)
-                // What the expected-size samples showed, until a comparison
-                // of the result says more.
+                // The quality chosen for the video, or before the job knows
+                // it, what the video list measured.
+                if (job.quality ??
+                        (job.status == JobStatus.waiting ? whole?.choice : null)
+                    case final choice?)
+                  QualityChoiceLine(
+                    choice: choice,
+                    original: job.info,
+                    result: job.status == JobStatus.done && !job.isSample
+                        ? job.result?.outputPath
+                        : null,
+                  )
                 else if (whole?.quality case final score?
-                    when job.status == JobStatus.waiting)
+                    when job.status == JobStatus.waiting && check == null)
                   ClosenessLine(score: score),
+                if (check != null) _QualityLine(check: check),
                 if (job.status == JobStatus.done && job.isSample)
                   Align(
                     alignment: AlignmentDirectional.centerStart,
@@ -300,7 +314,7 @@ class _JobTile extends ConsumerWidget {
                       label: Text(l10n.convertWholeVideo),
                     ),
                   ),
-                if (job.plan.producesOutput)
+                if (job.outputPath.isNotEmpty)
                   TechnicalText(
                     [
                       '→ ${job.isSample ? 'Samples/' : ''}'
@@ -347,6 +361,11 @@ class _JobTile extends ConsumerWidget {
                 onTap: () => openWithDefaultApp(job.path),
                 child: Text(l10n.playOriginal),
               ),
+              if (job.status == JobStatus.skipped && job.keptAsIs)
+                PopupMenuItem(
+                  onTap: () => queue.convertAnyway(job.id),
+                  child: Text(l10n.convertAnyway),
+                ),
               PopupMenuItem(
                 onTap: () => queue.useSettings(job.id),
                 child: Text(l10n.useSettings),
@@ -448,12 +467,20 @@ class _JobTile extends ConsumerWidget {
         : 1.0;
     switch (job.status) {
       case JobStatus.waiting:
+        final keptAsIs =
+            job.keptAsIs ||
+            (job.quality == null && whole?.choice?.converts == false);
         return [
           l10n.jobWaiting,
-          if (whole != null)
+          if (whole != null && !keptAsIs)
             l10n.aboutSize(format.bytes((whole.bytes * sampleShare).round())),
         ].join('  ·  ');
       case JobStatus.running:
+        if (job.attempt case final attempt?) {
+          return attempt > 1
+              ? l10n.jobChoosingQuality(attempt - 1)
+              : l10n.jobCheckingQuality;
+        }
         final progress = job.progress;
         if (progress == null || progress.fraction <= 0) {
           return l10n.statusStarting;
@@ -483,7 +510,7 @@ class _JobTile extends ConsumerWidget {
           l10n.tookTime(format.wait(result?.elapsed ?? Duration.zero)),
         ].join('  ·  ');
       case JobStatus.skipped:
-        return l10n.jobSkipped;
+        return job.keptAsIs ? l10n.jobLeftAsIs : l10n.jobSkipped;
       case JobStatus.failed:
         return l10n.statusFailed;
       case JobStatus.cancelled:
@@ -494,6 +521,7 @@ class _JobTile extends ConsumerWidget {
   Color _statusColor(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return switch (job.status) {
+      JobStatus.skipped when job.keptAsIs => scheme.tertiary,
       JobStatus.done || JobStatus.skipped => SuccessColors.of(context).text,
       JobStatus.failed => scheme.error,
       _ => scheme.onSurfaceVariant,
@@ -621,6 +649,17 @@ class _StatusIcon extends StatelessWidget {
     final look = AppLook.of(context);
     final success = SuccessColors.of(context);
     final (icon, background, foreground) = switch (job.status) {
+      // Worth a look before the original goes.
+      JobStatus.done when job.needsALook => (
+        Icons.visibility_rounded,
+        scheme.tertiaryContainer,
+        scheme.onTertiaryContainer,
+      ),
+      JobStatus.skipped when job.keptAsIs => (
+        Icons.inventory_2_outlined,
+        scheme.tertiaryContainer,
+        scheme.onTertiaryContainer,
+      ),
       JobStatus.done || JobStatus.skipped => (
         Icons.check_rounded,
         success.container,

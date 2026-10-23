@@ -13,6 +13,7 @@ import 'package:vidctrl/app/window.dart';
 import 'package:vidctrl/core/ffmpeg/locator.dart';
 import 'package:vidctrl/core/media/ffprobe.dart';
 import 'package:vidctrl/core/quality/quality_meter.dart';
+import 'package:vidctrl/core/quality/quality_search.dart';
 
 import '../support/fake_media.dart';
 import '../support/fakes.dart';
@@ -60,6 +61,7 @@ void main() {
     );
     // What a camera's file measures: nothing to see.
     env.estimator.quality = const QualityScore(41.4, vmaf: 96.0);
+    env.frames.picture = frame;
     env.ffprobe.add('/videos/DSC_0412.MOV');
     env.ffprobe.add(
       '/videos/DSC_0413.MOV',
@@ -187,6 +189,90 @@ void main() {
           await tester.pump();
         }
         await save(tester, '3b_compared');
+      });
+
+      testWidgets('the quality chosen for each video', (tester) async {
+        final env = environment();
+        for (final (path, outcome) in [
+          (files[0], QualityOutcome.standard),
+          (files[1], QualityOutcome.raised),
+          (files[2], QualityOutcome.belowTarget),
+          (files[3], QualityOutcome.notWorthIt),
+        ]) {
+          env.estimator.choices[path] = fakeChoice(outcome);
+        }
+        final sources = await pumpApp(tester, env, look: look);
+        await addVideos(tester, sources, files);
+        await tester.pump();
+        await save(tester, '12_quality_list');
+      });
+
+      testWidgets('the quality in the queue', (tester) async {
+        final env = environment();
+        for (final (path, outcome) in [
+          (files[0], QualityOutcome.belowTarget),
+          (files[1], QualityOutcome.notWorthIt),
+          (files[2], QualityOutcome.raised),
+        ]) {
+          env.estimator.choices[path] = fakeChoice(outcome);
+        }
+        final sources = await pumpApp(tester, env, look: look);
+        await addVideos(tester, sources, files.take(3));
+        await tester.pump();
+        await addToQueue(tester);
+        env.executor.last.finish(
+          bytes: 450000000,
+          elapsed: const Duration(minutes: 4),
+        );
+        await tester.pump();
+        await tester.pump();
+        env.executor.last.report(0.3);
+        await tester.pump();
+        await save(tester, '12b_quality_queue');
+      });
+
+      testWidgets('checking the quality before converting', (tester) async {
+        final env = environment();
+        env.estimator
+          ..choices[files[2]] = fakeChoice(QualityOutcome.raised)
+          ..hold = true;
+        final sources = await pumpApp(tester, env, look: look);
+        await addVideos(tester, sources, [files[2]]);
+        await tester.pump();
+        await save(tester, '12c_quality_choosing_list');
+        await addToQueue(tester);
+        await save(tester, '12d_quality_choosing_queue');
+      });
+
+      testWidgets('a video to check by eye', (tester) async {
+        final env = environment();
+        env.estimator.choices[files[2]] = fakeChoice(
+          QualityOutcome.belowTarget,
+        );
+        final sources = await pumpApp(tester, env, look: look);
+        await addVideos(tester, sources, [files[2]]);
+        await tester.pump();
+        await tester.tap(find.byTooltip("About this video's quality"));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+        // The frames are decoded outside the test's simulated clock.
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 400)),
+        );
+        await tester.pump();
+        await save(tester, '12e_quality_dialog');
+      });
+
+      testWidgets('why a video stays as it is', (tester) async {
+        final env = environment();
+        env.estimator.choices[files[3]] = fakeChoice(QualityOutcome.notWorthIt);
+        final sources = await pumpApp(tester, env, look: look);
+        await addVideos(tester, sources, [files[3]]);
+        await tester.pump();
+        await tester.tap(find.byTooltip("About this video's quality"));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+        await save(tester, '12f_quality_kept');
       });
 
       testWidgets('details', (tester) async {

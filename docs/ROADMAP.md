@@ -15,7 +15,11 @@
   samples are an option and report the whole video's expected size; expected
   size and time before starting; video details for originals and results;
   "Compare with the original" for a finished result, in plain words with
-  the VMAF and XPSNR scores beside;
+  the VMAF and XPSNR scores beside; before converting, how close each video
+  will look, measured on short pieces; "Archive" raises the quality of a
+  video that needs it, marks one still short of looking the same for a
+  look by eye (its hardest frame against the original's, at real size),
+  and leaves alone one that would hardly shrink;
   keep-awake on Linux and macOS; closing the window asks first while
   converting, and FFmpeg is stopped before the app goes; "Show the command";
   technical names beside plain labels; English and Ukrainian with a
@@ -52,7 +56,9 @@
    measured yet. Its one number leaves already squeezed recordings, such as
    calls, only about a tenth smaller, where a higher one would still look the
    same. A fixed number cannot suit both calm and busy footage; choosing it
-   per video from a measured sample would.
+   per video from a measured sample would, as "Archive" now does upwards
+   (lowering its number for calm footage is not done: it stays the
+   poorest allowed).
 3. **Check in Resolve.** Studio 21.1.1 on Linux is checked: every codec the
    goal keeps, every sound format, sync after a rewrap, and the outputs of
    each variant, also with hardware decoding off (the findings are at the
@@ -82,7 +88,7 @@
 
 ## Later
 
-Automatic quality per video, "fit into N MB", user-defined goals, lossless
+Automatic quality per video for "Save space" too, "fit into N MB", user-defined goals, lossless
 trimming, an in-app before/after comparison for samples, watch folders,
 updating itself in place.
 

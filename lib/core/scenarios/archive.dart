@@ -43,6 +43,15 @@ const gpuEncoderPreference = [
 /// footage those were 1.5, 2.4 and 3 times.
 const svtAv1Crf = '35';
 const x265Crf = '24';
+
+/// The best quality the archive gives a video whose standard one falls short
+/// of looking the same (`quality_search.dart`), lower being better. Below
+/// this the file grows a lot for little: on a grainy film download that no
+/// quality brought to the target, crf 20 gave 60% of the original's size
+/// and crf 18 72%, for 0.4 more VMAF on its poorest piece. HEVC's number is
+/// set by the same proportion to its standard one; it is not measured.
+const svtAv1BestCrf = 20;
+const x265BestCrf = 16;
 const nvencAv1Cq = '32';
 const nvencHevcCq = '26';
 
@@ -75,7 +84,7 @@ const videoToolboxQuality = '65';
   return (level: '6.2', megabits: 160);
 }
 
-class ArchivePreset implements Preset {
+class ArchivePreset implements Preset, RaisesQuality {
   const ArchivePreset();
 
   @override
@@ -294,6 +303,43 @@ class ArchivePreset implements Preset {
       (a) => a.codec == 'aac' && (a.bitRate ?? 0) <= keepAacUpTo,
     );
     return keep ? const AudioCopy() : highQualityAac(input);
+  }
+
+  @override
+  QualityRange? qualityRange(ConversionPlan plan) => switch (plan.video) {
+    VideoEncode(encoder: 'libsvtav1') => QualityRange(
+      standard: int.parse(svtAv1Crf),
+      best: svtAv1BestCrf,
+    ),
+    VideoEncode(encoder: 'libx265') => QualityRange(
+      standard: int.parse(x265Crf),
+      best: x265BestCrf,
+    ),
+    _ => null,
+  };
+
+  @override
+  ConversionPlan withQuality(
+    ConversionPlan plan,
+    int? value, {
+    bool belowTarget = false,
+  }) {
+    final video = plan.video;
+    if (video is! VideoEncode) return plan;
+    final at = video.args.indexOf('-crf');
+    final encode = value == null || at < 0 || qualityRange(plan) == null
+        ? video
+        : VideoEncode(
+            encoder: video.encoder,
+            pixFmt: video.pixFmt,
+            filters: video.filters,
+            args: [...video.args]..[at + 1] = '$value',
+          );
+    return plan.withVideo(
+      encode,
+      nameSuffix:
+          '_${encoderTag(encode)}${belowTarget ? belowTargetMarker : ''}',
+    );
   }
 
   ResourceCost _cost(String encoder) => switch (encoder) {

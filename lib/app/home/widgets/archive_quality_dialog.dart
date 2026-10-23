@@ -5,11 +5,11 @@ import '../../theme.dart';
 import '../headings.dart';
 
 /// How the archive keeps the quality: the case for a master copy, the two
-/// measures and the levels they must reach, how the settings were chosen
-/// and that each release is checked. Opened from the "?" at the end of the
-/// archive's explanation. The levels are those in `archive.dart` and
-/// `quality_meter.dart`; the release check is
-/// `test/integration/ffmpeg_check_test.dart`.
+/// measures and the levels they must reach, how the settings were chosen,
+/// that each video is checked (`quality_search.dart`) and each release too.
+/// Opened from the "?" at the end of the archive's explanation. The levels
+/// are those in `archive.dart` and `quality_meter.dart`; the release check
+/// is `test/integration/ffmpeg_check_test.dart`.
 class ArchiveQualityDialog extends StatelessWidget {
   const ArchiveQualityDialog({super.key});
 
@@ -55,6 +55,7 @@ class ArchiveQualityDialog extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               _Point(l10n.archiveQualityTunedTitle, l10n.archiveQualityTuned),
+              _Point(l10n.archiveQualityEachTitle, l10n.archiveQualityEach),
               _Point(
                 l10n.archiveQualityCheckedTitle,
                 l10n.archiveQualityChecked,

@@ -59,7 +59,7 @@ class _WindowCloseGuardState extends ConsumerState<WindowCloseGuard>
         await ref.read(queueProvider.notifier).shutDown();
       }
       if (ref.exists(estimateCacheProvider)) {
-        await ref.read(estimateCacheProvider.notifier).stopMeasuring();
+        await ref.read(estimateCacheProvider.notifier).leave();
       }
       if (ref.exists(qualityProvider)) {
         await ref.read(qualityProvider.notifier).stop();

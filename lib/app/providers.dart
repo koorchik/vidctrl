@@ -7,6 +7,7 @@ import '../core/ffmpeg/runner.dart';
 import '../core/media/ffprobe.dart';
 import '../core/media/thumbnail.dart';
 import '../core/platform/sleep_inhibitor.dart';
+import '../core/quality/frame_grabber.dart';
 import '../core/quality/quality_meter.dart';
 import '../core/queue/job_executor.dart';
 
@@ -22,6 +23,7 @@ class AppEnvironment {
     required this.estimator,
     required this.qualityMeter,
     this.thumbnailer,
+    this.frameGrabber,
   });
 
   /// The FFmpeg in use and where it was found.
@@ -40,6 +42,9 @@ class AppEnvironment {
 
   /// Grabs preview frames of videos. Null where there is no FFmpeg to ask.
   final Thumbnailer? thumbnailer;
+
+  /// Grabs full-size frames, to compare a result with its original by eye.
+  final FrameGrabber? frameGrabber;
 }
 
 /// Thrown at startup when no usable FFmpeg can be found.
@@ -65,6 +70,7 @@ final environmentProvider = FutureProvider<AppEnvironment>(
       ),
       qualityMeter: QualityMeter(FfmpegRunner(paths.ffmpeg)),
       thumbnailer: Thumbnailer(paths.ffmpeg),
+      frameGrabber: FrameGrabber(paths.ffmpeg),
     );
   },
   // A missing FFmpeg does not appear by waiting; show the message at once.

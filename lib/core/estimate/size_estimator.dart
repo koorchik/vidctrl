@@ -18,6 +18,7 @@ import '../ffmpeg/command_builder.dart';
 import '../ffmpeg/runner.dart';
 import '../media/media_info.dart';
 import '../quality/quality_meter.dart';
+import '../quality/quality_search.dart';
 import '../scenarios/blocks.dart';
 import '../scenarios/scenario.dart';
 
@@ -27,6 +28,7 @@ class OutputEstimate {
     this.time,
     this.measured = false,
     this.quality,
+    this.choice,
   });
 
   final int bytes;
@@ -40,6 +42,9 @@ class OutputEstimate {
   /// How close the picture will come to the original: the poorest of the
   /// samples. Null where it was not measured.
   final QualityScore? quality;
+
+  /// The quality chosen for this video, where the goal raises it when needed.
+  final QualityChoice? choice;
 }
 
 /// The size of the output when it can be calculated without encoding
@@ -146,11 +151,24 @@ OutputEstimate extrapolateSamples({
 
 abstract interface class OutputEstimator {
   /// Null when the estimate could not be made or was cancelled.
-  Future<OutputEstimate?> estimate(MediaInfo info, ConversionPlan plan);
+  ///
+  /// With [raise], a plan whose standard quality falls short of looking the
+  /// same is measured again at better ones (`quality_search.dart`), and the
+  /// estimate carries the choice. [onAttempt] is told each try, from 1 (the
+  /// standard quality) on.
+  Future<OutputEstimate?> estimate(
+    MediaInfo info,
+    ConversionPlan plan, {
+    RaisesQuality? raise,
+    void Function(int attempt)? onAttempt,
+  });
 
   /// Stops every estimate in progress. Completes once they have ended: FFmpeg
   /// has exited and nothing it wrote is left.
   Future<void> cancelAll();
+
+  /// Deletes the pieces kept to show the hardest frames, as the app leaves.
+  Future<void> discardKept();
 }
 
 /// Measures quality-targeted encodes by encoding samples with FFmpeg, and
@@ -176,12 +194,20 @@ class SampleEstimator implements OutputEstimator {
 
   /// Estimates under way, so that [cancelAll] can wait for them to end.
   final _measuring = <Future<OutputEstimate?>>{};
+
+  /// Encoded pieces kept to show a video's hardest frame.
+  final _kept = <String>{};
   var _generation = 0;
   var _counter = 0;
 
   @override
-  Future<OutputEstimate?> estimate(MediaInfo info, ConversionPlan plan) async {
-    final measuring = _measure(info, plan);
+  Future<OutputEstimate?> estimate(
+    MediaInfo info,
+    ConversionPlan plan, {
+    RaisesQuality? raise,
+    void Function(int attempt)? onAttempt,
+  }) async {
+    final measuring = _measure(info, plan, raise, onAttempt);
     _measuring.add(measuring);
     try {
       return await measuring;
@@ -190,7 +216,12 @@ class SampleEstimator implements OutputEstimator {
     }
   }
 
-  Future<OutputEstimate?> _measure(MediaInfo info, ConversionPlan plan) async {
+  Future<OutputEstimate?> _measure(
+    MediaInfo info,
+    ConversionPlan plan,
+    RaisesQuality? raise,
+    void Function(int attempt)? onAttempt,
+  ) async {
     final calculated = estimateWithoutEncoding(info, plan);
     if (calculated != null) return calculated;
     if (plan.video is! VideoEncode) return null;
@@ -198,91 +229,276 @@ class SampleEstimator implements OutputEstimator {
     if (samples.isEmpty) return null;
 
     final generation = _generation;
+    await _workDir.create(recursive: true);
+    final comparable = compare && canComparePlan(plan);
+
+    if (raise == null || !comparable) {
+      final trial = await _trial(info, plan, samples, generation, comparable);
+      if (trial == null) return null;
+      return OutputEstimate(
+        bytes: trial.bytes,
+        time: trial.time,
+        measured: true,
+        quality: trial.score,
+      );
+    }
+
+    // The first try, kept in case its pieces could not be compared: the
+    // size is known all the same.
+    _Trial? first;
+    // The pieces each try kept; estimates run side by side, so each deletes
+    // only its own.
+    final pieces = <String>[];
+    QualityChoice? choice;
+    // The piece kept to show the hardest frame, if any.
+    String? shown;
+    try {
+      choice = await chooseQuality(
+        range: raise.qualityRange(plan),
+        sourceBytes: info.sizeBytes,
+        onAttempt: onAttempt,
+        measure: (value) async {
+          final trial = await _trial(
+            info,
+            raise.withQuality(plan, value),
+            samples,
+            generation,
+            true,
+            keepHardest: true,
+          );
+          first ??= trial;
+          if (trial?.hardest?.encodedPiece case final piece?) pieces.add(piece);
+          final score = trial?.score;
+          if (trial == null || score == null) return null;
+          return QualityTrial(
+            value: value,
+            score: score,
+            bytes: trial.bytes,
+            time: trial.time,
+            pieces: samples.length,
+            hardest: trial.hardest,
+          );
+        },
+      );
+    } finally {
+      // Only a result that falls short has its frame shown, from the
+      // chosen quality's piece, and only while this estimate still counts.
+      shown =
+          choice?.outcome == QualityOutcome.belowTarget &&
+              generation == _generation
+          ? choice?.chosen.hardest?.encodedPiece
+          : null;
+      for (final path in pieces) {
+        if (path != shown) await _delete(path);
+      }
+    }
+    if (choice == null || generation != _generation) {
+      final measured = first;
+      if (generation != _generation || measured == null) return null;
+      return OutputEstimate(
+        bytes: measured.bytes,
+        time: measured.time,
+        measured: true,
+      );
+    }
+    return OutputEstimate(
+      bytes: choice.chosen.bytes,
+      time: choice.chosen.time,
+      measured: true,
+      quality: choice.chosen.score,
+      choice: shown == null ? _withoutPieces(choice) : choice,
+    );
+  }
+
+  /// [choice] without the pieces it named, which are deleted.
+  QualityChoice _withoutPieces(QualityChoice choice) {
+    QualityTrial strip(QualityTrial trial) {
+      final hardest = trial.hardest;
+      return QualityTrial(
+        value: trial.value,
+        score: trial.score,
+        bytes: trial.bytes,
+        time: trial.time,
+        pieces: trial.pieces,
+        hardest: hardest == null
+            ? null
+            : HardestFrame(
+                pieceStart: hardest.pieceStart,
+                pieceLength: hardest.pieceLength,
+                frame: hardest.frame,
+              ),
+      );
+    }
+
+    final trials = [for (final trial in choice.trials) strip(trial)];
+    return QualityChoice(
+      outcome: choice.outcome,
+      trials: trials,
+      chosen: trials[choice.trials.indexOf(choice.chosen)],
+      sourceBytes: choice.sourceBytes,
+    );
+  }
+
+  /// Encodes [samples] with [plan] and, when [comparable], compares each with
+  /// the same piece of the original. With [keepHardest], the encoded piece
+  /// that came out poorest is kept, to show its hardest frame. Null when an
+  /// encode failed or was stopped.
+  Future<_Trial?> _trial(
+    MediaInfo info,
+    ConversionPlan plan,
+    List<SampleRange> samples,
+    int generation,
+    bool comparable, {
+    bool keepHardest = false,
+  }) async {
     // The sound is calculated, so only the picture is encoded.
     final pictureOnly = plan.withAudio(const AudioNone());
-    await _workDir.create(recursive: true);
-
     var bytes = 0;
     var sampled = Duration.zero;
     final scores = <QualityScore?>[];
-    final comparable = compare && canComparePlan(plan);
+    ({double score, HardestFrame frame})? poorest;
     final stopwatch = Stopwatch()..start();
-    for (final sample in samples) {
-      final output = File(
-        p.join(_workDir.path, 'sample_${_counter++}.${plan.extension}'),
-      );
-      final run = await _runner.start(
-        buildFfmpegArgs(
-          input: info.path,
-          output: output.path,
-          plan: pictureOnly,
-          sample: sample,
-        ),
-      );
-      _running.add(run);
-      // Stopped while this sample was starting.
-      if (generation != _generation) unawaited(run.cancel());
-      final result = await run.result;
-      _running.remove(run);
-      try {
-        if (generation != _generation) return null;
-        if (result.status != RunStatus.completed) return null;
-        if (!await output.exists()) return null;
-        bytes += await output.length();
-        if (comparable) {
-          // Comparing is not part of converting: kept out of the time.
-          stopwatch.stop();
-          scores.add(await _compare(info, output.path, sample, generation));
-          stopwatch.start();
+    var finished = false;
+    try {
+      for (final sample in samples) {
+        final output = File(
+          p.join(_workDir.path, 'sample_${_counter++}.${plan.extension}'),
+        );
+        final run = await _runner.start(
+          buildFfmpegArgs(
+            input: info.path,
+            output: output.path,
+            plan: pictureOnly,
+            sample: sample,
+          ),
+        );
+        _running.add(run);
+        // Stopped while this sample was starting.
+        if (generation != _generation) unawaited(run.cancel());
+        final result = await run.result;
+        _running.remove(run);
+        var kept = false;
+        try {
           if (generation != _generation) return null;
+          if (result.status != RunStatus.completed) return null;
+          if (!await output.exists()) return null;
+          bytes += await output.length();
+          if (comparable) {
+            // Comparing is not part of converting: kept out of the time.
+            stopwatch.stop();
+            final compared = await _compare(
+              info,
+              output.path,
+              sample,
+              generation,
+            );
+            stopwatch.start();
+            if (generation != _generation) return null;
+            scores.add(compared?.score);
+            final frame = compared?.hardest;
+            if (keepHardest &&
+                frame != null &&
+                (poorest == null || frame.score < poorest.score)) {
+              if (poorest?.frame.encodedPiece case final previous?) {
+                await _delete(previous);
+              }
+              poorest = (
+                score: frame.score,
+                frame: HardestFrame(
+                  pieceStart: sample.start,
+                  pieceLength: sample.length,
+                  frame: frame.index,
+                  encodedPiece: output.path,
+                ),
+              );
+              _kept.add(output.path);
+              kept = true;
+            }
+          }
+        } finally {
+          if (!kept && await output.exists()) await output.delete();
         }
-      } finally {
-        if (await output.exists()) await output.delete();
+        final end = sample.start + sample.length;
+        sampled += (end > info.duration ? info.duration : end) - sample.start;
       }
-      final end = sample.start + sample.length;
-      sampled += (end > info.duration ? info.duration : end) - sample.start;
+      finished = sampled > Duration.zero;
+    } finally {
+      // A trial that failed or was stopped keeps nothing.
+      if (!finished || generation != _generation) {
+        if (poorest?.frame.encodedPiece case final path?) await _delete(path);
+      }
     }
-    if (sampled <= Duration.zero) return null;
-    return extrapolateSamples(
+    if (!finished || generation != _generation) return null;
+    final estimate = extrapolateSamples(
       info: info,
       plan: plan,
       sampleBytes: bytes,
       sampled: sampled,
       spent: stopwatch.elapsed,
-      quality: scores.isEmpty || scores.contains(null)
+    );
+    return _Trial(
+      bytes: estimate.bytes,
+      time: estimate.time,
+      score: scores.isEmpty || scores.contains(null)
           ? null
           : QualityScore.worstOf(scores.cast<QualityScore>()),
+      hardest: poorest?.frame,
     );
   }
 
   /// How close [output], an encoded [sample], comes to the same piece of the
-  /// original. Null when it could not be compared.
-  Future<QualityScore?> _compare(
+  /// original, and its frame that differs most. Null when it could not be
+  /// compared.
+  Future<({QualityScore score, ({int index, double score})? hardest})?>
+  _compare(
     MediaInfo info,
     String output,
     SampleRange sample,
     int generation,
   ) async {
     final video = info.video;
+    final useVmaf = vmaf && video != null;
+    final log = File(p.join(_workDir.path, 'frames_${_counter++}.log'));
     final run = await _runner.start(
       comparisonArgs(
         original: info.path,
         result: output,
         range: sample,
-        vmafModel: vmaf && video != null
-            ? vmafModelFor(video.width, video.height)
-            : null,
+        vmafModel: useVmaf ? vmafModelFor(video.width, video.height) : null,
         threads: Platform.numberOfProcessors,
+        frameLog: log.path,
       ),
     );
     _running.add(run);
     if (generation != _generation) unawaited(run.cancel());
     final result = await run.result;
     _running.remove(run);
-    if (result.status != RunStatus.completed) return null;
-    final lumaDb = parseXpsnr(result.errorLines);
-    if (lumaDb == null) return null;
-    return QualityScore(lumaDb, vmaf: parseVmaf(result.errorLines));
+    try {
+      if (result.status != RunStatus.completed) return null;
+      final lumaDb = parseXpsnr(result.errorLines);
+      if (lumaDb == null) return null;
+      final frames = await log.exists()
+          ? frameScores(await log.readAsString())
+          : const <double>[];
+      ({int index, double score})? hardest;
+      for (var i = 0; i < frames.length; i++) {
+        if (hardest == null || frames[i] < hardest.score) {
+          hardest = (index: i, score: frames[i]);
+        }
+      }
+      return (
+        score: QualityScore(lumaDb, vmaf: parseVmaf(result.errorLines)),
+        hardest: hardest,
+      );
+    } finally {
+      if (await log.exists()) await log.delete();
+    }
+  }
+
+  Future<void> _delete(String path) async {
+    _kept.remove(path);
+    final file = File(path);
+    if (await file.exists()) await file.delete();
   }
 
   @override
@@ -295,4 +511,28 @@ class SampleEstimator implements OutputEstimator {
       for (final estimate in measuring) estimate.catchError((_) => null),
     ]);
   }
+
+  @override
+  Future<void> discardKept() async {
+    for (final path in _kept.toList()) {
+      await _delete(path);
+    }
+  }
+}
+
+/// What encoding the pieces at one quality showed.
+class _Trial {
+  const _Trial({
+    required this.bytes,
+    required this.time,
+    this.score,
+    this.hardest,
+  });
+
+  final int bytes;
+  final Duration? time;
+
+  /// The poorest piece's score; null where the pieces were not compared.
+  final QualityScore? score;
+  final HardestFrame? hardest;
 }

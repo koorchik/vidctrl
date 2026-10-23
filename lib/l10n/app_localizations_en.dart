@@ -976,4 +976,127 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get archiveQualityYours =>
       'In the queue, in the ⋯ menu of a finished video, choose “Compare with the original”: the app compares the copy with its original and says in plain words how alike they are.';
+
+  @override
+  String get choosingQuality => 'choosing the quality…';
+
+  @override
+  String get jobCheckingQuality => 'Checking the quality…';
+
+  @override
+  String jobChoosingQuality(int attempt) {
+    return 'Choosing the quality… try $attempt';
+  }
+
+  @override
+  String get qualityRaised => 'Quality raised to look the same';
+
+  @override
+  String get qualityCheckByEye => 'Check by eye before deleting the original';
+
+  @override
+  String get statusKeptAsIs => 'Will stay as it is';
+
+  @override
+  String qualityNotWorthIt(int percent) {
+    return 'Converting would save only $percent%';
+  }
+
+  @override
+  String get qualityNotSmaller => 'Converting would not make it smaller';
+
+  @override
+  String get jobLeftAsIs => 'Left as it is';
+
+  @override
+  String get convertAnyway => 'Convert anyway';
+
+  @override
+  String get qualityDetails => 'About this video\'s quality';
+
+  @override
+  String toCheckByEye(int count) {
+    return 'check by eye: $count';
+  }
+
+  @override
+  String get qualityReportRaisedTitle => 'Quality raised for this video';
+
+  @override
+  String get qualityReportRaised =>
+      'At the archive\'s usual quality, the hardest part of this video would not quite look the same as the original. So it gets a better quality: the lowest at which every piece checked looks the same. The file is larger than usual, and nothing is lost.';
+
+  @override
+  String get qualityReportBelowTitle => 'Check this video by eye';
+
+  @override
+  String get qualityReportBelow =>
+      'Even at the best quality the archive gives, the hardest part of this video differs a little from the original. This happens with film grain, noise or effects, which a smaller file cannot copy exactly. It does not mean the copy looks bad: compare the frame below, and keep the original if the difference matters to you.';
+
+  @override
+  String get qualityReportBelowGpu =>
+      'This way of encoding has no better quality to try. Encoding on the processor (Thorough) raises it where a video needs it.';
+
+  @override
+  String get qualityReportKeptTitle => 'Why this video stays as it is';
+
+  @override
+  String qualityReportKept(int percent) {
+    return 'Converted, this video would keep $percent% of its size, so it would free little space. The original is left as it is, untouched. To convert it all the same, choose “Convert anyway” in its ⋯ menu in the queue.';
+  }
+
+  @override
+  String get qualityReportKeptLarger =>
+      'Converted, this video would come out larger than it is, so it would free no space. The original is left as it is, untouched. To convert it all the same, choose “Convert anyway” in its ⋯ menu in the queue.';
+
+  @override
+  String qualityPieces(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Judged by the poorest of $count pieces of 3 s',
+      one: 'Judged by its only piece of 3 s',
+    );
+    return '$_temp0; it looks the same from VMAF 95';
+  }
+
+  @override
+  String qualitySizeShare(int percent) {
+    return '$percent% of the original\'s size';
+  }
+
+  @override
+  String get qualityChosen => '← chosen';
+
+  @override
+  String qualityFrameTitle(String time) {
+    return 'The hardest frame checked, at $time';
+  }
+
+  @override
+  String get qualityFrameHint =>
+      'At its real size: one dot of the picture for one dot of your screen. Drag to look around; hold Space to see the original.';
+
+  @override
+  String get qualityFrameOriginal => 'Original';
+
+  @override
+  String get qualityFrameResult => 'Result';
+
+  @override
+  String get qualityFrameFit => 'Fit to the window';
+
+  @override
+  String get qualityFrameLoading => 'Getting the frames…';
+
+  @override
+  String get qualityFrameMissing =>
+      'The frames could not be read: the file may have been moved or deleted.';
+
+  @override
+  String get archiveQualityEachTitle => 'Each video is checked';
+
+  @override
+  String get archiveQualityEach =>
+      'Before converting, a few short pieces of each video are encoded and compared with the original, and the poorest one decides. If it falls short, that video gets a better quality, up to a limit past which files grow a lot for little. A video still short of it is converted all the same, and marked to be checked by eye. One that would keep more than four fifths of its size is left as it is.';
 }

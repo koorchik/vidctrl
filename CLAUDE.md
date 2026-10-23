@@ -133,6 +133,24 @@ Capabilities)` (`scenarios/scenario.dart`) looks at one file and returns a
   and fixed-rate formats, measured by encoding short pieces otherwise. Each
   piece is also compared with the original, so the video list and the
   waiting jobs say how close the result will look (the poorest piece).
+- `quality/quality_search.dart` chooses each archive video's quality from
+  those measurements. The poorest piece must look the same (VMAF 95, or
+  XPSNR 42 without VMAF); the preset's standard crf is the poorest allowed,
+  and a video that falls short gets a lower one, down to a best
+  (`RaisesQuality` in `scenario.dart`, numbers in `archive.dart`). Four
+  outcomes: standard, raised, `belowTarget` (still short at the best: it
+  is converted anyway, its name ends in `-check` and the app asks for a
+  look by eye) and `notWorthIt` (the result would keep over 80% of the
+  original's size: left as it is, with "Convert anyway" in the queue). The
+  search measures the best number second, so a hopeless video costs two
+  tries; otherwise it interpolates, six tries at most. A standard result
+  already past the size limit ends it: better ones only grow.
+- `quality/frame_grabber.dart` grabs the hardest frame of the poorest piece
+  from the original and the result, full size, for the (i) window
+  (`home/widgets/quality_report.dart`), which shows them at real size with
+  an Original/Result switch. Before converting, the piece encoded while
+  measuring stands in for the result; it is kept only for a `belowTarget`
+  video and deleted when the app closes.
 - `quality/quality_meter.dart` compares a result with its original in one
   pass: XPSNR (`xpsnr`) always, VMAF (`libvmaf`, the 4K model above 1080p)
   where the FFmpeg has it; frames paired by order, a sample against the same
@@ -169,7 +187,13 @@ recipeProvider ──┤        │
 - **Queue** (`queue/`): a job is a snapshot (video info, recipe, plan, output
   path) made by Add to queue / Add all, so later panel changes do not touch
   it. The queue starts by itself and runs one job at a time. An identical job
-  still pending is not added twice.
+  still pending is not added twice. An archive job whose quality is not
+  known yet measures its video first ("Checking the quality…", then
+  "Choosing the quality… try N"), keeps the result for the list too, and
+  takes its plan and file name from it. Cancel and pause stop the
+  measuring at once (it cannot be held midway; continuing measures again).
+  A sample of a video not worth converting is made all the same. Adding is
+  never blocked by measuring.
 - **Estimates** (`estimates/`): expected sizes shared by the video list and
   the queue, keyed by file and goal; a finished sample overwrites a
   measurement with its better one.
@@ -339,8 +363,9 @@ The UI renders presets and options generically; it needs no other change.
 - **Screenshots for comparing:** FFmpeg turns an 8-bit picture into RGB by
   a faster, less exact path than a 10-bit one, so the 8-bit original came
   out darker and more contrasty than its 10-bit copy, a difference that is
-  not in the files. Convert both the same way
-  (`scale=flags=accurate_rnd+full_chroma_int:in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgb24`).
+  not in the files. `scale=flags=accurate_rnd+full_chroma_int` before
+  `format=rgb24` makes both alike (`FrameGrabber`); the colour tags in the
+  files are read as they are.
 - **SVT-AV1 4.2 notes:** `scd=1` is ignored with a warning. `tune=0` turns
   CDEF and loop restoration off on frames it finds noisy. `film-grain=N`
   sets how noisy the encoder assumes the picture to be (N/10) when it
@@ -407,7 +432,10 @@ The UI renders presets and options generically; it needs no other change.
   Comparing the pieces makes it 40 to 80% slower (a film's six pieces: 12
   to 19 s); that time is kept out of the expected conversion time. The
   poorest piece decides: a film whose dark scenes lose detail is fine on
-  average.
+  average. Choosing a better quality adds a try per number: 38 s for that
+  film (crf 35, then 20, both short: `belowTarget`), 8 to 25 s for camera
+  and phone videos that need none. The per-frame scores come from a log
+  file, whose path inside `-lavfi` is escaped twice (`escapeFilterPath`).
 - **Byte counts overflow when multiplied.** Tens of gigabytes times
   gigabytes exceeds 64-bit integers; take the ratio first.
 - **Widget tests:**
