@@ -1,5 +1,6 @@
 import '../../core/ffmpeg/command_builder.dart';
 import '../../core/output/output_namer.dart';
+import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
 
 /// Whether a job converts the whole video or a short piece of it.
@@ -37,9 +38,15 @@ class Recipe {
   Recipe withoutSample() => copyWith(sample: SampleChoice.none);
 
   /// Identifies the goal and options, not the sample choice: a sample and a
-  /// whole-video conversion with the same goal share expected sizes.
+  /// whole-video conversion with the same goal share expected sizes. Options
+  /// count as the preset will apply them, so a default chosen again is the
+  /// same goal as one never changed.
   String get goalKey {
-    final entries = values.entries.map((e) => '${e.key}=${e.value}').toList()
+    final preset = findPreset(presetId);
+    final applied = preset == null
+        ? values
+        : {for (final o in preset.options) o.id: preset.choice(values, o.id)};
+    final entries = applied.entries.map((e) => '${e.key}=${e.value}').toList()
       ..sort();
     return '$presetId|${entries.join(',')}';
   }

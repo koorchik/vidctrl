@@ -629,6 +629,37 @@ void main() {
       },
     );
 
+    test('going back to the default finds what was measured for it', () async {
+      await sources().addPaths(['/videos/a.mp4']);
+      await settle();
+      env.estimator.hold = true;
+      recipe().setOption('codec', 'hevc');
+      await settle();
+
+      recipe().setOption('codec', 'av1');
+      await settle();
+
+      final preview = container.read(previewProvider)[video('a.mp4').id]!;
+      expect(preview.estimate, isNotNull);
+      // AV1 once, HEVC once: the default chosen again is not measured anew.
+      expect(env.estimator.measured, ['/videos/a.mp4', '/videos/a.mp4']);
+    });
+
+    test('a video waiting for its turn says it is being measured', () async {
+      env.estimator.hold = true;
+      final many = [for (var i = 0; i < 5; i++) '/videos/m$i.mp4'];
+      for (final path in many) {
+        env.ffprobe.add(path);
+      }
+
+      await sources().addPaths(many);
+      await settle();
+
+      final previews = container.read(previewProvider).values;
+      expect(env.estimator.measured.length, lessThan(many.length));
+      expect(previews.every((p) => p.measuring), isTrue);
+    });
+
     test('a quick fix is calculated, not measured', () async {
       recipe().selectPreset('resolve.studio');
       await sources().addPaths(['/videos/a.mp4']);

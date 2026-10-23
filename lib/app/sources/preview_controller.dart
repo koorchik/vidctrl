@@ -48,18 +48,19 @@ class PreviewController extends Notifier<Map<int, Preview>> {
       final key = estimateKey(video.path, recipe);
       final estimate =
           estimateWithoutEncoding(info, plan) ?? cache.estimates[key];
-      previews[video.id] = Preview(
-        plan: plan,
-        estimate: estimate,
-        measuring: cache.measuring.contains(key),
-      );
-      if (estimate == null &&
+      final pending =
+          estimate == null &&
           plan.producesOutput &&
           plan.video is VideoEncode &&
           !cache.measuring.contains(key) &&
-          !cache.failed.contains(key)) {
-        toMeasure.add((key, video, plan));
-      }
+          !cache.failed.contains(key);
+      previews[video.id] = Preview(
+        plan: plan,
+        estimate: estimate,
+        // One waiting for its turn is measured as soon as another is done.
+        measuring: cache.measuring.contains(key) || (pending && !queueBusy),
+      );
+      if (pending) toMeasure.add((key, video, plan));
     }
 
     if (!queueBusy && toMeasure.isNotEmpty) {
