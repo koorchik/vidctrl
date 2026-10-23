@@ -36,6 +36,25 @@ void main() {
     );
   });
 
+  test('VIDCTRL_ENDPOINT names another endpoint file', () {
+    expect(
+      EndpointFile.forThisUser(
+        environment: {
+          'VIDCTRL_ENDPOINT': '/home/alice/dev/control.json',
+          'XDG_RUNTIME_DIR': '/run/user/1000',
+          'HOME': '/home/alice',
+        },
+      ).path,
+      '/home/alice/dev/control.json',
+    );
+    expect(
+      EndpointFile.forThisUser(
+        environment: {'VIDCTRL_ENDPOINT': '', 'HOME': '/home/alice'},
+      ).path,
+      isNot(''),
+    );
+  });
+
   test(
     'a written endpoint reads back and only its owner can read it',
     () async {

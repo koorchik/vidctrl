@@ -89,12 +89,16 @@ class EndpointFile {
 
   final String path;
 
-  static EndpointFile forThisUser() => EndpointFile(
-    endpointPath(
-      os: Platform.operatingSystem,
-      environment: Platform.environment,
-    ),
-  );
+  /// The file for this user, or the one `VIDCTRL_ENDPOINT` names, so that
+  /// two copies can run side by side in development and in tests.
+  static EndpointFile forThisUser({Map<String, String>? environment}) {
+    final env = environment ?? Platform.environment;
+    final given = env['VIDCTRL_ENDPOINT'];
+    if (given != null && given.isNotEmpty) return EndpointFile(given);
+    return EndpointFile(
+      endpointPath(os: Platform.operatingSystem, environment: env),
+    );
+  }
 
   /// Null when the file is missing or damaged.
   Future<Endpoint?> read() async {

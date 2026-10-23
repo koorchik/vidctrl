@@ -234,7 +234,11 @@ first window to start owns the endpoint file `control.json` (Linux
 protocol; it is removed when the window closes. The client program
 (`dart run bin/vidctrl_client.dart …`, `vidctrl-client` once compiled) imports
 only `lib/core/`; `VIDCTRL_APP` names the app it starts when no window is
-open, for a development build.
+open, for a development build, and `VIDCTRL_ENDPOINT=<file>` gives the
+window and the client another endpoint file, so a development copy runs
+beside an installed one. `dart compile exe` refuses this package (a
+dependency, `objective_c`, has build hooks); `dart build cli --target
+bin/vidctrl_client.dart` makes the program.
 
 ### The seam for tests
 

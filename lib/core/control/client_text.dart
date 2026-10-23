@@ -1,0 +1,310 @@
+import 'dart:math';
+
+import '../media/media_details.dart' show formatBytes;
+import 'views.dart';
+import 'words.dart';
+
+// What vidctrl-client prints for people: plain words first, then the ids a
+// person or an agent refers to things by, and the technical names last.
+// Nothing here speaks of deleting a file (see `speaksOfDeleting`).
+
+List<String> statusText(StatusView status) {
+  final name = status.version.isEmpty ? 'VidCtrl' : 'VidCtrl ${status.version}';
+  return switch (status.state) {
+    'ready' => [
+      '$name is open and ready.',
+      _queueSummary(status.busy, status.paused, status.jobs),
+    ],
+    'starting' => ['$name is starting: it is looking for FFmpeg.'],
+    'ffmpegMissing' => [
+      '$name is open, but it could not find FFmpeg; the window says what '
+          'to do.',
+    ],
+    _ => ['$name is open (${status.state}).'],
+  };
+}
+
+String _queueSummary(bool busy, bool paused, Map<String, int> jobs) {
+  final counts = [
+    for (final MapEntry(:key, :value) in jobs.entries)
+      '$value ${statusWords(key).toLowerCase()}',
+  ];
+  return 'The queue is ${_queueState(busy, paused)}'
+      '${counts.isEmpty ? ', with no jobs' : ': ${counts.join(', ')}'}.';
+}
+
+String _queueState(bool busy, bool paused) => paused
+    ? 'paused in the window'
+    : busy
+    ? 'converting'
+    : 'idle';
+
+/// The goals, each by the shortest name `--goal` takes: its kind's when
+/// that kind has no other.
+List<String> goalsText(List<GoalView> goals) {
+  String name(GoalView goal) =>
+      goals.where((g) => g.scenario == goal.scenario).length == 1
+      ? goal.scenario
+      : goal.id;
+  // A label that only repeats the id ("yes") is said once.
+  String choiceName(ChoiceView choice) =>
+      choice.label.toLowerCase() == choice.id
+      ? choice.id
+      : '${choice.label}: ${choice.id}';
+  return [
+    for (final (i, goal) in goals.indexed) ...[
+      if (i > 0) '',
+      '${goal.title}${goal.subtitle.isEmpty ? '' : ', ${goal.subtitle}'}: '
+          '--goal ${name(goal)}',
+      for (final option in goal.options) ...[
+        '  ${option.title}${option.advanced ? ' (under More options…)' : ''}: '
+            '--opt ${option.id}=…',
+        for (final choice in option.choices)
+          '    ${choiceName(choice)}'
+              '${choice.id == option.defaultChoice ? ' (the default)' : ''}'
+              '${choice.hint.isEmpty ? '' : '. ${choice.hint}'}',
+      ],
+    ],
+  ];
+}
+
+/// One line of a `videos.add` answer.
+String addedText(Map<String, Object?> entry) {
+  final path = entry['path'];
+  final id = entry['id'];
+  return switch (entry['result']) {
+    'added' => 'Video $id: Added. $path',
+    'known' => 'Video $id: In the list already. $path',
+    'unreadable' => 'Video $id: ${statusWords('unreadable')}. $path',
+    _ => 'Nothing found at $path: no file, nor a folder with videos.',
+  };
+}
+
+List<String> videoText(VideoView video) {
+  final facts = [
+    if (video.sizeBytes case final bytes?) formatBytes(bytes),
+    if (video.durationSeconds case final seconds?) _clock(seconds),
+    if (video.width != null && video.height != null)
+      '${video.width}x${video.height}',
+    ?video.videoCodec,
+    if (video.audioCodecs.isNotEmpty) 'sound ${video.audioCodecs.join(', ')}',
+    if (video.hdr) 'HDR',
+  ];
+  return [
+    'Video ${video.id}: ${statusWords(video.status)}. ${video.path}',
+    if (facts.isNotEmpty) '  ${facts.join(', ')}',
+    if (video.preview case final preview?) '  ${_previewText(preview)}',
+  ];
+}
+
+String _previewText(GoalPreview preview) {
+  final size = switch (preview.expectedBytes) {
+    final bytes? =>
+      ' About ${formatBytes(bytes)}'
+          '${preview.measured ? ', measured' : ''}.',
+    null when preview.measuring => ' Measuring the size…',
+    null => '',
+  };
+  final closeness = preview.closeness == null
+      ? ''
+      : ' ${closenessWords(preview.closeness!)}.';
+  return 'With ${preview.goal}: ${planWords(preview.plan)}.$size$closeness';
+}
+
+String removedText(int id) =>
+    'Video $id: Off the list; its file stays on disk.';
+
+/// A job as the queue pane shows it.
+List<String> jobText(JobView job) {
+  final progress = [
+    if (job.fraction case final fraction? when job.status == 'running')
+      _percent(fraction),
+    if (job.remainingSeconds case final seconds?) _timeLeft(seconds),
+  ];
+  final state = job.attempt != null && job.status == 'running'
+      ? 'Choosing the quality, try ${job.attempt}'
+      : statusWords(job.status);
+  return [
+    'Job ${job.id}: $state${progress.map((s) => ', $s').join()}. '
+        '${job.path}',
+    '  ${_recipe(job.goal, job.options)}, video ${job.videoId}'
+        '${switch (job.sample) {
+          'start' => ', a sample from the start',
+          'middle' => ', a sample from the middle',
+          _ => '',
+        }}',
+    ..._resultText(
+      outputPath: job.outputPath,
+      outputBytes: job.outputBytes,
+      quality: job.quality,
+      needsALook: job.needsALook,
+      errorLines: job.errorLines,
+    ),
+  ];
+}
+
+List<String> queueText(bool busy, bool paused, List<JobView> jobs) => [
+  if (jobs.isEmpty)
+    paused
+        ? 'The queue is empty and paused in the window.'
+        : 'The queue is empty.'
+  else
+    'The queue is ${_queueState(busy, paused)}:',
+  for (final job in jobs) ...jobText(job),
+];
+
+/// A `queue.add` answer.
+List<String> queueAddText(Map<String, Object?> answer) {
+  final added = [
+    for (final job in answer['added'] as List)
+      JobView.fromJson(Map<String, Object?>.from(job as Map)),
+  ];
+  return [
+    'Goal: ${_recipe(answer['goal'] as String, Map.from(answer['options'] as Map))}.',
+    for (final job in added) 'Job ${job.id}: Queued. ${job.path}',
+    for (final video in answer['alreadyQueued'] as List)
+      'Video $video: In the queue already, with this goal and folder.',
+    for (final skipped in answer['skipped'] as List)
+      switch ((skipped as Map)['reason']) {
+        'unreadable' =>
+          'Not queued, ${_video(skipped['video'])}: it cannot be read.',
+        _ => 'Not queued, ${_video(skipped['video'])}: nothing found there.',
+      },
+    if (added.isEmpty) 'Nothing new was queued.',
+  ];
+}
+
+String _video(Object? reference) =>
+    reference is int ? 'video $reference' : '$reference';
+
+String _recipe(String goal, Map<Object?, Object?> options) => [
+  goal,
+  for (final MapEntry(:key, :value) in options.entries) '$key=$value',
+].join(', ');
+
+/// How a job ended, as `wait` reports it.
+List<String> outcomeText(JobOutcome outcome) => [
+  'Job ${outcome.jobId}: ${statusWords(outcome.status)}. ${outcome.path}',
+  ..._resultText(
+    outputPath: outcome.outputPath,
+    needsALook: outcome.needsALook,
+  ),
+];
+
+/// How a job ended, from its `job-finished` event.
+List<String> finishedText(JobView job) => [
+  'Job ${job.id}: ${statusWords(job.status)}. ${job.path}',
+  ..._resultText(
+    outputPath: job.status == 'done' ? job.outputPath : null,
+    outputBytes: job.outputBytes,
+    quality: job.quality,
+    needsALook: job.needsALook,
+    errorLines: job.errorLines,
+  ),
+];
+
+List<String> _resultText({
+  String? outputPath,
+  int? outputBytes,
+  QualityView? quality,
+  required bool needsALook,
+  List<String> errorLines = const [],
+}) => [
+  if (outputPath != null)
+    '  Result: $outputPath'
+        '${outputBytes == null ? '' : ', ${formatBytes(outputBytes)}'}',
+  if (quality != null) '  ${_qualityText(quality)}',
+  if (needsALook && quality?.outcome != 'belowTarget')
+    '  Worth a look by eye: its name ends in -check.',
+  // FFmpeg's last words say why it failed.
+  for (final line in errorLines.skip(max(0, errorLines.length - 3)))
+    '  > $line',
+];
+
+String _qualityText(QualityView quality) {
+  final standard = quality.standardValue;
+  final numbers = [
+    if (quality.value case final value?)
+      standard == null || standard == value
+          ? 'crf $value'
+          : 'crf $value, usual $standard',
+    ..._scores(quality.vmaf, quality.xpsnr),
+  ];
+  final size = quality.share > 0
+      ? ' Expected at ${(quality.share * 100).round()}% of the original\'s '
+            'size.'
+      : '';
+  return '${outcomeWords(quality.outcome)}'
+      '${numbers.isEmpty ? '' : ' (${numbers.join('; ')})'}.$size';
+}
+
+/// One event of `events`, for people.
+List<String> eventText(String event, Map<String, Object?> params) {
+  Object? the(String key) => params[key];
+  VideoView video() => VideoView.fromJson(params);
+  JobView job() => JobView.fromJson(params);
+  return switch (event) {
+    'snapshot' => [
+      'Now: ${(the('videos') as List).length} videos in the list, '
+          '${(the('jobs') as List).length} jobs in the queue; the queue is '
+          '${_queueState(the('busy') == true, the('paused') == true)}.',
+    ],
+    'video-added' => ['Video ${the('id')}: Added. ${the('path')}'],
+    'video-ready' || 'video-unreadable' => [videoText(video()).first],
+    'video-removed' => [removedText(the('video') as int)],
+    'job-added' => [
+      'Job ${the('id')}: Queued. ${the('path')}',
+      '  ${_recipe(job().goal, job().options)}',
+    ],
+    'job-checking' => [
+      'Job ${the('job')}: Choosing the quality, try ${the('attempt')}.',
+    ],
+    'job-started' => ['Job ${the('id')}: Converting. ${the('path')}'],
+    'job-progress' => [
+      'Job ${the('job')}: ${_percent(the('fraction') as num)}'
+          '${switch (the('remainingSeconds')) {
+            final num seconds => ', ${_timeLeft(seconds.toDouble())}',
+            _ => '',
+          }}.',
+    ],
+    'job-finished' => finishedText(job()),
+    'job-removed' => ['Job ${the('job')}: ${statusWords('removed')}.'],
+    'queue-paused' => ['The queue is paused in the window.'],
+    'queue-resumed' => ['The queue goes on.'],
+    'queue-idle' => ['The queue has nothing more to do.'],
+    'compare-finished' when the('status') == 'measured' => [
+      'Job ${the('job')}: Compared with the original. '
+          '${closenessWords(the('closeness') as String)} '
+          '(${_scores(the('vmaf') as num?, the('xpsnr') as num?).join('; ')}).',
+    ],
+    'compare-finished' => [
+      'Job ${the('job')}: Could not be compared with the original.',
+      for (final line in (the('errorLines') as List?) ?? const []) '  > $line',
+    ],
+    'app-closing' => ['VidCtrl is closing.'],
+    _ => [event],
+  };
+}
+
+List<String> _scores(num? vmaf, num? xpsnr) => [
+  if (vmaf != null) 'VMAF ${vmaf.toStringAsFixed(1)}',
+  if (xpsnr != null) 'XPSNR ${xpsnr.toStringAsFixed(1)} dB',
+];
+
+String _percent(num fraction) => '${(fraction * 100).floor()}%';
+
+/// `12:34`, or `1:02:03` past an hour.
+String _clock(double seconds) {
+  final whole = seconds.round();
+  final h = whole ~/ 3600;
+  final m = whole % 3600 ~/ 60;
+  final s = (whole % 60).toString().padLeft(2, '0');
+  return h > 0 ? '$h:${m.toString().padLeft(2, '0')}:$s' : '$m:$s';
+}
+
+String _timeLeft(double seconds) {
+  if (seconds < 60) return 'under a minute left';
+  final minutes = (seconds / 60).round();
+  if (minutes < 60) return 'about $minutes min left';
+  return 'about ${minutes ~/ 60} h ${minutes % 60} min left';
+}
