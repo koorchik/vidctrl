@@ -343,7 +343,9 @@ How a widget stays right in both:
    `test/integration/conversion_test.dart`.
 5. For `vidctrl-client`'s manual, say in `_leaves`
    (`lib/core/control/manual.dart`, one entry per scenario) what the goal
-   leaves as it is, then run `flutter test tool/make_manual.dart`, which
+   is for and leaves as it is in a few words (the manual's line, which
+   must stay under 16 KB in all), and what it leaves in full (`help
+   goals`); then run `flutter test tool/make_manual.dart`, which
    rewrites `docs/CLIENT.md` and the goal words the client prints
    (`manual_test.dart` fails until then).
 

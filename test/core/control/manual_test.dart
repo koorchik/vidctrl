@@ -16,6 +16,16 @@ import 'package:vidctrl/core/scenarios/registry.dart';
 import '../../../tool/make_manual.dart'
     show manualFile, manualWordsFile, manualWordsSource;
 
+/// What [markdown] names a part or list by: its headings, and the words it
+/// sets in bold.
+Set<String> _headings(String markdown) => {
+  for (final m in RegExp(
+    r'^#+ (.+)$|\*\*([^*]+)\*\*',
+    multiLine: true,
+  ).allMatches(markdown))
+    m[1] ?? m[2]!,
+};
+
 /// Every key in [json] and the objects and lists inside it.
 Set<String> _keys(Object? json) => switch (json) {
   final Map<Object?, Object?> map => {
@@ -30,17 +40,41 @@ Set<String> _keys(Object? json) => switch (json) {
 
 void main() {
   final text = manual(client: 'vidctrl-client');
+  final document = manualDocument(client: 'vidctrl-client');
+
+  test('the manual is short enough for an agent to read in one go', () {
+    expect(utf8.encode(text).length, lessThanOrEqualTo(16000));
+  });
 
   test('the manual covers every command the client knows', () {
     for (final c in clientCommands) {
-      expect(text, contains('`vidctrl-client $c'), reason: c);
+      expect(text, contains('\n- `$c'), reason: c);
       expect(commandHelp(c), contains('vidctrl-client $c'), reason: c);
-      expect(text, contains(commandHelp(c).split('\n#### ').first), reason: c);
+      expect(
+        document,
+        contains(commandHelp(c).split('\n#### ').first),
+        reason: c,
+      );
       expect(usage(), contains('  $c '), reason: c);
     }
+    expect(
+      text,
+      contains(
+        '`vidctrl-client help <command>` prints a command\'s examples, its '
+        'text output and a JSON sample.',
+      ),
+    );
     expect([
       for (final c in manualJson()['commands'] as List) (c as Map)['name'],
     ], clientCommands);
+  });
+
+  test('every command\'s help has an example, and a sample of its JSON', () {
+    for (final c in clientCommands) {
+      final help = commandHelp(c);
+      expect(help, contains('```sh\nvidctrl-client $c'), reason: c);
+      if (c != 'help') expect(help, contains('```json\n{'), reason: c);
+    }
   });
 
   test('the manual lists every goal, option and choice', () {
@@ -56,14 +90,28 @@ void main() {
       }
     }
     // With the panel's words, not only ids.
-    expect(text, contains('### Archive, no quality loss: `--goal archive`'));
-    expect(text, contains('`av1`: Smallest file (the default).'));
+    expect(
+      text,
+      contains('- `--goal archive` (`archive.master`): Archive, no quality'),
+    );
+    expect(text, contains('`av1` Smallest file (default)'));
     expect(text, contains('`--goal resolve.studio`'));
+    // In full in the goals' help.
+    final goals = commandHelp('goals');
+    expect(goals, contains('#### Archive, no quality loss: `--goal archive`'));
+    expect(goals, contains('`av1`: Smallest file (the default).'));
+  });
+
+  test('the manual says which goal to choose', () {
+    final part = text.substring(text.indexOf('## Goals'));
+    expect(part, contains('the usual choice to save space without loss'));
+    expect(part, contains('at most 1080p'));
   });
 
   test('the manual, help and quick start never speak of deleting files', () {
     final texts = [
       text,
+      document,
       quickStart('x', os: 'linux'),
       quickStart('/opt/VidCtrl/vidctrl-client', os: 'linux'),
       quickStart(r'C:\VidCtrl\vidctrl-client.exe', os: 'windows'),
@@ -290,20 +338,47 @@ void main() {
       for (final kind in ControlErrorKind.values) kind.code,
       ...ClientErrorCodes.all,
     ];
+    final codesPart = text.substring(text.indexOf('## Codes'));
     for (final code in codes) {
-      expect(text, contains('- `$code`: '), reason: code);
+      expect(codesPart, contains('`$code`'), reason: code);
+      expect(document, contains('- `$code`: '), reason: code);
     }
-    for (final status in [
-      ...JobStatus.values.map(codeOf),
-      ...SourceStatus.values.map(codeOf),
-    ]) {
-      expect(text, contains('- `$status`: ${statusWords(status)}'));
+    // In full, with the words, in the help of the commands that give them.
+    for (final status in JobStatus.values.map(codeOf)) {
+      expect(
+        commandHelp('queue'),
+        contains('- `$status`: ${statusWords(status)}'),
+      );
+    }
+    for (final status in SourceStatus.values.map(codeOf)) {
+      expect(
+        commandHelp('videos'),
+        contains('- `$status`: ${statusWords(status)}'),
+      );
     }
     expect(
-      text,
+      commandHelp('job'),
       contains('- `BELOW_TARGET`: ${outcomeWords(OutcomeCodes.belowTarget)}'),
     );
     expect(text, contains('-check'));
+  });
+
+  test('what a help points to is in it or in the manual', () {
+    final known = _headings(text);
+    for (final c in clientCommands) {
+      final help = commandHelp(c);
+      final named = {
+        for (final m in RegExp(r'(?:see|under) "([^"…]+)"').allMatches(help))
+          m[1]!,
+      };
+      for (final name in named) {
+        expect(
+          {...known, ..._headings(help)},
+          contains(name),
+          reason: '$c points to "$name"',
+        );
+      }
+    }
   });
 
   test('the manual names no value as it was before codes', () {
@@ -318,7 +393,7 @@ void main() {
       '`app-closing`',
       'Text`',
     ]) {
-      expect(text, isNot(contains(old)), reason: old);
+      expect(document, isNot(contains(old)), reason: old);
     }
   });
 
@@ -341,7 +416,8 @@ void main() {
       Events.compareFinished,
       Events.appClosing,
     ]) {
-      expect(text, contains('| `$event` |'), reason: event);
+      expect(text, contains('`$event`'), reason: event);
+      expect(commandHelp('events'), contains('| `$event` |'), reason: event);
     }
     for (final code in [
       ExitCode.ok,
@@ -352,7 +428,8 @@ void main() {
       ExitCode.badArguments,
       ExitCode.ffmpegMissing,
     ]) {
-      expect(text, contains('| $code |'), reason: '$code');
+      expect(text, contains('\n- $code: '), reason: '$code');
+      expect(commandHelp('wait'), contains('| $code |'), reason: '$code');
     }
     for (final kind in ControlErrorKind.values) {
       expect(text, contains('`${kind.code}`'), reason: kind.code);
@@ -398,10 +475,11 @@ void main() {
     }
   });
 
-  test('docs/CLIENT.md is the manual as it is now', () {
+  test('docs/CLIENT.md is the manual, then every command\'s details', () {
+    expect(document, startsWith(text));
     expect(
       File(manualFile).readAsStringSync().replaceAll('\r\n', '\n'),
-      text,
+      document,
       reason: 'Run `flutter test tool/make_manual.dart`.',
     );
   });

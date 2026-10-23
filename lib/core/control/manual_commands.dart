@@ -41,12 +41,15 @@ class CommandDoc {
     required this.area,
     this.arguments = '',
     required this.summary,
+    required this.brief,
+    required this.answer,
     required this.about,
     this.options = const [],
     required this.examples,
     required this.text,
     required this.json,
     this.shapes = const [],
+    this.codes = const [],
     this.errors = const [],
   });
 
@@ -61,6 +64,14 @@ class CommandDoc {
 
   /// One line, for `--help`.
   final String summary;
+
+  /// What the manual's short entry says it does, and its notable refusals,
+  /// in Markdown: a sentence or three.
+  final String brief;
+
+  /// The keys of its `--json` answer, in the manual's short notation
+  /// (`{removed: [int]}`).
+  final String answer;
 
   /// Paragraphs in Markdown.
   final List<String> about;
@@ -78,9 +89,13 @@ class CommandDoc {
   /// What `--json` gives, in Markdown.
   final List<String> json;
 
-  /// The names of the shapes in [json], as the manual's "What `--json`
-  /// gives" names them.
+  /// The names of the shapes in [json], as the manual's "JSON" names them;
+  /// its help gives each in full.
   final List<String> shapes;
+
+  /// The kinds of code its answer carries besides its shapes' (`addResult`),
+  /// by their `codeKinds` name.
+  final List<String> codes;
 
   /// How it can fail, besides the failures every command shares.
   final List<String> errors;
@@ -368,6 +383,41 @@ final _estimateAnswer = {
 
 List<String> _jsonBlock(Object? value) => ['```json', jsonEncode(value), '```'];
 
+/// `resume`'s part, on its own as `manual`'s JSON sample shows it.
+CommandDoc _resume(String c) => CommandDoc(
+  'resume',
+  area: CommandArea.queue,
+  summary: 'lets a paused queue go on',
+  brief: 'The paused queue goes on.',
+  answer: '`{paused: false}`',
+  about: [
+    'The job held goes on, then the next. Resuming a queue that is not '
+        'paused changes nothing.',
+  ],
+  examples: ['$c resume'],
+  text: [pausedText(paused: false)],
+  json: [
+    '`paused` (bool): false.',
+    ..._jsonBlock({'paused': false}),
+  ],
+);
+
+/// What `manual --json` gives, with one of each list and object.
+Map<String, Object?> _manualSample(Map<String, GoalWords> words) {
+  final data = manualData(words: words);
+  Object? first(Object? value) => switch (value) {
+    final List<Object?> list => list.take(1).toList(),
+    final Map<String, Object?> map => Map.fromEntries(
+      map.entries.take(1).map((e) => MapEntry(e.key, first(e.value))),
+    ),
+    _ => value,
+  };
+  return {
+    'commands': [commandJson(_resume('vidctrl-client'))],
+    for (final MapEntry(:key, :value) in data.entries) key: first(value),
+  };
+}
+
 /// Every command's part of the manual, in the order `--help` lists them,
 /// with [c] as the command that runs the client.
 List<CommandDoc> commandDocs(
@@ -379,6 +429,12 @@ List<CommandDoc> commandDocs(
     area: CommandArea.videos,
     arguments: '<paths…>',
     summary: 'adds videos to the list, as dropping them on the window does',
+    brief:
+        'Adds files, and the videos in folders, to the list, and waits until '
+        'each is read. Results in `Converted` count too: give files, not a '
+        'folder of results.',
+    answer: '`{videos: [{path, id?, result}]}`',
+    codes: ['addResult'],
     about: [
       'A folder adds the videos in it and in its folders, by their '
           'extension (${videoExtensions.join(', ')}), leaving out hidden '
@@ -407,6 +463,10 @@ List<CommandDoc> commandDocs(
     'videos',
     area: CommandArea.videos,
     summary: 'the videos in the list, and what a goal would do to each',
+    brief:
+        'The list; with `--goal`, each video\'s `preview` (sizes measured only '
+        'for the panel\'s goal while the queue is idle; else `estimate`).',
+    answer: '`{videos: [Video]}`',
     about: [
       'With `--goal` (and `--opt`), each video that could be read says what '
           'that goal would do to it, how large the result would be and how '
@@ -447,6 +507,13 @@ List<CommandDoc> commandDocs(
     area: CommandArea.videos,
     arguments: '<video> | --job <job>',
     summary: 'how a video or a result is made, as "Video details" shows it',
+    brief:
+        'How a video, or a done job\'s result, is encoded, track by track; '
+        '`--raw`: ffprobe\'s report.',
+    answer:
+        '`{info: Video, details: [{group, number, title, rows}]}` or '
+        '`{info, raw}`',
+    codes: ['detailGroup'],
     about: [
       'As "Video details" in the window: how the file is encoded, track by '
           'track (picture, then sound, then the file as a whole), in the '
@@ -487,6 +554,11 @@ List<CommandDoc> commandDocs(
     area: CommandArea.videos,
     arguments: '<videos…>',
     summary: 'measures how large videos would come out with a goal',
+    brief:
+        'Measures expected size and closeness by encoding pieces, seconds to '
+        'a minute each; without `--goal`, the panel\'s. `BUSY` while '
+        'converting.',
+    answer: '`{videos: [Video]}` with `preview`',
     about: [
       'As the window does for the videos selected in its panel: it encodes '
           'a few short pieces of each video and compares them with the '
@@ -532,6 +604,8 @@ List<CommandDoc> commandDocs(
     area: CommandArea.videos,
     arguments: '<videos…>',
     summary: 'takes videos off the list; their files stay on disk',
+    brief: 'Takes videos off the list; files stay on disk, jobs in the queue.',
+    answer: '`{removed: [int]}`',
     about: [
       'Only off the window\'s list, as its own remove button does: the files '
           'stay on disk, and jobs already queued for these videos stay in '
@@ -551,6 +625,8 @@ List<CommandDoc> commandDocs(
     'queue',
     area: CommandArea.queue,
     summary: 'the jobs in the queue, as the queue pane shows them',
+    brief: 'The jobs, in order.',
+    answer: '`{paused: bool, busy: bool, jobs: [Job]}`',
     about: [
       'Each job with its status, progress and time left, its goal and '
           'options, its result once known, and how its quality was chosen.',
@@ -560,6 +636,11 @@ List<CommandDoc> commandDocs(
     json: [
       '`paused` (bool): the queue is paused in the window; `busy` (bool): '
           'it is working through jobs; `jobs` (list of Job), in queue order.',
+      ..._jsonBlock({
+        'paused': false,
+        'busy': true,
+        'jobs': [_doneJob.toJson(), _waitingJob.toJson()],
+      }),
     ],
     shapes: ['Job', 'Quality'],
   ),
@@ -568,6 +649,17 @@ List<CommandDoc> commandDocs(
     area: CommandArea.queue,
     arguments: '<videos…>',
     summary: 'queues videos with a goal, as Add to queue does',
+    brief:
+        'Queues each readable video, adding unlisted paths (folders give '
+        'their videos). Without `--goal`, the panel\'s: name it. `--out '
+        '<folder>`: every result there; `--out next`: beside each video, in '
+        '`--subfolder` (`Converted`); neither: the panel\'s folder. A like '
+        'waiting job is not queued twice; nothing is if an argument is wrong '
+        'or none can be (exit 5).',
+    answer:
+        '`{goal, options, added: [Job], alreadyQueued: [int], skipped: '
+        '[{video, reason}]}`',
+    codes: ['addResult'],
     about: [
       'Videos given by a path that is not in the list yet are added first, '
           'as `$c add` does; a folder gives the videos in it. Each video that can be read gets a job; one '
@@ -633,6 +725,8 @@ List<CommandDoc> commandDocs(
     area: CommandArea.queue,
     arguments: '<jobs…>',
     summary: 'takes jobs out of the queue; any finished file stays on disk',
+    brief: 'Takes jobs out, cancelling one under way; files stay on disk.',
+    answer: '`{removed: [int]}`',
     about: [
       'As each job\'s remove in the window: a waiting job is taken out, one '
           'under way is cancelled first, and one that has ended only leaves '
@@ -655,6 +749,8 @@ List<CommandDoc> commandDocs(
     area: CommandArea.queue,
     arguments: '<job> <position>',
     summary: 'moves a waiting job to another place in the queue',
+    brief: 'Moves a waiting job; position 1, the top, converts next.',
+    answer: '`{jobs: [Job]}`',
     about: [
       'As dragging it in the window, where only waiting jobs can be dragged. '
           'Positions count from 1, the top of the list; one past the end is '
@@ -663,7 +759,12 @@ List<CommandDoc> commandDocs(
     ],
     examples: ['$c queue move 2 1'],
     text: movedText([_waitingJob, _doneJob, _runningJob]),
-    json: ['`jobs` (list of Job): the whole queue, in its new order.'],
+    json: [
+      '`jobs` (list of Job): the whole queue, in its new order.',
+      ..._jsonBlock({
+        'jobs': [_waitingJob.toJson(), _doneJob.toJson()],
+      }),
+    ],
     shapes: ['Job', 'Quality'],
     errors: [
       'A job that is not in the queue or not waiting, or a position that is '
@@ -675,6 +776,10 @@ List<CommandDoc> commandDocs(
     area: CommandArea.queue,
     arguments: '<job>',
     summary: 'tries a failed or cancelled job again, as its retry button does',
+    brief:
+        'A `FAILED` or `CANCELLED` job waits again; read its `errorLines` '
+        'first.',
+    answer: '`{job: Job}`',
     about: [
       'The job waits its turn again, in its place, with the same settings. '
           'Look at why it failed first: `$c queue --json` gives its '
@@ -699,6 +804,8 @@ List<CommandDoc> commandDocs(
     summary:
         'takes the done and skipped jobs out of the queue; their files stay '
         'on disk',
+    brief: 'Takes `DONE` and `SKIPPED` jobs out; results stay on disk.',
+    answer: '`{removed: [int]}`',
     about: [
       'As "Clear finished" in the window. Only the queue changes: each '
           'result stays where its `outputPath` said. Failed and cancelled '
@@ -719,6 +826,10 @@ List<CommandDoc> commandDocs(
     area: CommandArea.queue,
     arguments: '<job>',
     summary: 'converts a video kept as it is, as "Convert anyway" does',
+    brief:
+        'Converts a job `SKIPPED` as `NOT_WORTH_IT` all the same; ask the '
+        'person first.',
+    answer: '`{added: [Job], alreadyQueued: bool}`',
     about: [
       'For a job that ended `SKIPPED` with the outcome `NOT_WORTH_IT`: Archive '
           'found that converting would hardly make the file smaller. A new '
@@ -747,6 +858,9 @@ List<CommandDoc> commandDocs(
     summary:
         'queues the whole video after a sample, as the window\'s button '
         'does',
+    brief:
+        'Converts the whole video of a `DONE` sample job, with its settings.',
+    answer: '`{added: [Job], alreadyQueued: bool}`',
     about: [
       'For a sample job that is done, as "Convert the whole video" under '
           'it in the window: a new job converts the whole video the sample '
@@ -758,6 +872,7 @@ List<CommandDoc> commandDocs(
     json: [
       '`added` (list of Job) and `alreadyQueued` (bool), as for `queue '
           'convert-anyway`.',
+      ..._jsonBlock(_againAnswer),
     ],
     shapes: ['Job', 'Quality'],
     errors: [
@@ -769,6 +884,8 @@ List<CommandDoc> commandDocs(
     'pause',
     area: CommandArea.queue,
     summary: 'pauses the queue, as the window\'s pause button does',
+    brief: 'Holds the job under way; starts nothing new.',
+    answer: '`{paused: true}`',
     about: [
       'Nothing new starts, and the job under way is held where the system '
           'allows (otherwise it finishes). A job still choosing its quality '
@@ -784,26 +901,16 @@ List<CommandDoc> commandDocs(
       ..._jsonBlock({'paused': true}),
     ],
   ),
-  CommandDoc(
-    'resume',
-    area: CommandArea.queue,
-    summary: 'lets a paused queue go on',
-    about: [
-      'The job held goes on, then the next. Resuming a queue that is not '
-          'paused changes nothing.',
-    ],
-    examples: ['$c resume'],
-    text: [pausedText(paused: false)],
-    json: [
-      '`paused` (bool): false.',
-      ..._jsonBlock({'paused': false}),
-    ],
-  ),
+  _resume(c),
   CommandDoc(
     'cancel',
     area: CommandArea.queue,
     arguments: '[job]',
     summary: 'cancels the job under way, as its cancel button does',
+    brief:
+        'Stops the job under way (with `[job]`, only that one): `CANCELLED`, '
+        'no result. A waiting job: `queue remove`.',
+    answer: '`{cancelled: int or null, job?: Job}`',
     about: [
       'It answers once the job has stopped; the queue goes on with the next '
           'one. The job stays in the queue as `CANCELLED`; no result is '
@@ -840,6 +947,9 @@ List<CommandDoc> commandDocs(
     area: CommandArea.results,
     arguments: '<job>',
     summary: 'one job, as its row and (i) window show it',
+    brief:
+        'One job; `--command`: the FFmpeg command it runs, to show, not run.',
+    answer: '`{job: Job, command?: string}`',
     about: [
       'Its status, goal and options, its result and size once done, and how '
           'its quality was chosen: the outcome and the scores of the poorest '
@@ -869,6 +979,12 @@ List<CommandDoc> commandDocs(
     arguments: '<job>',
     area: CommandArea.results,
     summary: 'compares a result with its original, as the window\'s menu does',
+    brief:
+        'Compares a `DONE` result with its original, taking about as long as '
+        'the video, one at a time (`BUSY`); not after resizing, retiming or '
+        'HDR to SDR. `--no-wait`: `{started: true}`, then `COMPARE_FINISHED`.',
+    answer: '`{job: int, status, closeness, xpsnr: number, vmaf?: number}`',
+    codes: ['comparison', 'closeness'],
     about: [
       'As "Compare with the original" in a done job\'s ⋯ menu: VidCtrl '
           'compares the result with its original frame by frame (a sample '
@@ -918,6 +1034,8 @@ List<CommandDoc> commandDocs(
     'status',
     area: CommandArea.waiting,
     summary: 'whether VidCtrl is open, and how its queue stands',
+    brief: 'Whether the window is open, and its queue; never opens it.',
+    answer: '`{running: false}`, or `{running: true, …Status}`',
     about: [
       'It never opens the window. A window that has just opened is '
           '`STARTING` while it looks for FFmpeg, then `READY`, or '
@@ -942,10 +1060,12 @@ List<CommandDoc> commandDocs(
     area: CommandArea.waiting,
     arguments: '[jobs…]',
     summary: 'waits until the jobs are finished, and says how each ended',
+    brief: 'Waits until the jobs end (see "Waiting").',
+    answer: '`{outcomes: [Outcome]}` at the end',
     about: [
       'Without job ids, until no job is waiting or converting; with ids, '
           'until those have ended. Jobs added meanwhile, by this program or '
-          'the person, count too. The rules are under "Waiting and events". '
+          'the person, count too. The rules are under "Waiting". '
           'Conversions can take hours: run it in the background.',
       'Each job is printed as soon as it ends; the last line sums up. '
           'Exit 0 when every job ended done or skipped, 1 when one failed or '
@@ -976,11 +1096,15 @@ List<CommandDoc> commandDocs(
     'events',
     area: CommandArea.waiting,
     summary: 'tells what happens in the window, as it happens',
+    brief:
+        'Prints events as they happen (see "Codes"): a `SNAPSHOT` first (not '
+        'with `--since-now`), until the window closes (exit 4).',
+    answer: '`{event, time, …its fields}` per line',
     about: [
       'It goes on until the window closes, then exits 4: stop it yourself '
           'when you no longer need it. First it tells how everything stands '
           '(`SNAPSHOT`), so nothing is missed by starting late. The events '
-          'are listed under "Waiting and events".',
+          'are listed under "Events".',
     ],
     options: [
       (
@@ -1020,22 +1144,34 @@ List<CommandDoc> commandDocs(
     'goals',
     area: CommandArea.help,
     summary: 'the goals and their options, as this computer offers them',
+    brief: 'The goals with the options this computer offers.',
+    answer: '`{goals: [Goal]}`',
     about: [
-      'The same goals as "Goals" below, with only the options this computer '
+      'The same goals as those below, with only the options this computer '
           'can use: the speed of Archive, for one, is offered only where the '
           'graphics card can encode. An option left out here is refused by '
           '`queue add`, but for the choice the goal makes here anyway.',
     ],
     examples: ['$c goals', '$c goals --json'],
     text: goalsText([_goalView(_firstGoal, words)]),
-    json: ['`goals` (list of Goal), in the order of the panel.'],
+    json: [
+      '`goals` (list of Goal), in the order of the panel.',
+      ..._jsonBlock({
+        'goals': [_goalView(_firstGoal, words).toJson()],
+      }),
+    ],
     shapes: ['Goal'],
   ),
   CommandDoc(
     'manual',
     area: CommandArea.help,
-    summary: 'prints this guide',
-    about: ['It needs no window and opens none.'],
+    summary: 'prints the guide to every command, goal and code',
+    brief: 'This guide.',
+    answer: '`{commands, goals, exitCodes, events, codes}`',
+    about: [
+      'It needs no window and opens none. Each command\'s examples, text '
+          'output and JSON sample are in its help: `$c help <command>`.',
+    ],
     examples: ['$c manual', '$c manual --json'],
     text: ['# vidctrl-client', '…'],
     json: [
@@ -1044,15 +1180,18 @@ List<CommandDoc> commandDocs(
           'the name `--goal` takes, and a `hint` for each goal and option), '
           '`exitCodes` (object: code to meaning), `events` (list: `name`, '
           '`fields`, `description`) and `codes` (object: for each kind of '
-          'code, as "What the results mean" lists them, a list of `code` and '
-          '`description`).',
+          'code, as the manual\'s "Codes" lists them, a list of `code` and '
+          '`description`). Here with one of each:',
+      ..._jsonBlock(_manualSample(words)),
     ],
   ),
   CommandDoc(
     'help',
     area: CommandArea.help,
     arguments: '[command]',
-    summary: 'the commands, or one command\'s part of this guide',
+    summary: 'the commands, or one command\'s details',
+    brief: 'The commands, or one command\'s details.',
+    answer: 'text only',
     about: [
       'Without a command, the short list `--help` prints. It needs no window '
           'and opens none.',

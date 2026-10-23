@@ -116,7 +116,8 @@ void main() {
   test('writes the manual\'s words and docs/CLIENT.md', () {
     final words = englishGoalWords();
     File(manualWordsFile).writeAsStringSync(manualWordsSource(words));
-    File(manualFile)
-        .writeAsStringSync(manual(client: 'vidctrl-client', words: words));
+    File(
+      manualFile,
+    ).writeAsStringSync(manualDocument(client: 'vidctrl-client', words: words));
   });
 }
