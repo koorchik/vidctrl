@@ -36,6 +36,7 @@ flutter test tool/make_screenshots.dart               # redraws the README's pic
 dart run tool/desktop_entry.dart                      # Linux: registers the icon with the desktop
 tool/fetch_ffmpeg.sh linux                            # the pinned FFmpeg into third_party/ffmpeg/ (or windows, macos)
 tool/build_client.sh build/linux/x64/release/bundle   # vidctrl-client beside a built app
+flutter test tool/make_manual.dart                    # rewrites docs/CLIENT.md and the client's goal words
 
 dart run tool/convert.dart --list                     # the engine without the UI
 dart run tool/convert.dart archive.master clip.mov --dry-run
@@ -44,7 +45,9 @@ dart run tool/calibrate_archive.dart a.mov b.mp4      # quality numbers for the 
 # With a window open (flutter run), drive it from another terminal; add
 # --json to any command, and see the client's own help for the commands:
 dart run bin/vidctrl_client.dart --help
-VIDCTRL_APP=build/linux/x64/release/bundle/vidctrl dart run bin/vidctrl_client.dart status   # VIDCTRL_APP points the client at a development build
+# With none open, any command but status, manual and help starts one;
+# VIDCTRL_APP names a development build to start:
+VIDCTRL_APP=build/linux/x64/debug/bundle/vidctrl dart run bin/vidctrl_client.dart queue
 ```
 
 - Several `--exclude-tags` flags do not combine; use the `"a || b"` form.
@@ -241,10 +244,12 @@ protocol; it is removed when the window closes. The client program
 only `lib/core/`; `VIDCTRL_APP` names the app it starts when no window is
 open, for a development build, and `VIDCTRL_ENDPOINT=<file>` gives the
 window and the client another endpoint file, so a development copy runs
-beside an installed one. `dart compile exe` refuses this package (a
-dependency, `objective_c`, has build hooks); `dart build cli --target
-bin/vidctrl_client.dart` makes the program, and `tool/build_client.sh`
-copies it beside an app.
+beside an installed one. On macOS the client starts the app with `open`,
+which passes it no environment, so `VIDCTRL_ENDPOINT` does not reach a
+window started that way: start that window by hand with it set. `dart
+compile exe` refuses this package (a dependency, `objective_c`, has build
+hooks); `dart build cli --target bin/vidctrl_client.dart` makes the
+program, and `tool/build_client.sh` copies it beside an app.
 
 ### The seam for tests
 
@@ -336,6 +341,11 @@ How a widget stays right in both:
 4. Add table-driven plan tests in `test/core/scenarios/`, a row in
    `file_names_test.dart`, and at least one real conversion in
    `test/integration/conversion_test.dart`.
+5. For `vidctrl-client`'s manual, say in `_leaves`
+   (`lib/core/control/manual.dart`, one entry per scenario) what the goal
+   leaves as it is, then run `flutter test tool/make_manual.dart`, which
+   rewrites `docs/CLIENT.md` and the goal words the client prints
+   (`manual_test.dart` fails until then).
 
 The UI renders presets and options generically; it needs no other change.
 

@@ -12,7 +12,10 @@ inside its UI isolate (`lib/app/control/`), whose every method calls the same
 notifiers as the buttons. The wire format, endpoint file, socket plumbing,
 views and the client itself are plain Dart in `lib/core/control/`;
 `bin/vidctrl_client.dart` compiles to a native program with
-`dart compile exe`. The release puts it beside the app on each system.
+`dart build cli` (`tool/build_client.sh`). Not `dart compile exe`: it
+refuses a package whose dependencies have build hooks, and the app's
+`path_provider` brings `objective_c`, which has one. The release puts it
+beside the app on each system.
 
 **Tech Stack:** Dart 3 / Flutter, Riverpod 3 notifiers, `dart:io`
 `ServerSocket`/`Socket`, `package:args` (new dependency) for the client's
@@ -27,7 +30,7 @@ reasons.
 - Work happens in the worktree `../vidctrl-agent-control` on the branch
   `agent-control`, branched from `main` at 7bcc2ea.
 - `lib/core/` never imports Flutter; the client imports only `lib/core/`
-  (`flutter analyze` and `dart compile exe` both prove it).
+  (`flutter analyze` and `dart build cli` both prove it).
 - Every server method goes through the notifiers the buttons use
   (`SourcesController`, `QueueController`, `EstimateCache`,
   `QualityController`); none edits their state or runs FFmpeg itself.
@@ -113,7 +116,7 @@ lib/app/home/widgets/
   agent_button.dart        header button + AgentDialog
 bin/vidctrl_client.dart    main() → runClient()
 tool/make_manual.dart      writes manual_words.g.dart and docs/CLIENT.md
-tool/build_client.sh       dart compile exe into a given folder
+tool/build_client.sh       dart build cli into a given folder
 docs/CLIENT.md             generated from the manual
 ```
 
@@ -128,20 +131,21 @@ and the spec's "Not yet known" stays open.
 Settles the open point in the spec's "Shipping" before anything depends on
 it. Nothing from it is kept but the finding.
 
-- [ ] **Step 1:** On a Mac with the Developer ID identity, write
-  `hello.dart` (`print('ok')`), `dart compile exe hello.dart -o hello`.
+- [ ] **Step 1:** On a Mac with the Developer ID identity, build the
+  client as the release does: `tool/build_client.sh <folder>` (`dart build
+  cli`), which writes `<folder>/vidctrl-client`.
 - [ ] **Step 2:** Copy it into a built `VidCtrl.app/Contents/MacOS/`, sign
   as `tool/package_macos.sh` signs `ffmpeg`:
-  `codesign --force --sign "$identity" --options runtime --timestamp hello`,
-  then sign the app as the script does.
+  `codesign --force --sign "$identity" --options runtime --timestamp
+  vidctrl-client`, then sign the app as the script does.
   Expected: `codesign --verify --deep --strict --verbose=2` passes.
-- [ ] **Step 3:** Run `VidCtrl.app/Contents/MacOS/hello` from Terminal.
-  Expected: prints `ok`. If it is killed or fails, retry with an
+- [ ] **Step 3:** Run `VidCtrl.app/Contents/MacOS/vidctrl-client --help`
+  from Terminal. Expected: prints the commands. If it is killed or fails, retry with an
   entitlements file holding only `com.apple.security.cs.allow-jit`, then
   `allow-unsigned-executable-memory`; note which one was needed.
 - [ ] **Step 4:** Notarize the disk image (`tool/package_macos.sh` with the
   secrets), download it on another Mac or quarantine it
-  (`xattr -w com.apple.quarantine ...`), copy the app, run `hello`.
+  (`xattr -w com.apple.quarantine ...`), copy the app, run `vidctrl-client --help`.
   Expected: runs with no Gatekeeper dialog.
 - [ ] **Step 5:** Write the finding into the spec's "Shipping" paragraph
   (replacing "Not yet known") and, if an entitlement was needed, into
@@ -322,7 +326,7 @@ test('a stale endpoint file is not live', () async {
   - `bool speaksOfDeleting(String text)` — true when, after taking out every `filesRule` and `neverDeletes`, the lower-cased text matches any of `delet`, `\brm\b`, `\bunlink`, `\btrash`, `\berase`, `clean(ing)? up`, `remove the original`, `the original can go`.
   Copy, exactly:
   - statuses: waiting "Waiting", running "Converting", paused "Paused", done "Done", skipped "Nothing to do", failed "Failed", cancelled "Cancelled", removed "Taken out of the queue (the file stays on disk)".
-  - plans: skip "Already fine: nothing to do", remux "Moved to a new file type, untouched", audioOnly "Only the sound is converted", encode "Converted", unsupported "This goal cannot do anything with it", keptAsIs "Kept as it is: converting would hardly make it smaller".
+  - plans: skip "Already fine: nothing to do", remux "Copied into a new file type, untouched", audioOnly "Only the sound is converted", encode "Converted", unsupported "This goal cannot do anything with it", keptAsIs "Kept as it is: converting would hardly make it smaller".
   - closeness: same "Looks the same as the original", veryClose "Very close to the original", differs "Differences may be visible" (the ARB's words).
   - outcomes: standard "Usual quality", raised "Raised quality: needed to look the same", belowTarget "Worth a look by eye: even the best quality falls a little short somewhere", notWorthIt "Kept as it is: converting would hardly make it smaller".
 
@@ -800,7 +804,7 @@ from `tool/`).
 - Modify: `.github/workflows/ci.yml`, `tool/package_macos.sh`, `README.md`
 
 **Interfaces:**
-- Produces: `tool/build_client.sh <folder>` → `dart compile exe bin/vidctrl_client.dart -o <folder>/vidctrl-client` (`vidctrl-client.exe` on Windows, detected by `uname`/`$OS`), failing loudly.
+- Produces: `tool/build_client.sh <folder>` → `dart build cli --target bin/vidctrl_client.dart`, the program copied to `<folder>/vidctrl-client` (`vidctrl-client.exe` on Windows, detected by `uname`/`$OS`), failing loudly.
 
 - [ ] **Step 1:** Write `tool/build_client.sh`; run `tool/build_client.sh
   build/linux/x64/release/bundle` after `flutter build linux --release`.

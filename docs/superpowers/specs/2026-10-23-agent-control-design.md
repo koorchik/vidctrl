@@ -1,6 +1,6 @@
 # Controlling the running app from the command line
 
-Status: design, not built. Written 2026-10-23.
+Status: built on the agent-control branch (2026-10-23); macOS hardened-runtime check (Task 0) open.
 
 ## Why
 
@@ -408,8 +408,9 @@ must find it in the window and get an agent working in one paste.
   (removing the quarantine from the whole `.app`) covers the client too.
   **Not yet known:** whether a Dart program runs under the hardened runtime
   with no entitlements (one report on Apple's forums of an AOT binary in an
-  app bundle failing there). So step 1 starts with a spike on a Mac: a
-  hello-world `dart compile exe` signed with `--options runtime`, run from
+  app bundle failing there). So a spike on a Mac (the plan's Task 0) settles
+  it: the client as `tool/build_client.sh` builds it, signed with
+  `--options runtime`, run from
   `Contents/MacOS/`, notarized; if it needs an entitlement, the client gets
   its own entitlements file with only that.
 - **Windows:** the client is unsigned like the app for now; started from a
