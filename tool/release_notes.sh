@@ -50,6 +50,11 @@ own build of FFmpeg 8.1 from its unmodified source, the same on every system,
 under the GNU GPL version 3; $notice says where it is built and where its
 source code is.
 
+\`vidctrl-client\` comes beside the app: it lets an AI agent such as Claude
+Code add videos and queue conversions in the open window. "Use with an AI
+agent" (the robot at the top of the window) gives the text to paste into the
+agent.
+
 The Windows app is not signed, so Windows asks before running it for the
 first time: "Windows protected your PC" → More info → Run anyway.
 

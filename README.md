@@ -38,7 +38,9 @@ other:
   keeping: a fraction of the size, looking the same as the original. One
   quality, the highest; the defaults need no thought. That quality was
   measured, not guessed ([how](#how-the-archive-quality-was-measured)): the
-  smallest file that still looks the same. The "?" at the end of its
+  smallest file that still looks the same. Each video is also checked before
+  it is converted, and one that needs a better quality gets it
+  ([how](#the-quality-is-chosen-for-each-video)). The "?" at the end of its
   explanation opens the short version: the two measures, the levels they must
   reach, and the check before every release. Shooting dates, place, timecode
   and the camera's make and model are kept. Two choices, each saying what it
@@ -99,11 +101,11 @@ as the original:
 - **A second opinion:** VMAF, Netflix's measure built from viewing tests,
   rates the copies we tested 96 and up; 95 is about where people stop
   telling the two apart.
-- **Every video is different:** the setting is fixed, the footage is not.
-  Very grainy or HDR video can land a little under 42 dB (39 to 41 in our
-  tests), because grain cannot be copied exactly. VMAF stays at 95 or
-  above, and no difference shows. Reaching 42 dB on such footage would take
-  about one and a half times the file size.
+- **Every video is different:** the setting is where each video starts, not
+  where it must end. Very grainy or HDR video can land a little under 42 dB
+  (39 to 41 in our tests), because grain cannot be copied exactly, while VMAF
+  stays at 95 or above and no difference shows. Footage that falls short of
+  that too gets a better quality of its own, as below.
 
 At the same quality the files differ a lot in size, which is why the
 default is AV1 on the processor:
@@ -117,10 +119,43 @@ default is AV1 on the processor:
 | Works everywhere (HEVC), Fast on a Mac (M1) | 2.5× | 4.5× |
 
 `tool/calibrate_archive.dart` repeats the measurement on any clips, so other
-cameras and graphics cards can be checked the same way. To check one video,
-choose ⋯ → "Compare with the original" on its finished job: the app
-measures the copy against the original (VMAF and XPSNR) and says in plain
-words whether it looks the same.
+cameras and graphics cards can be checked the same way.
+
+### The quality is chosen for each video
+
+One setting cannot suit every video: an already compressed film download,
+dark and grainy, lost detail at the archive's usual quality while camera
+footage did not. So before converting, the archive checks each video:
+
+- **Measured on the video itself:** a few 3-second pieces spread over it are
+  encoded with the exact settings and compared with the original. The
+  poorest piece decides, not the average: an archive takes the original's
+  place, and the one scene that shows a difference is the one a person
+  would notice. It must reach VMAF 95 (XPSNR 42 dB with an FFmpeg that has
+  no VMAF).
+- **Looks the same:** the usual quality is kept (crf 35 for AV1, 24 for
+  HEVC); it is the poorest any video gets. The video list says so before
+  anything is converted: "Looks the same as the original".
+- **Quality raised:** a video whose poorest piece falls short gets a better
+  quality, the lowest number at which every piece looks the same, at most
+  crf 20 for AV1 (16 for HEVC), past which files grow a lot for little. It
+  is marked "Quality tuned", and its file name carries the number it got
+  (`clip_av1-crf26.mp4`). Up to six tries; most videos need one.
+- **Check by eye:** a video still short at the best quality (film grain,
+  noise or effects that a smaller file cannot copy exactly) is converted all
+  the same, its file name ending in `-check`. Its (i) shows the scores and
+  the hardest frame, original and result at their real size, to compare
+  before deleting the original.
+- **Left as it is:** a video that would keep more than four fifths of its
+  size frees too little space, so it is not converted; "Convert anyway" in
+  its ⋯ menu in the queue does it all the same.
+
+The fast choice (the graphics card) has no better quality to try, so it only
+checks and marks; Thorough raises the quality where a video needs it.
+
+To check one video after converting, choose ⋯ → "Compare with the original"
+on its finished job: the app measures the copy against the original (VMAF
+and XPSNR) and says in plain words whether it looks the same.
 
 ### How it works
 
@@ -148,6 +183,9 @@ Also:
 - **Expected size before starting:** for each selected video and in total,
   with the time it will take. Where the size depends on the footage, short
   pieces are encoded in the background with the exact settings and scaled up.
+- **How close before converting:** the same pieces are compared with the
+  original, so each video says how close the result will look ("Looks the
+  same as the original"), with the scores in small type.
 - Progress, time left and expected size while converting.
 - **Video details:** a frame of the video and its key facts, then every
   detail (codecs, bitrates, colour, HDR, sound tracks, timecode), all

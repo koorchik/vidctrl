@@ -19,6 +19,8 @@ import 'package:vidctrl/app/recipe/recipe.dart';
 import 'package:vidctrl/app/recipe/recipe_controller.dart';
 import 'package:vidctrl/app/theme.dart';
 import 'package:vidctrl/core/media/ffprobe.dart';
+import 'package:vidctrl/core/quality/quality_meter.dart';
+import 'package:vidctrl/core/quality/quality_search.dart';
 
 import '../test/support/fake_media.dart';
 import '../test/support/fakes.dart';
@@ -42,6 +44,11 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
 
       final env = FakeEnvironment(capabilities: withGpu({'av1_nvenc'}));
+      // What a camera's file measures: nothing to see. The second video
+      // needs a better quality than the archive's usual one.
+      env.estimator
+        ..quality = const QualityScore(41.4, vmaf: 96.0)
+        ..choices[_videos[1]] = fakeChoice(QualityOutcome.raised);
       env.ffprobe.add(_videos[0]);
       env.ffprobe.add(
         _videos[1],
@@ -72,7 +79,12 @@ void main() {
       // The state is set through the controllers rather than by clicking, so
       // nothing is left looking hovered or pressed.
       //
-      // A finished sample of the first video...
+      // Every video measured while the queue is still idle, so the list
+      // says how close each will look...
+      await tester.pump();
+      await tester.pump();
+
+      // ...a finished sample of the first video...
       sources.select(0);
       recipe.setSample(SampleChoice.start);
       await tester.pump();
@@ -102,6 +114,12 @@ void main() {
       queue.addSelected();
       await tester.pump();
       sources.toggle(3);
+      await tester.pump();
+
+      // The header's icon is decoded outside the test's simulated clock.
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 400)),
+      );
       await tester.pump();
 
       await saveScreenshot(tester, look.name, folder: _folder, pixelRatio: 2);
