@@ -174,6 +174,46 @@ List<String> queueAddText(Map<String, Object?> answer) {
   ];
 }
 
+/// A job taken out of the queue, by `queue remove` or `clear-finished`.
+String takenOutText(int id) =>
+    'Job $id: Taken out of the queue; any finished file stays on disk.';
+
+List<String> clearedText(List<int> removed) => [
+  if (removed.isEmpty) 'No job had finished; nothing was taken out.',
+  for (final id in removed) takenOutText(id),
+];
+
+/// The queue after a job was moved, numbered by position.
+List<String> movedText(List<JobView> jobs) => [
+  'The queue, in order:',
+  for (final (i, job) in jobs.indexed)
+    '${i + 1}. Job ${job.id}: ${statusWords(job.status)}. ${job.path}',
+];
+
+String retriedText(JobView job) => 'Job ${job.id}: Queued again. ${job.path}';
+
+String pausedText({required bool paused}) => paused
+    ? 'The queue is paused: nothing new starts until it is resumed, and the '
+          'job under way is held where the system allows.'
+    : 'The queue goes on.';
+
+String cancelledText(int? job) => job == null
+    ? 'No job is converting; nothing was cancelled.'
+    : 'Job $job: Cancelled; the queue goes on with the next one.';
+
+/// A `queue.convertAnyway` or `queue.convertWhole` answer.
+List<String> addedJobText(Map<String, Object?> answer) {
+  final added = [
+    for (final job in answer['added'] as List)
+      JobView.fromJson(Map<String, Object?>.from(job as Map)),
+  ];
+  return [
+    for (final job in added) 'Job ${job.id}: Queued. ${job.path}',
+    if (answer['alreadyQueued'] == true)
+      'In the queue already: a job just like it is waiting or under way.',
+  ];
+}
+
 String _video(Object? reference) =>
     reference is int ? 'video $reference' : '$reference';
 

@@ -27,6 +27,15 @@ const clientCommands = <String>[
   'remove',
   'queue',
   'queue add',
+  'queue remove',
+  'queue move',
+  'queue retry',
+  'queue clear-finished',
+  'queue convert-anyway',
+  'queue convert-whole',
+  'pause',
+  'resume',
+  'cancel',
   'wait',
   'events',
   'manual',
@@ -272,6 +281,9 @@ ArgParser _parser() {
         ..addOption('out')
         ..addOption('subfolder'),
     );
+  for (final control in _queueControls.keys) {
+    queue.addCommand(control, _withGlobals(ArgParser()));
+  }
   return _withGlobals(ArgParser())
     ..addCommand('status', _withGlobals(ArgParser()))
     ..addCommand('goals', _withGlobals(ArgParser()))
@@ -282,6 +294,9 @@ ArgParser _parser() {
     ..addCommand('videos', _withGoal(_withGlobals(ArgParser())))
     ..addCommand('remove', _withGlobals(ArgParser()))
     ..addCommand('queue', queue)
+    ..addCommand('pause', _withGlobals(ArgParser()))
+    ..addCommand('resume', _withGlobals(ArgParser()))
+    ..addCommand('cancel', _withGlobals(ArgParser()))
     ..addCommand('wait', _withGlobals(ArgParser())..addOption('timeout'))
     ..addCommand(
       'events',
@@ -370,8 +385,8 @@ _Command? _command(ArgResults top, ClientIo io) {
         }),
       );
     case 'queue':
-      final add = command.command;
-      if (add == null) {
+      final sub = command.command;
+      if (sub == null) {
         noArguments();
         return _Command(
           'queue',
@@ -383,6 +398,8 @@ _Command? _command(ArgResults top, ClientIo io) {
           }),
         );
       }
+      if (sub.name != 'add') return _queueControl(sub);
+      final add = sub;
       if (add.rest.isEmpty) throw _bad('queue add needs videos.');
       final out = add.option('out');
       final params = {
@@ -395,6 +412,27 @@ _Command? _command(ArgResults top, ClientIo io) {
       return _Command(
         'queue add',
         (c, o) => _call(c!, o, Methods.queueAdd, params, queueAddText),
+      );
+    case 'pause' || 'resume':
+      noArguments();
+      return _Command(
+        command.name!,
+        (c, o) => _call(
+          c!,
+          o,
+          command.name == 'pause' ? Methods.queuePause : Methods.queueResume,
+          const {},
+          (a) => [pausedText(paused: a['paused'] == true)],
+        ),
+      );
+    case 'cancel':
+      if (args.length > 1) throw _bad('cancel takes one job at most.');
+      final job = args.isEmpty ? null : _jobId(args.single, 'cancel');
+      return _Command(
+        'cancel',
+        (c, o) => _call(c!, o, Methods.queueCancel, {
+          'job': ?job,
+        }, (a) => [cancelledText(a['cancelled'] as int?)]),
       );
     case 'wait':
       final jobs = [
@@ -451,6 +489,80 @@ _Command? _command(ArgResults top, ClientIo io) {
 
 ControlError _bad(String message) =>
     ControlError(ControlErrorKind.badArgument, message);
+
+/// The commands under `queue` that act on jobs already there: the window's
+/// method for each, and how its answer reads.
+final _queueControls =
+    <
+      String,
+      ({String method, List<String> Function(Map<String, Object?> answer) text})
+    >{
+      'remove': (
+        method: Methods.queueRemove,
+        text: (a) => [
+          for (final id in a['removed'] as List) takenOutText(id as int),
+        ],
+      ),
+      'move': (
+        method: Methods.queueMove,
+        text: (a) => movedText([
+          for (final j in a['jobs'] as List) JobView.fromJson(_object(j)),
+        ]),
+      ),
+      'retry': (
+        method: Methods.queueRetry,
+        text: (a) => [retriedText(JobView.fromJson(_object(a['job'])))],
+      ),
+      'clear-finished': (
+        method: Methods.queueClearFinished,
+        text: (a) =>
+            clearedText([for (final id in a['removed'] as List) id as int]),
+      ),
+      'convert-anyway': (
+        method: Methods.queueConvertAnyway,
+        text: addedJobText,
+      ),
+      'convert-whole': (method: Methods.queueConvertWhole, text: addedJobText),
+    };
+
+/// `queue remove`, `queue move` and the others in [_queueControls].
+_Command _queueControl(ArgResults sub) {
+  final name = 'queue ${sub.name}';
+  final control = _queueControls[sub.name]!;
+  final args = sub.rest;
+  final Map<String, Object?> params;
+  switch (sub.name) {
+    case 'remove':
+      if (args.isEmpty) throw _bad('$name needs job numbers.');
+      params = {
+        'jobs': [for (final job in args) _jobId(job, name)],
+      };
+    case 'move':
+      if (args.length != 2) throw _bad('$name takes a job and a position.');
+      final position = int.tryParse(args.last);
+      if (position == null) {
+        throw _bad(
+          '$name takes a position in the queue, 1 for the first; not '
+          '"${args.last}".',
+        );
+      }
+      params = {'job': _jobId(args.first, name), 'position': position};
+    case 'clear-finished':
+      if (args.isNotEmpty) throw _bad('$name takes no "${args.first}".');
+      params = const {};
+    default:
+      if (args.length != 1) throw _bad('$name takes one job number.');
+      params = {'job': _jobId(args.single, name)};
+  }
+  return _Command(
+    name,
+    (c, o) => _call(c!, o, control.method, params, control.text),
+  );
+}
+
+int _jobId(String job, String command) => RegExp(r'^\d+$').hasMatch(job)
+    ? int.parse(job)
+    : throw _bad('$command takes job numbers, not "$job".');
 
 /// `goal` and `options` for the window, from `--goal` and `--opt`.
 Map<String, Object?> _goalParams(ArgResults results) {

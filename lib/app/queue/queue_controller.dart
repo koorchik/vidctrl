@@ -498,48 +498,44 @@ class QueueController extends Notifier<QueueState> {
     );
   }
 
-  /// After a sample: queues the whole video with the same settings.
-  void convertWhole(int jobId) {
+  /// After a sample: queues the whole video with the same settings. Returns
+  /// the new job; null when there is none, an identical one included.
+  QueueJob? convertWhole(int jobId) {
     final job = _find(jobId);
-    if (job == null || !job.isSample) return;
+    if (job == null || !job.isSample) return null;
     final recipe = job.recipe.withoutSample();
-    if (_alreadyQueued(job.sourceId, recipe, job.output)) return;
-    state = state.copyWith(
-      jobs: [
-        ...state.jobs,
-        _makeJob(
-          sourceId: job.sourceId,
-          info: job.info,
-          recipe: recipe,
-          output: job.output,
-          reserved: _reservedOutputs(),
-        ),
-      ],
+    if (_alreadyQueued(job.sourceId, recipe, job.output)) return null;
+    final whole = _makeJob(
+      sourceId: job.sourceId,
+      info: job.info,
+      recipe: recipe,
+      output: job.output,
+      reserved: _reservedOutputs(),
     );
+    state = state.copyWith(jobs: [...state.jobs, whole]);
     _ensureRunning();
+    return whole;
   }
 
   /// After a video was left as it is: converts it all the same, at the
-  /// quality found for it.
-  void convertAnyway(int jobId) {
+  /// quality found for it. Returns the new job; null when there is none, an
+  /// identical one included.
+  QueueJob? convertAnyway(int jobId) {
     final job = _find(jobId);
     final quality = job?.quality;
-    if (job == null || quality == null || !job.keptAsIs) return;
-    if (_alreadyQueued(job.sourceId, job.recipe, job.output)) return;
-    state = state.copyWith(
-      jobs: [
-        ...state.jobs,
-        _makeJob(
-          sourceId: job.sourceId,
-          info: job.info,
-          recipe: job.recipe,
-          output: job.output,
-          reserved: _reservedOutputs(),
-          quality: quality.anyway(),
-        ),
-      ],
+    if (job == null || quality == null || !job.keptAsIs) return null;
+    if (_alreadyQueued(job.sourceId, job.recipe, job.output)) return null;
+    final anyway = _makeJob(
+      sourceId: job.sourceId,
+      info: job.info,
+      recipe: job.recipe,
+      output: job.output,
+      reserved: _reservedOutputs(),
+      quality: quality.anyway(),
     );
+    state = state.copyWith(jobs: [...state.jobs, anyway]);
     _ensureRunning();
+    return anyway;
   }
 
   /// Puts a job's settings back into the panel and selects its video, to

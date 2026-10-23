@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import '../../core/control/protocol.dart';
 import '../../core/ffmpeg/capabilities.dart';
 import '../../core/output/output_namer.dart';
+import '../../core/scenarios/archive.dart';
 import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
 import '../home/scenario_texts.dart';
@@ -46,8 +47,9 @@ SourceVideo? findVideo(SourcesState state, Object reference) {
 
 /// The goal and options asked for in [params], or the panel's goal and
 /// options where no goal is named; options given then change the panel's.
-/// Only the options the panel offers on this computer can be given. The
-/// panel itself is left as it is.
+/// Only the options the panel offers on this computer can be given, or one
+/// it does not with the choice the goal makes here anyway. The panel itself
+/// is left as it is.
 Recipe recipeFrom(
   Ref ref,
   Map<String, Object?> params,
@@ -116,23 +118,37 @@ OptionValues _options(
             : 'The goal ${preset.id} has no option "$key". $here',
       );
     }
-    if (!offered.contains(option)) {
-      // As on the panel, which does not show the row here.
-      throw badArgument(
-        'The option ${option.id} of ${preset.id} cannot be chosen on this '
-        'computer. $here',
-      );
-    }
     if (value is! String || !option.choices.contains(value)) {
       throw badArgument(
         'The option ${option.id} of ${preset.id} has no choice "$value". '
         'Choices: ${option.choices.join(', ')}.',
       );
     }
+    // As on the panel, which does not show the row here; naming what
+    // happens anyway changes nothing, so a script may name it everywhere.
+    final anyway = _madeAnyway(preset, option, capabilities);
+    if (!offered.contains(option) && value != anyway) {
+      throw badArgument(
+        'The option ${option.id} of ${preset.id} cannot be chosen on this '
+        'computer: it is always $anyway here. $here',
+      );
+    }
     values[option.id] = value;
   }
   return values;
 }
+
+/// The choice [preset] makes for [option] on a computer where the panel
+/// never shows it: the format this FFmpeg can make for the archive's (HEVC
+/// without AV1), the default otherwise (the processor without a graphics
+/// card encoder).
+String _madeAnyway(
+  Preset preset,
+  PresetOption option,
+  Capabilities capabilities,
+) => preset is ArchivePreset && option.id == ArchivePreset.codec
+    ? ArchivePreset.formatFor(const {}, capabilities)
+    : option.defaultChoice;
 
 /// Whether the panel shows [option], with the goal's defaults or with one
 /// other option changed: the archive's speed row appears only once HEVC is

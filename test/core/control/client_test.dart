@@ -296,6 +296,108 @@ void main() {
     expect(app.paramsOf(Methods.queueAdd)['out'], '/home/alice/done');
   });
 
+  test(
+    'the queue\'s controls ask the window for what its buttons do',
+    () async {
+      final app = await _FakeApp.start(_endpoint, {
+        Methods.queueRemove: (params, _) => {'removed': params['jobs']},
+        Methods.queueMove: (_, _) => {
+          'jobs': [_job(3, 'waiting'), _job(1, 'running')],
+        },
+        Methods.queueRetry: (params, _) => {
+          'job': _job(params['job'] as int, 'waiting'),
+        },
+        Methods.queueClearFinished: (_, _) => {'removed': <int>[]},
+        Methods.queuePause: (_, _) => {'paused': true},
+        Methods.queueResume: (_, _) => {'paused': false},
+        Methods.queueCancel: (params, _) => {'cancelled': params['job'] ?? 1},
+        Methods.queueConvertAnyway: (_, _) => {
+          'added': [_job(5, 'waiting')],
+          'alreadyQueued': false,
+        },
+        Methods.queueConvertWhole: (_, _) => {
+          'added': <Object?>[],
+          'alreadyQueued': true,
+        },
+      });
+      for (final (args, method, params, printed) in [
+        (
+          ['queue', 'remove', '1', '2'],
+          Methods.queueRemove,
+          {
+            'jobs': [1, 2],
+          },
+          'Job 2: Taken out of the queue; any finished file stays on disk.',
+        ),
+        (
+          ['queue', 'move', '3', '1'],
+          Methods.queueMove,
+          {'job': 3, 'position': 1},
+          '1. Job 3: Waiting.',
+        ),
+        (
+          ['queue', 'retry', '4'],
+          Methods.queueRetry,
+          {'job': 4},
+          'Job 4: Queued again.',
+        ),
+        (
+          ['queue', 'clear-finished'],
+          Methods.queueClearFinished,
+          <String, Object?>{},
+          'nothing was taken out',
+        ),
+        (['pause'], Methods.queuePause, <String, Object?>{}, 'paused'),
+        (['resume'], Methods.queueResume, <String, Object?>{}, 'goes on'),
+        (
+          ['cancel'],
+          Methods.queueCancel,
+          <String, Object?>{},
+          'Job 1: Cancelled',
+        ),
+        (['cancel', '2'], Methods.queueCancel, {'job': 2}, 'Job 2: Cancelled'),
+        (
+          ['queue', 'convert-anyway', '0'],
+          Methods.queueConvertAnyway,
+          {'job': 0},
+          'Job 5: Queued.',
+        ),
+        (
+          ['queue', 'convert-whole', '0'],
+          Methods.queueConvertWhole,
+          {'job': 0},
+          'In the queue already',
+        ),
+      ]) {
+        final run = await _run(args);
+        expect(run.exitCode, ExitCode.ok, reason: '$args ${run.err}');
+        expect(app.paramsOf(method), params, reason: '$args');
+        expect(run.out, contains(printed), reason: '$args');
+      }
+
+      // Refused before the window is asked anything.
+      final asked = app.calls.length;
+      for (final args in [
+        ['queue', 'remove'],
+        ['queue', 'remove', 'a.mov'],
+        ['queue', 'move', '3'],
+        ['queue', 'move', '3', 'top'],
+        ['queue', 'retry'],
+        ['queue', 'retry', '1', '2'],
+        ['queue', 'clear-finished', '1'],
+        ['queue', 'convert-whole', 'x'],
+        ['pause', 'now'],
+        ['cancel', '1', '2'],
+        ['cancel', 'all'],
+      ]) {
+        final run = await _run(args);
+        expect(run.exitCode, ExitCode.badArguments, reason: '$args');
+        expect(run.err, isNotEmpty, reason: '$args');
+      }
+      expect(app.calls.length, asked);
+    },
+  );
+
   test('--json prints the answer as JSON', () async {
     final answer = {
       'paused': false,
@@ -753,6 +855,27 @@ void main() {
           {'video': 3, 'reason': 'unreadable'},
         ],
       },
+      Methods.queueRemove: (_, _) => {
+        'removed': [1],
+      },
+      Methods.queueClearFinished: (_, _) => {
+        'removed': [2],
+      },
+      Methods.queueMove: (_, _) => {
+        'jobs': [_job(1, 'waiting')],
+      },
+      Methods.queueRetry: (_, _) => {'job': _job(3, 'waiting')},
+      Methods.queuePause: (_, _) => {'paused': true},
+      Methods.queueResume: (_, _) => {'paused': false},
+      Methods.queueCancel: (_, _) => {'cancelled': null},
+      Methods.queueConvertAnyway: (_, _) => {
+        'added': [_job(4, 'waiting')],
+        'alreadyQueued': false,
+      },
+      Methods.queueConvertWhole: (_, _) => {
+        'added': <Object?>[],
+        'alreadyQueued': true,
+      },
       Methods.wait: (_, _) => {
         'outcomes': [
           _outcome(1, 'done', needsALook: true),
@@ -792,14 +915,25 @@ void main() {
       ['remove', '1', '/videos/b.mov'],
       ['queue'],
       ['queue', 'add', '1', '2', '3', '/videos/none'],
+      ['queue', 'remove', '1'],
+      ['queue', 'clear-finished'],
+      ['queue', 'move', '1', '1'],
+      ['queue', 'retry', '3'],
+      ['queue', 'convert-anyway', '2'],
+      ['queue', 'convert-whole', '2'],
+      ['pause'],
+      ['resume'],
+      ['cancel'],
       ['wait'],
       ['events', '--since-now'],
     ]) {
       following = args.first == 'events';
       final run = await _run(args);
       expect(run.exitCode, isNot(ExitCode.badArguments), reason: run.err);
-      if (args.first == 'remove') {
+      if (args.contains('remove') || args.contains('clear-finished')) {
         expect(run.out, contains('stays on disk'));
+      }
+      if (args.first == 'remove') {
         expect(app.paramsOf(Methods.videosRemove), {
           'videos': [1, '/videos/b.mov'],
         });

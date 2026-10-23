@@ -37,12 +37,12 @@ VidCtrl deletes no file: "remove" takes a video off the list or a job out of the
 How every command works:
 
 - `vidctrl-client <command> [arguments] [options]`; options may come before or after the arguments.
-- `--json` prints the answer as one JSON document on stdout (`events`: one per line). Without it, lines for people. The JSON has ids and numbers, and English words beside the ids in fields ending in `Text`. A value that is not known is left out, never `null`.
+- `--json` prints the answer as one JSON document on stdout (`events`: one per line). Without it, lines for people. The JSON has ids and numbers, and English words beside the ids in fields ending in `Text`. A value that is not known is left out, never `null`; only `cancel` answers `null`, when no job was converting.
 - `--no-start`: do not open the window when it is not open; exit 2 instead.
 - `--help` prints the command's part of this guide.
 - Videos are given by id or by path, jobs by id. A reference made only of digits is an id: a file named `3` in the current folder is given as `./3`.
 - Paths may be relative or start with `~`: the client makes them absolute from the current folder before sending them.
-- A goal is given by its id (`--goal archive`), its options with `--opt option=choice`, once for each (`--opt codec=hevc --opt speed=gpu`). An unknown goal, option or choice is refused with the valid ones named.
+- A goal is given by its id (`--goal archive`), its options with `--opt option=choice`, once for each (`--opt codec=hevc --opt speed=gpu`). An unknown goal, option or choice is refused with the valid ones named. So is an option this computer does not offer (`vidctrl-client goals` lists those it does), unless its choice is the one the goal makes here anyway: `--opt speed=cpu` where the graphics card cannot encode, `--opt codec=hevc` where FFmpeg cannot make AV1. A script may name the defaults on every computer.
 - Errors go to stderr, as a line for people, or with `--json` as `{"error": {"kind": "...", "message": "..."}}`; the exit code tells what kind (see "Exit codes"). The kinds:
   - `badArgument`: a command, goal, option, choice or value that is not valid (exit 5).
   - `notFound`: no such video or job (exit 5).
@@ -89,7 +89,7 @@ With `--json`: `{"running": false}` when the window is not open; otherwise `runn
 
 The goals and their options, as this computer offers them.
 
-The same goals as "Goals" below, with only the options this computer can use: the speed of Archive, for one, is offered only where the graphics card can encode. An option left out here is refused by `queue add`.
+The same goals as "Goals" below, with only the options this computer can use: the speed of Archive, for one, is offered only where the graphics card can encode. An option left out here is refused by `queue add`, but for the choice the goal makes here anyway.
 
 Examples:
 
@@ -285,7 +285,251 @@ With `--json`: `goal` (string): the goal's id; `options` (object): every option 
 
 Errors:
 
-- An unknown goal, option or choice, an option this computer does not offer, a video id not in the list, or a `--subfolder` that is not one folder's name: exit 5, with the valid ones named.
+- An unknown goal, option or choice, a choice of an option this computer does not offer other than the one made here anyway, a video id not in the list, or a `--subfolder` that is not one folder's name: exit 5, with the valid ones named.
+
+### `vidctrl-client queue remove <jobs…>`
+
+Takes jobs out of the queue; any finished file stays on disk.
+
+As each job's remove in the window: a waiting job is taken out, one under way is cancelled first, and one that has ended only leaves the queue. Every file stays on disk, the original and any result.
+
+To take out every done and skipped job at once: `vidctrl-client queue clear-finished`.
+
+Examples:
+
+```sh
+vidctrl-client queue remove 2
+vidctrl-client queue remove 0 1 --json
+```
+
+It prints, for example:
+
+```
+Job 2: Taken out of the queue; any finished file stays on disk.
+```
+
+With `--json`: `removed` (list of int): the jobs taken out.
+
+```json
+{"removed":[2]}
+```
+
+Errors:
+
+- A job that is not in the queue: exit 5, and none is taken out.
+
+### `vidctrl-client queue move <job> <position>`
+
+Moves a waiting job to another place in the queue.
+
+As dragging it in the window, where only waiting jobs can be dragged. Positions count from 1, the top of the list; one past the end is the end. The queue converts the waiting job nearest the top next, so `vidctrl-client queue move <job> 1` makes it the next.
+
+Example:
+
+```sh
+vidctrl-client queue move 2 1
+```
+
+It prints, for example:
+
+```
+The queue, in order:
+1. Job 2: Waiting. /home/alice/Videos/dog.mp4
+2. Job 0: Done. /home/alice/Videos/beach.mov
+3. Job 1: Converting. /home/alice/Videos/party.mov
+```
+
+With `--json`: `jobs` (list of Job): the whole queue, in its new order.
+
+Errors:
+
+- A job that is not in the queue or not waiting, or a position that is not a whole number: exit 5.
+
+### `vidctrl-client queue retry <job>`
+
+Tries a failed or cancelled job again, as its retry button does.
+
+The job waits its turn again, in its place, with the same settings. Look at why it failed first: `vidctrl-client queue --json` gives its `errorLines`. Trying again rarely helps when the video itself cannot be converted; tell the person instead.
+
+Example:
+
+```sh
+vidctrl-client queue retry 2
+```
+
+It prints, for example:
+
+```
+Job 2: Queued again. /home/alice/Videos/dog.mp4
+```
+
+With `--json`: `job` (Job): the job, waiting again.
+
+```json
+{"job":{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"waiting","statusText":"Waiting","needsALook":false,"errorLines":[]}}
+```
+
+Errors:
+
+- A job that is not in the queue, or one that neither failed nor was cancelled: exit 5.
+
+### `vidctrl-client queue clear-finished`
+
+Takes the done and skipped jobs out of the queue; their files stay on disk.
+
+As "Clear finished" in the window. Only the queue changes: each result stays where its `outputPath` said. Failed and cancelled jobs stay, to be tried again.
+
+Example:
+
+```sh
+vidctrl-client queue clear-finished
+```
+
+It prints, for example:
+
+```
+Job 0: Taken out of the queue; any finished file stays on disk.
+```
+
+With `--json`: `removed` (list of int): the jobs taken out; empty when none had ended done or skipped.
+
+```json
+{"removed":[0]}
+```
+
+### `vidctrl-client queue convert-anyway <job>`
+
+Converts a video kept as it is, as "Convert anyway" does.
+
+For a job that ended `skipped` with the outcome `notWorthIt`: Archive found that converting would hardly make the file smaller. A new job converts it all the same, at the quality found for it, with the same goal, options and folder. Ask the person first: the result is nearly as large as the original.
+
+Example:
+
+```sh
+vidctrl-client queue convert-anyway 3
+```
+
+It prints, for example:
+
+```
+Job 4: Queued. /home/alice/Videos/trip.mov
+```
+
+With `--json`: `added` (list of Job): the new job, or none when a job just like it is waiting or under way already; `alreadyQueued` (bool): that is so.
+
+```json
+{"added":[{"id":4,"videoId":3,"path":"/home/alice/Videos/trip.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"waiting","statusText":"Waiting","needsALook":false,"errorLines":[]}],"alreadyQueued":false}
+```
+
+Errors:
+
+- A job that is not in the queue, or one that was not kept as it is: exit 5.
+
+### `vidctrl-client queue convert-whole <job>`
+
+Queues the whole video after a sample, as the window's button does.
+
+For a sample job, as "Convert the whole video" under it in the window: a new job converts the whole video the sample was taken from, with the same goal, options and folder, into the output folder rather than `Samples`.
+
+Example:
+
+```sh
+vidctrl-client queue convert-whole 3 --json
+```
+
+It prints, for example:
+
+```
+Job 4: Queued. /home/alice/Videos/trip.mov
+```
+
+With `--json`: `added` (list of Job) and `alreadyQueued` (bool), as for `queue convert-anyway`.
+
+Errors:
+
+- A job that is not in the queue, or not a sample: exit 5.
+
+### `vidctrl-client pause`
+
+Pauses the queue, as the window's pause button does.
+
+Nothing new starts, and the job under way is held where the system allows (otherwise it finishes). A job still choosing its quality stops measuring, and measures again on `vidctrl-client resume`. Pausing a paused queue changes nothing, so a script may repeat it. The window shows the queue paused, and the person may continue it there.
+
+Example:
+
+```sh
+vidctrl-client pause
+```
+
+It prints, for example:
+
+```
+The queue is paused: nothing new starts until it is resumed, and the job under way is held where the system allows.
+```
+
+With `--json`: `paused` (bool): true.
+
+```json
+{"paused":true}
+```
+
+### `vidctrl-client resume`
+
+Lets a paused queue go on.
+
+The job held goes on, then the next. Resuming a queue that is not paused changes nothing.
+
+Example:
+
+```sh
+vidctrl-client resume
+```
+
+It prints, for example:
+
+```
+The queue goes on.
+```
+
+With `--json`: `paused` (bool): false.
+
+```json
+{"paused":false}
+```
+
+### `vidctrl-client cancel [job]`
+
+Cancels the job under way, as its cancel button does.
+
+It answers once the job has stopped; the queue goes on with the next one. The job stays in the queue as `cancelled`; no result is written for it, and the original stays as it is. `vidctrl-client queue retry <job>` tries it again.
+
+With a job id, only if that job is the one converting, so that another is not cancelled by mistake. A waiting job is taken out of the queue with `vidctrl-client queue remove <job>` instead.
+
+Examples:
+
+```sh
+vidctrl-client cancel
+vidctrl-client cancel 1 --json
+```
+
+It prints, for example:
+
+```
+Job 1: Cancelled; the queue goes on with the next one.
+
+# When no job is converting:
+No job is converting; nothing was cancelled.
+```
+
+With `--json`: `cancelled` (int, or null when no job was converting).
+
+```json
+{"cancelled":1}
+```
+
+Errors:
+
+- A job that is not in the queue, or not the one converting: exit 5, and nothing is cancelled.
 
 ### `vidctrl-client wait [jobs…]`
 
@@ -515,7 +759,7 @@ How a job ended, as `wait` tells it.
 
 ## Goals
 
-Each goal, by the name `--goal` takes, with its options and their choices. The full id (as `archive.master`) is taken too. An option is offered only where it makes a difference on this computer: `vidctrl-client goals` shows which are here. A file with no picture is `unsupported` by every goal but "Get the sound" and "Remove personal data".
+Each goal, by the name `--goal` takes, with its options and their choices. The full id (as `archive.master`) is taken too. An option is offered only where it makes a difference on this computer: `vidctrl-client goals` shows which are here; another is taken only with the choice the goal makes here anyway. A file with no picture is `unsupported` by every goal but "Get the sound" and "Remove personal data".
 
 ### Archive, no quality loss: `--goal archive`
 
@@ -630,8 +874,8 @@ Each id and its words (the `...Text` fields in JSON), then what to make of it.
 - `paused`: Paused. Under way, held because the queue is paused in the window.
 - `done`: Done. The result is at `outputPath`. Tell the person, and say so when `needsALook` is true.
 - `skipped`: Nothing to do. Nothing was written: the video already met the goal, the goal can do nothing with it (plan `unsupported`), or converting would hardly make it smaller (outcome `notWorthIt`). Counts as finished, not as a failure.
-- `failed`: Failed. It could not be converted; `errorLines` says why. The person can try it again in the window.
-- `cancelled`: Cancelled. Stopped in the window before it was done. `wait` counts it as a failure.
+- `failed`: Failed. It could not be converted; `errorLines` says why. The person can try it again in the window, as `queue retry <job>` does.
+- `cancelled`: Cancelled. Stopped before it was done, in the window or by `cancel`. `wait` counts it as a failure; `queue retry <job>` tries it again.
 - `removed`: Taken out of the queue (the file stays on disk). Only in `wait`, for a job taken out of the queue while it waited. Not a failure.
 
 ### Video statuses
@@ -666,7 +910,7 @@ How a job's quality was chosen (Quality `outcome`):
 - `standard`: Usual quality. The goal's usual quality was enough to look the same.
 - `raised`: Raised quality: needed to look the same. A better quality than usual was needed, and the file is larger for it.
 - `belowTarget`: Worth a look by eye: even the best quality falls a little short somewhere. Converted anyway, and the result's name ends in `-check`. Tell the person to look at it by eye beside the original. The job is `done` and `needsALook` is true; `wait` still exits 0.
-- `notWorthIt`: Kept as it is: converting would hardly make it smaller. The job ends `skipped` and nothing is written. In the window, "Convert anyway" in the job's ⋯ menu converts it all the same.
+- `notWorthIt`: Kept as it is: converting would hardly make it smaller. The job ends `skipped` and nothing is written. In the window, "Convert anyway" in the job's ⋯ menu converts it all the same, as `queue convert-anyway <job>` does.
 
 ## Waiting and events
 
@@ -710,7 +954,7 @@ The same for every command:
 | `job-progress` | `job` (int), `fraction` (number, 0 to 1), `remainingSeconds` (number, optional) | How far it is; at most once a second for each job. |
 | `job-finished` | a Job | It ended: `done`, `skipped`, `failed` or `cancelled`. |
 | `job-removed` | `job` (int) | It was taken out of the queue; any result stays on disk. |
-| `queue-paused` | none | The queue was paused in the window. |
+| `queue-paused` | none | The queue was paused, in the window or by `pause`. |
 | `queue-resumed` | none | It goes on again. |
 | `queue-idle` | none | The queue has nothing more to do. |
 | `compare-finished` | `job` (int), `status` (`measured` or `failed`), `closeness`, `closenessText`, `vmaf` (optional), `xpsnr`; or `errorLines` | "Compare with the original" in the window ended. |
@@ -750,7 +994,7 @@ vidctrl-client queue add --goal archive --json @($files.FullName)
 vidctrl-client wait 0 1 2 --json             # the job ids from `added`
 ```
 
-`wait` returns when the last of those jobs has ended. Then tell the person each result (`outputPath`), and name every one with `needsALook` true: worth a look by eye. `vidctrl-client queue --json` gives each job's size and quality too, and on exit 1 each failed job's `errorLines`.
+`wait` returns when the last of those jobs has ended. Then tell the person each result (`outputPath`), and name every one with `needsALook` true: worth a look by eye. `vidctrl-client queue --json` gives each job's size and quality too, and on exit 1 each failed job's `errorLines`: tell the person why it failed. Once the cause is put right, `vidctrl-client queue retry <job>` tries a job again.
 
 ### Report each file as it finishes
 
@@ -769,12 +1013,26 @@ vidctrl-client wait --json
 vidctrl-client queue --json
 ```
 
-Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`; its `quality` tells how the whole video will come out: `vmaf` and `xpsnr` of the poorest piece, and `share`, the expected size as a share of the original's. Tell the person where the samples are, so they can look at them. Once they agree, queue the whole videos with the same goal and options:
+Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`; its `quality` tells how the whole video will come out: `vmaf` and `xpsnr` of the poorest piece, and `share`, the expected size as a share of the original's. Tell the person where the samples are, so they can look at them. Once they agree, convert each whole video with its sample's settings, by the sample jobs' ids from `added`:
 
 ```sh
-vidctrl-client queue add ~/Videos/beach.mov ~/Videos/party.mov --goal archive --json
+vidctrl-client queue convert-whole 0 --json
+vidctrl-client queue convert-whole 1 --json
 vidctrl-client wait --json
 ```
+
+Each answer's `added` holds the new job. For other settings, queue the whole videos with `vidctrl-client queue add` and the goal and options wanted.
+
+### Hold the conversions for a while
+
+When the person needs the computer for something else:
+
+```sh
+vidctrl-client pause
+vidctrl-client resume                         # when the person says so
+```
+
+`pause` holds the job under way and starts nothing new; `resume` goes on where it was. To stop the job under way for good, `vidctrl-client cancel` (it can be tried again with `vidctrl-client queue retry <job>`); to take waiting jobs out of the queue, `vidctrl-client queue remove <jobs…>`. The files stay as they are.
 
 ### What would Archive do with these videos, and how big would they be?
 

@@ -271,7 +271,8 @@ String _commandsPart(String c, Map<String, GoalWords> words) => [
   '- `--json` prints the answer as one JSON document on stdout (`events`: '
       'one per line). Without it, lines for people. The JSON has ids and '
       'numbers, and English words beside the ids in fields ending in '
-      '`Text`. A value that is not known is left out, never `null`.',
+      '`Text`. A value that is not known is left out, never `null`; only '
+      '`cancel` answers `null`, when no job was converting.',
   '- `--no-start`: do not open the window when it is not open; exit 2 '
       'instead.',
   '- `--help` prints the command\'s part of this guide.',
@@ -283,7 +284,11 @@ String _commandsPart(String c, Map<String, GoalWords> words) => [
   '- A goal is given by its id (`--goal archive`), its options with '
       '`--opt option=choice`, once for each (`--opt codec=hevc --opt '
       'speed=gpu`). An unknown goal, option or choice is refused with the '
-      'valid ones named.',
+      'valid ones named. So is an option this computer does not offer '
+      '(`$c goals` lists those it does), unless its choice is the one the '
+      'goal makes here anyway: `--opt speed=cpu` where the graphics card '
+      'cannot encode, `--opt codec=hevc` where FFmpeg cannot make AV1. A '
+      'script may name the defaults on every computer.',
   '- Errors go to stderr, as a line for people, or with `--json` as '
       '`{"error": {"kind": "...", "message": "..."}}`; the exit code tells '
       'what kind (see "Exit codes"). The kinds:',
@@ -497,6 +502,23 @@ final _queueAddAnswer = {
   ],
 };
 
+/// A job made from job 3, a sample of trip.mov or that video kept as it is.
+const _anotherJob = JobView(
+  id: 4,
+  videoId: 3,
+  path: '$_folder/trip.mov',
+  goal: 'archive.master',
+  options: _options,
+  status: 'waiting',
+  needsALook: false,
+  errorLines: [],
+);
+
+final _againAnswer = {
+  'added': [_anotherJob.toJson()],
+  'alreadyQueued': false,
+};
+
 final _waitAnswer = {
   'outcomes': [
     const JobOutcome(
@@ -551,7 +573,7 @@ List<_CommandDoc> _commands(
       'The same goals as "Goals" below, with only the options this computer '
           'can use: the speed of Archive, for one, is offered only where the '
           'graphics card can encode. An option left out here is refused by '
-          '`queue add`.',
+          '`queue add`, but for the choice the goal makes here anyway.',
     ],
     examples: ['$c goals', '$c goals --json'],
     text: goalsText([_goalView(_firstGoal, words)]),
@@ -713,9 +735,199 @@ List<_CommandDoc> _commands(
     ],
     shapes: ['Job', 'Quality'],
     errors: [
-      'An unknown goal, option or choice, an option this computer does not '
-          'offer, a video id not in the list, or a `--subfolder` that is not '
-          'one folder\'s name: exit 5, with the valid ones named.',
+      'An unknown goal, option or choice, a choice of an option this '
+          'computer does not offer other than the one made here anyway, a '
+          'video id not in the list, or a `--subfolder` that is not one '
+          'folder\'s name: exit 5, with the valid ones named.',
+    ],
+  ),
+  _CommandDoc(
+    'queue remove',
+    arguments: '<jobs…>',
+    summary: 'takes jobs out of the queue; any finished file stays on disk',
+    about: [
+      'As each job\'s remove in the window: a waiting job is taken out, one '
+          'under way is cancelled first, and one that has ended only leaves '
+          'the queue. Every file stays on disk, the original and any result.',
+      'To take out every done and skipped job at once: `$c queue '
+          'clear-finished`.',
+    ],
+    examples: ['$c queue remove 2', '$c queue remove 0 1 --json'],
+    text: [takenOutText(2)],
+    json: [
+      '`removed` (list of int): the jobs taken out.',
+      ..._jsonBlock({
+        'removed': [2],
+      }),
+    ],
+    errors: ['A job that is not in the queue: exit 5, and none is taken out.'],
+  ),
+  _CommandDoc(
+    'queue move',
+    arguments: '<job> <position>',
+    summary: 'moves a waiting job to another place in the queue',
+    about: [
+      'As dragging it in the window, where only waiting jobs can be dragged. '
+          'Positions count from 1, the top of the list; one past the end is '
+          'the end. The queue converts the waiting job nearest the top next, '
+          'so `$c queue move <job> 1` makes it the next.',
+    ],
+    examples: ['$c queue move 2 1'],
+    text: movedText([_waitingJob, _doneJob, _runningJob]),
+    json: ['`jobs` (list of Job): the whole queue, in its new order.'],
+    shapes: ['Job', 'Quality'],
+    errors: [
+      'A job that is not in the queue or not waiting, or a position that is '
+          'not a whole number: exit 5.',
+    ],
+  ),
+  _CommandDoc(
+    'queue retry',
+    arguments: '<job>',
+    summary: 'tries a failed or cancelled job again, as its retry button does',
+    about: [
+      'The job waits its turn again, in its place, with the same settings. '
+          'Look at why it failed first: `$c queue --json` gives its '
+          '`errorLines`. Trying again rarely helps when the video itself '
+          'cannot be converted; tell the person instead.',
+    ],
+    examples: ['$c queue retry 2'],
+    text: [retriedText(_waitingJob)],
+    json: [
+      '`job` (Job): the job, waiting again.',
+      ..._jsonBlock({'job': _waitingJob.toJson()}),
+    ],
+    shapes: ['Job', 'Quality'],
+    errors: [
+      'A job that is not in the queue, or one that neither failed nor was '
+          'cancelled: exit 5.',
+    ],
+  ),
+  _CommandDoc(
+    'queue clear-finished',
+    summary:
+        'takes the done and skipped jobs out of the queue; their files stay '
+        'on disk',
+    about: [
+      'As "Clear finished" in the window. Only the queue changes: each '
+          'result stays where its `outputPath` said. Failed and cancelled '
+          'jobs stay, to be tried again.',
+    ],
+    examples: ['$c queue clear-finished'],
+    text: clearedText([0]),
+    json: [
+      '`removed` (list of int): the jobs taken out; empty when none had '
+          'ended done or skipped.',
+      ..._jsonBlock({
+        'removed': [0],
+      }),
+    ],
+  ),
+  _CommandDoc(
+    'queue convert-anyway',
+    arguments: '<job>',
+    summary: 'converts a video kept as it is, as "Convert anyway" does',
+    about: [
+      'For a job that ended `skipped` with the outcome `notWorthIt`: Archive '
+          'found that converting would hardly make the file smaller. A new '
+          'job converts it all the same, at the quality found for it, with '
+          'the same goal, options and folder. Ask the person first: the '
+          'result is nearly as large as the original.',
+    ],
+    examples: ['$c queue convert-anyway 3'],
+    text: addedJobText(_againAnswer),
+    json: [
+      '`added` (list of Job): the new job, or none when a job just like it '
+          'is waiting or under way already; `alreadyQueued` (bool): that '
+          'is so.',
+      ..._jsonBlock(_againAnswer),
+    ],
+    shapes: ['Job', 'Quality'],
+    errors: [
+      'A job that is not in the queue, or one that was not kept as it is: '
+          'exit 5.',
+    ],
+  ),
+  _CommandDoc(
+    'queue convert-whole',
+    arguments: '<job>',
+    summary:
+        'queues the whole video after a sample, as the window\'s button '
+        'does',
+    about: [
+      'For a sample job, as "Convert the whole video" under it in the '
+          'window: a new job converts the whole video the sample was taken '
+          'from, with the same goal, options and folder, into the output '
+          'folder rather than `Samples`.',
+    ],
+    examples: ['$c queue convert-whole 3 --json'],
+    text: addedJobText(_againAnswer),
+    json: [
+      '`added` (list of Job) and `alreadyQueued` (bool), as for `queue '
+          'convert-anyway`.',
+    ],
+    shapes: ['Job', 'Quality'],
+    errors: ['A job that is not in the queue, or not a sample: exit 5.'],
+  ),
+  _CommandDoc(
+    'pause',
+    summary: 'pauses the queue, as the window\'s pause button does',
+    about: [
+      'Nothing new starts, and the job under way is held where the system '
+          'allows (otherwise it finishes). A job still choosing its quality '
+          'stops measuring, and measures again on `$c resume`. Pausing a '
+          'paused queue changes nothing, so a script may repeat it. The '
+          'window shows the queue paused, and the person may continue it '
+          'there.',
+    ],
+    examples: ['$c pause'],
+    text: [pausedText(paused: true)],
+    json: [
+      '`paused` (bool): true.',
+      ..._jsonBlock({'paused': true}),
+    ],
+  ),
+  _CommandDoc(
+    'resume',
+    summary: 'lets a paused queue go on',
+    about: [
+      'The job held goes on, then the next. Resuming a queue that is not '
+          'paused changes nothing.',
+    ],
+    examples: ['$c resume'],
+    text: [pausedText(paused: false)],
+    json: [
+      '`paused` (bool): false.',
+      ..._jsonBlock({'paused': false}),
+    ],
+  ),
+  _CommandDoc(
+    'cancel',
+    arguments: '[job]',
+    summary: 'cancels the job under way, as its cancel button does',
+    about: [
+      'It answers once the job has stopped; the queue goes on with the next '
+          'one. The job stays in the queue as `cancelled`; no result is '
+          'written for it, and the original stays as it is. `$c queue retry '
+          '<job>` tries it again.',
+      'With a job id, only if that job is the one converting, so that '
+          'another is not cancelled by mistake. A waiting job is taken out '
+          'of the queue with `$c queue remove <job>` instead.',
+    ],
+    examples: ['$c cancel', '$c cancel 1 --json'],
+    text: [
+      cancelledText(1),
+      '',
+      '# When no job is converting:',
+      cancelledText(null),
+    ],
+    json: [
+      '`cancelled` (int, or null when no job was converting).',
+      ..._jsonBlock({'cancelled': 1}),
+    ],
+    errors: [
+      'A job that is not in the queue, or not the one converting: exit 5, '
+          'and nothing is cancelled.',
     ],
   ),
   _CommandDoc(
@@ -969,7 +1181,8 @@ String _goalsPart(Map<String, GoalWords> words) {
     'Each goal, by the name `--goal` takes, with its options and their '
         'choices. The full id (as `archive.master`) is taken too. An option '
         'is offered only where it makes a difference on this computer: '
-        '`vidctrl-client goals` shows which are here. A file with no picture '
+        '`vidctrl-client goals` shows which are here; another is taken only '
+        'with the choice the goal makes here anyway. A file with no picture '
         'is `unsupported` by every goal but "Get the sound" and "Remove '
         'personal data".',
     '',
@@ -1039,12 +1252,12 @@ const _jobStatuses = [
   (
     'failed',
     'It could not be converted; `errorLines` says why. The person '
-        'can try it again in the window.',
+        'can try it again in the window, as `queue retry <job>` does.',
   ),
   (
     'cancelled',
-    'Stopped in the window before it was done. `wait` counts it '
-        'as a failure.',
+    'Stopped before it was done, in the window or by `cancel`. `wait` '
+        'counts it as a failure; `queue retry <job>` tries it again.',
   ),
   (
     'removed',
@@ -1088,7 +1301,7 @@ const _outcomeNotes = {
   'notWorthIt':
       'The job ends `skipped` and nothing is written. In the '
       'window, "Convert anyway" in the job\'s ⋯ menu converts it all the '
-      'same.',
+      'same, as `queue convert-anyway <job>` does.',
 };
 
 String _resultsPart() => [
@@ -1203,7 +1416,12 @@ const _events = [
     'It was taken out of the queue; any '
         'result stays on disk.',
   ),
-  (Events.queuePaused, 'none', 'The queue was paused in the window.'),
+  (
+    Events.queuePaused,
+    'none',
+    'The queue was paused, in the window or by '
+        '`pause`.',
+  ),
   (Events.queueResumed, 'none', 'It goes on again.'),
   (Events.queueIdle, 'none', 'The queue has nothing more to do.'),
   (
@@ -1298,7 +1516,7 @@ $c queue add --goal archive --json @(\$files.FullName)
 $c wait 0 1 2 --json             # the job ids from `added`
 ```
 
-`wait` returns when the last of those jobs has ended. Then tell the person each result (`outputPath`), and name every one with `needsALook` true: worth a look by eye. `$c queue --json` gives each job's size and quality too, and on exit 1 each failed job's `errorLines`.
+`wait` returns when the last of those jobs has ended. Then tell the person each result (`outputPath`), and name every one with `needsALook` true: worth a look by eye. `$c queue --json` gives each job's size and quality too, and on exit 1 each failed job's `errorLines`: tell the person why it failed. Once the cause is put right, `$c queue retry <job>` tries a job again.
 
 ### Report each file as it finishes
 
@@ -1317,12 +1535,26 @@ $c wait --json
 $c queue --json
 ```
 
-Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`; its `quality` tells how the whole video will come out: `vmaf` and `xpsnr` of the poorest piece, and `share`, the expected size as a share of the original's. Tell the person where the samples are, so they can look at them. Once they agree, queue the whole videos with the same goal and options:
+Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`; its `quality` tells how the whole video will come out: `vmaf` and `xpsnr` of the poorest piece, and `share`, the expected size as a share of the original's. Tell the person where the samples are, so they can look at them. Once they agree, convert each whole video with its sample's settings, by the sample jobs' ids from `added`:
 
 ```sh
-$c queue add ~/Videos/beach.mov ~/Videos/party.mov --goal archive --json
+$c queue convert-whole 0 --json
+$c queue convert-whole 1 --json
 $c wait --json
 ```
+
+Each answer's `added` holds the new job. For other settings, queue the whole videos with `$c queue add` and the goal and options wanted.
+
+### Hold the conversions for a while
+
+When the person needs the computer for something else:
+
+```sh
+$c pause
+$c resume                         # when the person says so
+```
+
+`pause` holds the job under way and starts nothing new; `resume` goes on where it was. To stop the job under way for good, `$c cancel` (it can be tried again with `$c queue retry <job>`); to take waiting jobs out of the queue, `$c queue remove <jobs…>`. The files stay as they are.
 
 ### What would Archive do with these videos, and how big would they be?
 

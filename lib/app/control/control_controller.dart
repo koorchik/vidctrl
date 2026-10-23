@@ -111,9 +111,10 @@ class ControlController extends Notifier<ControlState>
     if (ref.mounted && identical(_listener, listener)) _follow();
   }
 
-  /// Starts following, once the environment is ready.
+  /// Starts following, once the environment is ready. Not once stopped: a
+  /// request answered while stopping must not follow again.
   void _follow() {
-    if (_following != null) return;
+    if (_listener == null || _following != null) return;
     _following = [
       ref.listen<QueueState>(queueProvider, (before, after) {
         _tell(queueEvents(before ?? const QueueState(), after));

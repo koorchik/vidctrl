@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:vidctrl/app/control/control_controller.dart';
@@ -13,13 +14,26 @@ import 'package:vidctrl/app/recipe/recipe_controller.dart';
 import 'package:vidctrl/app/sources/sources_controller.dart';
 import 'package:vidctrl/core/control/connection.dart';
 import 'package:vidctrl/core/control/endpoint.dart';
+import 'package:vidctrl/core/control/listener.dart';
 import 'package:vidctrl/core/control/protocol.dart';
 import 'package:vidctrl/core/ffmpeg/capabilities.dart';
 import 'package:vidctrl/core/output/output_namer.dart';
+import 'package:vidctrl/core/quality/quality_search.dart';
 
 import '../../support/control.dart';
 import '../../support/fake_media.dart';
 import '../../support/fakes.dart';
+
+/// A client as the window sees it, that keeps what it is told.
+class _Peer implements ControlPeer {
+  final told = <String>[];
+
+  @override
+  void notify(String method, Map<String, Object?> params) => told.add(method);
+
+  @override
+  Future<void> get closed => Completer<void>().future;
+}
 
 Matcher _failsWith(ControlErrorKind kind, [Object? message]) => throwsA(
   isA<ControlError>()
@@ -463,7 +477,23 @@ void main() {
       expect(container.read(queueProvider).jobs, isEmpty);
     });
 
-    test('without AV1 the archive takes no codec choice', () async {
+    test('an option the panel does not offer takes the choice made here '
+        'anyway', () async {
+      // No graphics card encoder: the processor converts, whatever is asked.
+      final (container, client) = await startControlled(env);
+      final id = await addVideo(client, video('a.mp4'));
+
+      final answer = await client.call(Methods.queueAdd, {
+        'videos': [id],
+        'goal': 'archive',
+        'options': {'speed': 'cpu'},
+      }) as Map;
+
+      expect(answer['added'], hasLength(1));
+      expect(container.read(queueProvider).jobs, hasLength(1));
+    });
+
+    test('without AV1 the archive takes codec hevc only', () async {
       env = FakeEnvironment(
         capabilities: const Capabilities(
           ffmpegVersion: 'test',
@@ -482,10 +512,25 @@ void main() {
         }),
         _failsWith(
           ControlErrorKind.badArgument,
-          allOf(contains('codec'), contains('no options on this computer')),
+          allOf(
+            contains('codec'),
+            contains('hevc'),
+            contains('no options on this computer'),
+          ),
         ),
       );
       expect(container.read(queueProvider).jobs, isEmpty);
+
+      // What it makes here anyway.
+      await client.call(Methods.queueAdd, {
+        'videos': [id],
+        'goal': 'archive',
+        'options': {'codec': 'hevc'},
+      });
+      expect(
+        p.basename(container.read(queueProvider).jobs.single.outputPath),
+        contains('hevc'),
+      );
     });
 
     test('the same job twice is reported as already queued', () async {
@@ -588,6 +633,303 @@ void main() {
       expect(
         job['outputPath'],
         container.read(queueProvider).jobs.single.outputPath,
+      );
+    });
+  });
+
+  group('queue controls', () {
+    /// Queues [names] through [client] with [goal]; returns the job ids.
+    Future<List<int>> queue(
+      ControlConnection client,
+      List<String> names, {
+      String goal = 'space',
+      String? sample,
+    }) async {
+      final answer = await client.call(Methods.queueAdd, {
+        'videos': [for (final name in names) video(name)],
+        'goal': goal,
+        'sample': ?sample,
+      }) as Map;
+      return [for (final job in answer['added'] as List) (job as Map)['id']];
+    }
+
+    /// Until the fake executor has started [count] conversions.
+    Future<void> started(int count) async {
+      for (var i = 0; i < 100 && env.executor.started.length < count; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(env.executor.started, hasLength(count));
+    }
+
+    List<QueueJob> jobs(ProviderContainer container) =>
+        container.read(queueProvider).jobs;
+
+    test('cancel stops the job under way, as the cancel button does, and the '
+        'queue goes on', () async {
+      final (container, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4', 'b.mp4']);
+      await started(1);
+
+      final answer = await client.call(Methods.queueCancel);
+
+      expect(answer, {'cancelled': ids.first});
+      expect(env.executor.started.first.cancelRequested, isTrue);
+      expect(jobs(container).first.status, JobStatus.cancelled);
+      await started(2);
+    });
+
+    test('cancel of a job not converting says how to take it out', () async {
+      final (container, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4', 'b.mp4']);
+      await started(1);
+
+      await expectLater(
+        client.call(Methods.queueCancel, {'job': ids.last}),
+        _failsWith(
+          ControlErrorKind.badArgument,
+          'Job ${ids.last} is not converting; `vidctrl-client queue remove '
+          '${ids.last}` takes it out of the queue.',
+        ),
+      );
+      expect(env.executor.started.first.cancelRequested, isFalse);
+      expect(await client.call(Methods.queueCancel, {'job': ids.first}), {
+        'cancelled': ids.first,
+      });
+      expect(jobs(container).first.status, JobStatus.cancelled);
+    });
+
+    test('cancel with nothing converting cancels nothing', () async {
+      final (_, client) = await startControlled(env);
+
+      expect(await client.call(Methods.queueCancel), {'cancelled': null});
+      await expectLater(
+        client.call(Methods.queueCancel, {'job': 42}),
+        _failsWith(ControlErrorKind.notFound, contains('42')),
+      );
+    });
+
+    test('cancel stops a job still choosing its quality', () async {
+      env.estimator.hold = true;
+      final (container, client) = await startControlled(env);
+      final id = (await queue(client, ['a.mp4'], goal: 'archive')).single;
+      for (var i = 0; i < 100 && jobs(container).single.attempt == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(jobs(container).single.checking, isTrue);
+
+      expect(await client.call(Methods.queueCancel), {'cancelled': id});
+
+      expect(jobs(container).single.status, JobStatus.cancelled);
+      expect(env.executor.started, isEmpty);
+    });
+
+    test('move of the last job to position 1 puts it first', () async {
+      final (container, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4', 'b.mp4', 'c.mp4']);
+      await started(1);
+
+      final answer = await client.call(Methods.queueMove, {
+        'job': ids.last,
+        'position': 1,
+      }) as Map;
+
+      final order = [ids.last, ids.first, ids[1]];
+      expect([for (final j in answer['jobs'] as List) (j as Map)['id']], order);
+      expect([for (final job in jobs(container)) job.id], order);
+
+      // Past the end is the end.
+      await client.call(Methods.queueMove, {'job': ids.last, 'position': 9});
+      expect(jobs(container).last.id, ids.last);
+    });
+
+    test('move takes waiting jobs only, as dragging does', () async {
+      final (_, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4', 'b.mp4']);
+      await started(1);
+
+      await expectLater(
+        client.call(Methods.queueMove, {'job': ids.first, 'position': 2}),
+        _failsWith(ControlErrorKind.badArgument, contains('waiting')),
+      );
+      await expectLater(
+        client.call(Methods.queueMove, {'job': ids.last, 'position': 'top'}),
+        _failsWith(ControlErrorKind.badArgument, contains('position')),
+      );
+    });
+
+    test('remove takes a done job out of the queue and leaves its file on '
+        'disk', () async {
+      final (container, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4', 'b.mp4']);
+      await started(1);
+      final output = File(jobs(container).first.outputPath)
+        ..createSync(recursive: true);
+      env.executor.started.first.finish();
+      await started(2);
+
+      await expectLater(
+        client.call(Methods.queueRemove, {
+          'jobs': [ids.first, 42],
+        }),
+        _failsWith(ControlErrorKind.notFound, contains('42')),
+      );
+      expect(jobs(container), hasLength(2));
+
+      final answer = await client.call(Methods.queueRemove, {
+        'jobs': [ids.first],
+      });
+
+      expect(answer, {
+        'removed': [ids.first],
+      });
+      expect([for (final job in jobs(container)) job.id], [ids.last]);
+      expect(output.existsSync(), isTrue);
+    });
+
+    test('remove of the job under way cancels it first', () async {
+      final (container, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4']);
+      await started(1);
+
+      await client.call(Methods.queueRemove, {'jobs': ids});
+
+      expect(env.executor.started.single.cancelRequested, isTrue);
+      expect(jobs(container), isEmpty);
+    });
+
+    test('retry queues a failed job again; one that did not fail is '
+        'refused', () async {
+      final (container, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4']);
+      await started(1);
+
+      await expectLater(
+        client.call(Methods.queueRetry, {'job': ids.single}),
+        _failsWith(ControlErrorKind.badArgument, contains('failed')),
+      );
+      env.executor.started.single.fail();
+      await pumpEventQueue();
+      expect(jobs(container).single.status, JobStatus.failed);
+
+      final answer =
+          await client.call(Methods.queueRetry, {'job': ids.single}) as Map;
+
+      expect(answer['job'], containsPair('id', ids.single));
+      await started(2);
+      expect(jobs(container).single.status, JobStatus.running);
+    });
+
+    test(
+      'clear finished takes out the done jobs, as its button does',
+      () async {
+        final (container, client) = await startControlled(env);
+        final ids = await queue(client, ['a.mp4', 'b.mp4']);
+        await started(1);
+        env.executor.started.first.finish();
+        await started(2);
+
+        final answer = await client.call(Methods.queueClearFinished);
+
+        expect(answer, {
+          'removed': [ids.first],
+        });
+        expect([for (final job in jobs(container)) job.id], [ids.last]);
+      },
+    );
+
+    test('pause and resume hold and continue the queue, each as often as '
+        'asked', () async {
+      final (container, client) = await startControlled(env);
+      await queue(client, ['a.mp4']);
+      await started(1);
+      final handle = env.executor.started.single;
+
+      expect(await client.call(Methods.queuePause), {'paused': true});
+      expect(await client.call(Methods.queuePause), {'paused': true});
+      expect(container.read(queueProvider).paused, isTrue);
+      expect(handle.paused, isTrue);
+      expect(jobs(container).single.status, JobStatus.paused);
+
+      expect(await client.call(Methods.queueResume), {'paused': false});
+      expect(await client.call(Methods.queueResume), {'paused': false});
+      expect(handle.paused, isFalse);
+      expect(jobs(container).single.status, JobStatus.running);
+    });
+
+    test('convert whole queues the whole video after a sample', () async {
+      final (container, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4'], sample: 'start');
+      await started(1);
+      env.executor.started.single.finish();
+      await pumpEventQueue();
+
+      final answer = await client.call(Methods.queueConvertWhole, {
+        'job': ids.single,
+      }) as Map;
+
+      final whole = jobs(container).last;
+      expect(whole.isSample, isFalse);
+      expect(whole.recipe.presetId, 'space.small');
+      expect(answer['alreadyQueued'], isFalse);
+      expect((answer['added'] as List).single, containsPair('id', whole.id));
+      expect((answer['added'] as List).single, isNot(contains('sample')));
+
+      final again = await client.call(Methods.queueConvertWhole, {
+        'job': ids.single,
+      });
+      expect(again, {'added': isEmpty, 'alreadyQueued': true});
+      expect(jobs(container), hasLength(2));
+
+      await expectLater(
+        client.call(Methods.queueConvertWhole, {'job': whole.id}),
+        _failsWith(ControlErrorKind.badArgument, contains('sample')),
+      );
+    });
+
+    test('convert anyway converts a video kept as it is', () async {
+      final a = video('a.mp4');
+      env.estimator.choices[a] = fakeChoice(QualityOutcome.notWorthIt);
+      final (container, client) = await startControlled(env);
+      final kept = (await queue(client, ['a.mp4'], goal: 'archive')).single;
+      for (var i = 0; i < 100 && jobs(container).single.isPending; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(jobs(container).single.keptAsIs, isTrue);
+
+      final answer =
+          await client.call(Methods.queueConvertAnyway, {'job': kept}) as Map;
+
+      final anyway = jobs(container).last;
+      expect(anyway.id, isNot(kept));
+      expect(anyway.keptAsIs, isFalse);
+      expect(answer['alreadyQueued'], isFalse);
+      expect((answer['added'] as List).single, containsPair('id', anyway.id));
+      await started(1);
+
+      await expectLater(
+        client.call(Methods.queueConvertAnyway, {'job': anyway.id}),
+        _failsWith(ControlErrorKind.badArgument, contains('kept as it is')),
+      );
+    });
+
+    test('a job that is not in the queue is not found', () async {
+      final (_, client) = await startControlled(env);
+
+      for (final (method, params) in [
+        (Methods.queueMove, {'job': 7, 'position': 1}),
+        (Methods.queueRetry, {'job': 7}),
+        (Methods.queueConvertWhole, {'job': 7}),
+        (Methods.queueConvertAnyway, {'job': 7}),
+      ]) {
+        await expectLater(
+          client.call(method, params),
+          _failsWith(ControlErrorKind.notFound, contains('7')),
+          reason: method,
+        );
+      }
+      await expectLater(
+        client.call(Methods.queueRetry, {'job': 'first'}),
+        _failsWith(ControlErrorKind.badArgument, contains('first')),
       );
     });
   });
@@ -804,6 +1146,19 @@ void main() {
       await waiting;
       await client.done.timeout(const Duration(seconds: 2));
       expect(heard.names, [Events.appClosing]);
+    });
+
+    test('a client that subscribes while the window stops is told '
+        'nothing', () async {
+      final (container, _) = await startControlled(env);
+      final control = container.read(controlProvider.notifier);
+      await control.stop();
+
+      final peer = _Peer();
+      control.subscribe(peer);
+      await container.read(sourcesProvider.notifier).addPaths([video('a.mp4')]);
+
+      expect(peer.told, isEmpty);
     });
 
     test('a peer whose socket drops is forgotten', () async {
