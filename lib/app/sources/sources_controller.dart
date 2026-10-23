@@ -91,14 +91,23 @@ class SourcesController extends Notifier<SourcesState> {
   /// Adds files, and the videos inside any folders. A file already in the
   /// list is not added again. The newly added videos become the selection,
   /// so they can be queued straight away.
-  Future<void> addPaths(Iterable<String> paths) async {
+  Future<List<int>> addPaths(Iterable<String> paths) async {
     final files = await expandDroppedPaths(paths);
-    final known = {for (final video in state.videos) video.path};
-    final added = [
-      for (final path in files)
-        if (known.add(path)) SourceVideo(id: _nextId++, path: path),
-    ];
-    if (added.isEmpty) return;
+    final known = {for (final video in state.videos) video.path: video.id};
+    final ids = <int>[];
+    final added = <SourceVideo>[];
+    for (final path in files) {
+      final id = known[path];
+      if (id != null) {
+        ids.add(id);
+        continue;
+      }
+      final video = SourceVideo(id: _nextId++, path: path);
+      known[path] = video.id;
+      added.add(video);
+      ids.add(video.id);
+    }
+    if (added.isEmpty) return ids;
     state = state.copyWith(
       videos: [...state.videos, ...added],
       selectedIds: {for (final video in added) video.id},
@@ -117,6 +126,7 @@ class SourcesController extends Notifier<SourcesState> {
     _probes.add(probing);
     await probing;
     _probes.remove(probing);
+    return ids;
   }
 
   Future<void> _probe(SourceVideo video) async {

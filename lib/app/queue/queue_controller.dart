@@ -53,10 +53,10 @@ class QueueController extends Notifier<QueueState> {
   // ---- Adding -----------------------------------------------------------
 
   /// Queues the selected videos with the panel's current settings.
-  void addSelected() => _add(ref.read(sourcesProvider).selectedReady);
+  void addSelected() => _addWithPanel(ref.read(sourcesProvider).selectedReady);
 
   /// Queues every video in the list with the panel's current settings.
-  void addAll() => _add(ref.read(sourcesProvider).ready);
+  void addAll() => _addWithPanel(ref.read(sourcesProvider).ready);
 
   /// How many of [videos] Add would actually queue: a video that already has
   /// an identical job waiting or under way is not queued twice.
@@ -67,25 +67,42 @@ class QueueController extends Notifier<QueueState> {
         .length;
   }
 
-  void _add(List<SourceVideo> videos) {
+  void _addWithPanel(List<SourceVideo> videos) {
     final settings = ref.read(recipeProvider);
+    addVideos(videos, recipe: settings.recipe, output: settings.output);
+  }
+
+  /// Queues [videos] with [recipe] and [output], as Add does with the
+  /// panel's. `alreadyQueued` holds the ids skipped because an identical job
+  /// is waiting or under way.
+  ({List<QueueJob> added, List<int> alreadyQueued}) addVideos(
+    List<SourceVideo> videos, {
+    required Recipe recipe,
+    required OutputSettings output,
+  }) {
     final reserved = _reservedOutputs();
     final added = <QueueJob>[];
+    final alreadyQueued = <int>[];
     for (final video in videos) {
-      if (_alreadyQueued(video.id, settings.recipe, settings.output)) continue;
+      if (_alreadyQueued(video.id, recipe, output)) {
+        alreadyQueued.add(video.id);
+        continue;
+      }
       final job = _makeJob(
         sourceId: video.id,
         info: video.info!,
-        recipe: settings.recipe,
-        output: settings.output,
+        recipe: recipe,
+        output: output,
         reserved: reserved,
       );
       reserved.add(job.outputPath);
       added.add(job);
     }
-    if (added.isEmpty) return;
-    state = state.copyWith(jobs: [...state.jobs, ...added]);
-    _ensureRunning();
+    if (added.isNotEmpty) {
+      state = state.copyWith(jobs: [...state.jobs, ...added]);
+      _ensureRunning();
+    }
+    return (added: added, alreadyQueued: alreadyQueued);
   }
 
   bool _alreadyQueued(int sourceId, Recipe recipe, OutputSettings output) =>
@@ -392,24 +409,31 @@ class QueueController extends Notifier<QueueState> {
   /// Pauses the queue: the job under way is suspended (where the system
   /// allows; otherwise it finishes) and nothing new starts. Calling again
   /// continues.
-  void togglePause() {
+  void togglePause() => state.paused ? resume() : pause();
+
+  /// Pauses the queue; does nothing if it is paused already.
+  void pause() {
+    if (state.paused) return;
     final active = state.activeJob;
-    if (state.paused) {
-      state = state.copyWith(paused: false);
-      if (active != null && (_activeHandle?.resume() ?? false)) {
-        _update(active.id, (j) => j.copyWith(status: JobStatus.running));
-      }
-      _ensureRunning();
-    } else {
-      state = state.copyWith(paused: true);
-      if (_checkingJob != null) {
-        // Measuring cannot be held midway; it starts again on continuing.
-        _checkPaused = true;
-        unawaited(_env.estimator.cancelAll());
-      } else if (active != null && (_activeHandle?.pause() ?? false)) {
-        _update(active.id, (j) => j.copyWith(status: JobStatus.paused));
-      }
+    state = state.copyWith(paused: true);
+    if (_checkingJob != null) {
+      // Measuring cannot be held midway; it starts again on continuing.
+      _checkPaused = true;
+      unawaited(_env.estimator.cancelAll());
+    } else if (active != null && (_activeHandle?.pause() ?? false)) {
+      _update(active.id, (j) => j.copyWith(status: JobStatus.paused));
     }
+  }
+
+  /// Continues the queue; does nothing if it is not paused.
+  void resume() {
+    if (!state.paused) return;
+    final active = state.activeJob;
+    state = state.copyWith(paused: false);
+    if (active != null && (_activeHandle?.resume() ?? false)) {
+      _update(active.id, (j) => j.copyWith(status: JobStatus.running));
+    }
+    _ensureRunning();
   }
 
   /// Cancels the job under way; the queue moves on to the next one.

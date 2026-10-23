@@ -924,4 +924,79 @@ void main() {
 
     expect(container.read(recipeProvider).recipe.values, {'codec': 'hevc'});
   });
+
+  group('entry points for the control server', () {
+    test(
+      'queuing with given settings makes the job the button makes',
+      () async {
+        await sources().addPaths(['/videos/a.mp4']);
+        queue().addSelected();
+        final byButton = jobs().single;
+        await queue().remove(byButton.id);
+
+        final settings = container.read(recipeProvider);
+        final result = queue().addVideos(
+          sourceState().ready,
+          recipe: settings.recipe,
+          output: settings.output,
+        );
+
+        final byCommand = result.added.single;
+        expect(
+          (
+            byCommand.recipe,
+            byCommand.plan.nameSuffix,
+            byCommand.outputPath,
+            byCommand.sample,
+          ),
+          (
+            byButton.recipe,
+            byButton.plan.nameSuffix,
+            byButton.outputPath,
+            byButton.sample,
+          ),
+        );
+      },
+    );
+
+    test('a job waiting with the same settings is not queued twice '
+        'either way', () async {
+      await sources().addPaths(['/videos/a.mp4']);
+      queue().addSelected();
+
+      final settings = container.read(recipeProvider);
+      final result = queue().addVideos(
+        sourceState().ready,
+        recipe: settings.recipe,
+        output: settings.output,
+      );
+
+      expect(result.added, isEmpty);
+      expect(result.alreadyQueued, [video('a.mp4').id]);
+      expect(jobs(), hasLength(1));
+    });
+
+    test('adding paths tells which videos they are, those already listed '
+        'included', () async {
+      final first = await sources().addPaths(['/videos/a.mp4']);
+      final again = await sources().addPaths([
+        '/videos/a.mp4',
+        '/videos/b.mp4',
+      ]);
+
+      expect(again, [first.single, video('b.mp4').id]);
+      // Nothing new at all still says which videos the paths are.
+      expect(await sources().addPaths(['/videos/b.mp4']), [video('b.mp4').id]);
+    });
+
+    test('pause and resume can be repeated', () async {
+      queue().pause();
+      queue().pause();
+      expect(queueState().paused, isTrue);
+
+      queue().resume();
+      queue().resume();
+      expect(queueState().paused, isFalse);
+    });
+  });
 }
