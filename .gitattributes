@@ -1,0 +1,3 @@
+# Generated files are compared byte for byte with what generates them.
+docs/CLIENT.md text eol=lf
+*.g.dart text eol=lf

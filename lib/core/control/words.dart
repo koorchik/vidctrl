@@ -13,7 +13,12 @@ const neverDeletes =
 final _deleting = RegExp(
   r'delet|\brm\b|\bunlink|\btrash|\berase|\bclean(ed|ing)?[ -]?up\b|'
   r'\bremov(e|es|ed|ing) the (original|source|input)|the original can go|'
-  r'\bwip(e|es|ed|ing)\b|\bpurg|\bdiscard|\bdestro|get rid of|overwrit',
+  r'\bwip(e|es|ed|ing)\b|\bpurg|\bdiscard|\bdestro|get rid of|overwrit|'
+  r'originals?\b.{0,20}\b(can|may|could) (go|be removed)|'
+  r'\breplac(e|es|ed|ing)\b.{0,20}\boriginal|'
+  r'remov\w* .{0,30}(from (the )?disk|to free)|free (up )?space by|'
+  r'remove-item|\bdel\b|\brmdir\b|\bmv\b|throw(ing)? away|dispos|'
+  r'clear(ing)? out|rewrit|in place',
 );
 
 /// True when [text], once the two allowed rules are taken out, speaks of

@@ -184,6 +184,22 @@ void main() {
       'Get rid of the big files.',
       'The result overwrites the original.',
       'Overwriting is allowed.',
+      'The originals can go once they are converted.',
+      'The originals can be removed once checked.',
+      'Replace the originals with the results.',
+      'The result replaces the original.',
+      'Remove the files from disk.',
+      'Remove them to free up space.',
+      'Free up space by removing the camera files.',
+      r'Remove-Item $files',
+      'del beach.mov',
+      'rmdir Converted',
+      'mv beach.mov old/',
+      'Throw away the big files.',
+      'Dispose of the originals.',
+      'Clear out the folder.',
+      'Every file is rewritten.',
+      'The file is changed in place.',
     ]) {
       expect(speaksOfDeleting(phrase), isTrue, reason: phrase);
     }

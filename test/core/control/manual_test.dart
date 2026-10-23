@@ -254,7 +254,7 @@ void main() {
 
   test('docs/CLIENT.md is the manual as it is now', () {
     expect(
-      File(manualFile).readAsStringSync(),
+      File(manualFile).readAsStringSync().replaceAll('\r\n', '\n'),
       text,
       reason: 'Run `flutter test tool/make_manual.dart`.',
     );
@@ -262,7 +262,7 @@ void main() {
 
   test('the goal words are up to date with the English texts', () {
     expect(
-      File(manualWordsFile).readAsStringSync(),
+      File(manualWordsFile).readAsStringSync().replaceAll('\r\n', '\n'),
       manualWordsSource(),
       reason: 'Run `flutter test tool/make_manual.dart`.',
     );

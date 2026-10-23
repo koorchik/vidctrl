@@ -952,9 +952,10 @@ const _leaves = {
       'Takes the first sound track; a video without sound is `unsupported`. '
       'Sound that fits the file type is copied as it is.',
   'privacy':
-      'Every file is rewritten without the hidden notes; `quick` copies '
-      'picture and sound as they are (`remux`), `thorough` converts them '
-      'again (`encode`). Sound files are taken too.',
+      'Each result is a new copy without the hidden notes; the original '
+      'stays as it is. `quick` copies picture and sound as they are '
+      '(`remux`), `thorough` converts them again (`encode`). Sound files are '
+      'taken too.',
   'remux':
       'A video already of that file type is left as it is (`skip`); sound '
       'the new type cannot hold is converted (`audioOnly`); the picture '
@@ -1267,12 +1268,24 @@ String _recipes(String c) =>
 
 ### Queue every video over 2 GB in ~/Videos, and tell me when it is done
 
-Find them yourself, leaving out earlier results, then queue them with a goal and wait:
+Find them yourself, leaving out earlier results, and look at the list first:
+
+```sh
+find ~/Videos -type f -size +2G \\( -iname '*.mov' -o -iname '*.mp4' -o -iname '*.mts' -o -iname '*.mkv' \\) \\
+  -not -path '*/Converted/*'
+```
+
+If it lists nothing, tell the person no video was found, and stop. Otherwise queue them with a goal:
 
 ```sh
 find ~/Videos -type f -size +2G \\( -iname '*.mov' -o -iname '*.mp4' -o -iname '*.mts' -o -iname '*.mkv' \\) \\
   -not -path '*/Converted/*' -print0 | xargs -0 $c queue add --goal archive --json
-$c wait --json
+```
+
+For a long list `xargs` may run `queue add` more than once: each run prints one JSON answer on its own line. Take the job ids from every answer's `added` (`added[].id`); videos in `alreadyQueued` were in the queue already, and `$c queue --json` shows their jobs. Then wait for those jobs, in the background, as it can take hours:
+
+```sh
+$c wait 0 1 2 --json             # the job ids from `added`
 ```
 
 On Windows, in PowerShell:
@@ -1280,11 +1293,12 @@ On Windows, in PowerShell:
 ```powershell
 \$files = Get-ChildItem "\$HOME\\Videos" -Recurse -File -Include *.mov,*.mp4,*.mts,*.mkv |
   Where-Object { \$_.Length -gt 2GB -and \$_.FullName -notmatch '\\\\Converted\\\\' }
+\$files.Count                     # 0: tell the person no video was found, and stop
 $c queue add --goal archive --json @(\$files.FullName)
-$c wait --json
+$c wait 0 1 2 --json             # the job ids from `added`
 ```
 
-If `find` finds nothing, `queue add` says it needs videos (exit 5): tell the person none was found. Run `wait` in the background: it returns when the last job has ended. Then tell the person each result (`outputPath`), and name every one with `needsALook` true: worth a look by eye. `$c queue --json` gives each job's size and quality too, and on exit 1 each failed job's `errorLines`.
+`wait` returns when the last of those jobs has ended. Then tell the person each result (`outputPath`), and name every one with `needsALook` true: worth a look by eye. `$c queue --json` gives each job's size and quality too, and on exit 1 each failed job's `errorLines`.
 
 ### Report each file as it finishes
 
