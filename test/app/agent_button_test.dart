@@ -110,7 +110,10 @@ void main() {
     });
 
     test('the README shows the English prompt', () {
-      final readme = File('README.md').readAsStringSync();
+      // Windows checks the README out with CRLF line ends.
+      final readme = File('README.md')
+          .readAsStringSync()
+          .replaceAll('\r\n', '\n');
       final prompt = agentPrompt(
         _en,
         clientPath: '/home/alice/Apps/vidctrl/vidctrl-client',
