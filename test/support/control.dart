@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import 'package:vidctrl/app/control/control_controller.dart';
 import 'package:vidctrl/app/providers.dart';
 import 'package:vidctrl/core/control/connection.dart';
 import 'package:vidctrl/core/control/endpoint.dart';
+import 'package:vidctrl/core/control/protocol.dart';
 
 import 'fakes.dart';
 
@@ -58,6 +60,41 @@ Future<(ProviderContainer, ControlConnection)> startControlled(
   if (client == null) throw StateError('The window is not serving');
   addTearDown(client.close);
   return (container, client);
+}
+
+/// Everything the window has told a client unasked, in order.
+class Heard {
+  Heard(ControlConnection client) {
+    client.notifications.listen((notification) {
+      all.add(notification);
+      for (final (matches, found) in [..._awaited]) {
+        if (!matches(notification)) continue;
+        _awaited.remove((matches, found));
+        found.complete(notification);
+      }
+    });
+  }
+
+  final all = <ControlNotification>[];
+  final _awaited =
+      <(bool Function(ControlNotification), Completer<ControlNotification>)>[];
+
+  /// The names of all notifications so far.
+  List<String> get names => [for (final n in all) n.method];
+
+  /// The first notification named [method] (and, with [job], about that
+  /// job), heard already or within two seconds.
+  Future<ControlNotification> first(String method, {int? job}) {
+    bool matches(ControlNotification n) =>
+        n.method == method &&
+        (job == null || (n.params['id'] ?? n.params['job']) == job);
+    for (final notification in all) {
+      if (matches(notification)) return Future.value(notification);
+    }
+    final found = Completer<ControlNotification>();
+    _awaited.add((matches, found));
+    return found.future.timeout(const Duration(seconds: 2));
+  }
 }
 
 /// The endpoint file a window started on [dir] writes.

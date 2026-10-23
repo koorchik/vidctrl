@@ -19,6 +19,8 @@ import '../recipe/recipe.dart';
 import '../sources/sources_controller.dart';
 import 'app_views.dart';
 import 'arguments.dart';
+import 'events.dart';
+import 'waiter.dart';
 
 // What the window does for each request of `vidctrl-client`. Every method
 // works through the notifiers the window's own buttons use, so the window
@@ -39,17 +41,42 @@ const _methods = <String, _Method>{
   Methods.queueAdd: _queueAdd,
 };
 
+/// A method that goes on beyond its answer, or answers only later.
+typedef _Following = Future<Object?> Function(
+  Ref ref,
+  ControlSessions sessions,
+  ControlPeer peer,
+  Map<String, Object?> params,
+);
+
+const _following = <String, _Following>{
+  Methods.subscribe: _subscribe,
+  Methods.wait: _wait,
+};
+
+/// What the server keeps for a client between its requests.
+abstract interface class ControlSessions {
+  /// From now on [peer] is told every event.
+  void subscribe(ControlPeer peer);
+
+  /// Completes when [tracker] is finished; throws [ControlError] when the
+  /// window closes first.
+  Future<void> waitFor(ControlPeer peer, WaitTracker tracker);
+}
+
 /// Answers one request. `status` answers at once; every other method waits
 /// until FFmpeg has been looked for, and fails when it was not found.
 Future<Object?> handleControl(
   Ref ref,
+  ControlSessions sessions,
   String method,
   Map<String, Object?> params,
   ControlPeer peer,
 ) async {
   if (method == Methods.status) return _status(ref);
   final answer = _methods[method];
-  if (answer == null) {
+  final following = _following[method];
+  if (answer == null && following == null) {
     throw ControlError(
       ControlErrorKind.unknownMethod,
       'VidCtrl knows no method "$method".',
@@ -65,7 +92,9 @@ Future<Object?> handleControl(
       'VidCtrl could not find FFmpeg; the window says what to do.',
     );
   }
-  return answer(ref, env, params);
+  return answer != null
+      ? answer(ref, env, params)
+      : following!(ref, sessions, peer, params);
 }
 
 // ---- Status and goals ---------------------------------------------------
@@ -379,5 +408,67 @@ Future<Object?> _queueAdd(
     'added': [for (final job in result.added) jobView(job).toJson()],
     'alreadyQueued': result.alreadyQueued,
     'skipped': skipped,
+  };
+}
+
+// ---- Following ----------------------------------------------------------
+
+/// Tells the client every event from now on; first, unless it asks not to,
+/// how everything stands, so a client that starts late misses nothing.
+Future<Object?> _subscribe(
+  Ref ref,
+  ControlSessions sessions,
+  ControlPeer peer,
+  Map<String, Object?> params,
+) async {
+  final snapshot = params['snapshot'] ?? true;
+  if (snapshot is! bool) throw badArgument('"snapshot" is true or false.');
+  if (snapshot) {
+    final queue = ref.read(queueProvider);
+    peer.notify(
+      Events.snapshot,
+      eventParams({
+        'videos': [
+          for (final video in ref.read(sourcesProvider).videos)
+            videoView(video).toJson(),
+        ],
+        'jobs': [for (final job in queue.jobs) jobView(job).toJson()],
+        'paused': queue.paused,
+        'busy': queue.busy,
+      }),
+    );
+  }
+  sessions.subscribe(peer);
+  return const <String, Object?>{};
+}
+
+/// Answers once no job it counts is pending: the given ones, or else those
+/// pending now and any that become pending meanwhile.
+Future<Object?> _wait(
+  Ref ref,
+  ControlSessions sessions,
+  ControlPeer peer,
+  Map<String, Object?> params,
+) async {
+  Set<int>? ids;
+  if (params['jobs'] != null) {
+    final given = listParam(params, 'jobs');
+    final queue = ref.read(queueProvider);
+    ids = {};
+    for (final id in given) {
+      if (id is! int) throw badArgument('"jobs" takes job ids, not "$id".');
+      if (!queue.jobs.any((job) => job.id == id)) {
+        throw ControlError(
+          ControlErrorKind.notFound,
+          'There is no job $id in the queue.',
+        );
+      }
+      ids.add(id);
+    }
+  }
+  final tracker = WaitTracker(ref.read(queueProvider), jobs: ids);
+  await sessions.waitFor(peer, tracker);
+  return {
+    'outcomes': [for (final outcome in tracker.outcomes) outcome.toJson()],
   };
 }

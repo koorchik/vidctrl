@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:vidctrl/app/control/control_controller.dart';
 import 'package:vidctrl/app/providers.dart';
+import 'package:vidctrl/app/quality/quality_controller.dart';
 import 'package:vidctrl/app/queue/queue_controller.dart';
 import 'package:vidctrl/app/queue/queue_state.dart';
 import 'package:vidctrl/app/recipe/recipe.dart';
@@ -588,6 +589,249 @@ void main() {
         job['outputPath'],
         container.read(queueProvider).jobs.single.outputPath,
       );
+    });
+  });
+
+  group('events and wait', () {
+    /// Queues [names] to be made smaller through [client]; returns the job
+    /// ids.
+    Future<List<int>> queue(
+      ControlConnection client,
+      List<String> names,
+    ) async {
+      final answer = await client.call(Methods.queueAdd, {
+        'videos': [for (final name in names) video(name)],
+        'goal': 'space',
+      }) as Map;
+      return [for (final job in answer['added'] as List) (job as Map)['id']];
+    }
+
+    /// Until the window has read everything [client] sent before: it reads
+    /// requests in order and answers `status` at once.
+    Future<void> caughtUp(ControlConnection client) =>
+        client.call(Methods.status);
+
+    /// Until the fake executor has started [count] conversions.
+    Future<void> started(int count) async {
+      for (var i = 0; i < 100 && env.executor.started.length < count; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(env.executor.started, hasLength(count));
+    }
+
+    test(
+      'a client sees each job finish while the rest still converts',
+      () async {
+        final (container, client) = await startControlled(env);
+        final heard = Heard(client);
+        final ids = await queue(client, ['a.mp4', 'b.mp4']);
+        await client.call(Methods.subscribe, {'snapshot': false});
+        await started(1);
+
+        env.executor.started.first.finish();
+
+        final finished = await heard.first(Events.jobFinished, job: ids.first);
+        expect(finished.params['status'], 'done');
+        expect(finished.params['outputPath'], isA<String>());
+        expect(DateTime.tryParse(finished.params['time'] as String), isNotNull);
+        await heard.first(Events.jobStarted, job: ids.last);
+        expect(
+          container.read(queueProvider).jobs.last.status,
+          JobStatus.running,
+        );
+        expect(heard.names, isNot(contains(Events.snapshot)));
+      },
+    );
+
+    test('subscribing first tells how everything stands', () async {
+      final (_, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4']);
+      final heard = Heard(client);
+
+      expect(await client.call(Methods.subscribe), isEmpty);
+
+      final snapshot = await heard.first(Events.snapshot);
+      expect(heard.names.first, Events.snapshot);
+      expect(
+        (snapshot.params['videos'] as List).single,
+        containsPair('path', endsWith('a.mp4')),
+      );
+      expect(
+        (snapshot.params['jobs'] as List).single,
+        containsPair('id', ids.single),
+      );
+      expect(snapshot.params['busy'], isTrue);
+      expect(snapshot.params['paused'], isFalse);
+    });
+
+    test('events go only to clients that subscribed', () async {
+      final shared = await Directory.systemTemp.createTemp('vidctrl_control_');
+      addTearDown(() => shared.delete(recursive: true));
+      final (_, subscribed) = await startControlled(env, dir: shared);
+      final other = (await connectIfLive(controlFile(shared)))!;
+      addTearDown(other.close);
+      final heard = Heard(subscribed);
+      final unheard = Heard(other);
+      await subscribed.call(Methods.subscribe, {'snapshot': false});
+
+      await other.call(Methods.videosAdd, {
+        'paths': [video('a.mp4')],
+      });
+
+      final added = await heard.first(Events.videoAdded);
+      expect(added.params['path'], endsWith('a.mp4'));
+      await heard.first(Events.videoReady);
+      expect(unheard.all, isEmpty);
+    });
+
+    test('progress is told at most once a second for each job', () async {
+      final (_, client) = await startControlled(env);
+      final heard = Heard(client);
+      final ids = await queue(client, ['a.mp4']);
+      await client.call(Methods.subscribe, {'snapshot': false});
+      await started(1);
+
+      final handle = env.executor.started.single;
+      handle.report(0.1);
+      handle.report(0.2);
+      handle.report(0.3);
+      handle.finish();
+      await heard.first(Events.jobFinished, job: ids.single);
+
+      final progress = [
+        for (final n in heard.all)
+          if (n.method == Events.jobProgress) n.params,
+      ];
+      expect(progress, hasLength(1));
+      expect(progress.single, containsPair('fraction', 0.1));
+      expect(progress.single, containsPair('job', ids.single));
+    });
+
+    test('a finished comparison is told', () async {
+      final (container, client) = await startControlled(env);
+      final heard = Heard(client);
+      // Made no smaller in size: its frames pair with the original's.
+      final hd = video('hd.mp4');
+      env.ffprobe.add(hd, like: clip(width: 1920, height: 1080));
+      await client.call(Methods.queueAdd, {
+        'videos': [hd],
+        'goal': 'space',
+      });
+      await client.call(Methods.subscribe, {'snapshot': false});
+      await started(1);
+      env.executor.started.single.finish();
+      final job = await heard.first(Events.jobFinished);
+      final done = container.read(queueProvider).jobs.single;
+      expect(container.read(qualityProvider.notifier).canCompare(done), isTrue);
+
+      unawaited(container.read(qualityProvider.notifier).compare(done));
+      await pumpEventQueue();
+      env.qualityMeter.last.finish(43, vmaf: 96);
+
+      final compared = await heard.first(Events.compareFinished);
+      expect(compared.params['job'], job.params['id']);
+      expect(compared.params['closeness'], 'same');
+    });
+
+    test('wait returns when the queue is done, with each outcome', () async {
+      final (_, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4', 'b.mp4']);
+      var answered = false;
+      final waiting = client.call(Methods.wait).then((answer) {
+        answered = true;
+        return answer as Map;
+      });
+      await caughtUp(client);
+      await started(1);
+
+      env.executor.started.first.finish();
+      await started(2);
+      expect(answered, isFalse);
+      env.executor.started.last.fail();
+
+      final outcomes = (await waiting)['outcomes'] as List;
+      expect(outcomes.map((o) => ((o as Map)['jobId'], o['status'])), [
+        (ids.first, 'done'),
+        (ids.last, 'failed'),
+      ]);
+      expect((outcomes.first as Map)['outputPath'], isA<String>());
+    });
+
+    test('wait with nothing pending answers at once', () async {
+      final (_, client) = await startControlled(env);
+
+      expect(await client.call(Methods.wait), {'outcomes': isEmpty});
+    });
+
+    test('wait for an unknown job is not found', () async {
+      final (_, client) = await startControlled(env);
+
+      await expectLater(
+        client.call(Methods.wait, {
+          'jobs': [42],
+        }),
+        _failsWith(ControlErrorKind.notFound, contains('42')),
+      );
+    });
+
+    test('a waiting client is told once that the queue is paused', () async {
+      final (container, client) = await startControlled(env);
+      final heard = Heard(client);
+      await queue(client, ['a.mp4']);
+      unawaited(client.call(Methods.wait).catchError((Object _) => null));
+      await caughtUp(client);
+      await started(1);
+
+      container.read(queueProvider.notifier).pause();
+
+      await heard.first(Events.queuePaused);
+      expect(heard.names, [Events.queuePaused]);
+    });
+
+    test('a wait ends with app-closing when the window closes', () async {
+      final (container, client) = await startControlled(env);
+      final heard = Heard(client);
+      await queue(client, ['a.mp4']);
+      final waiting = expectLater(
+        client.call(Methods.wait),
+        _failsWith(ControlErrorKind.appClosed),
+      );
+      await caughtUp(client);
+      await started(1);
+
+      await container.read(controlProvider.notifier).stop();
+
+      await waiting;
+      await client.done.timeout(const Duration(seconds: 2));
+      expect(heard.names, [Events.appClosing]);
+    });
+
+    test('a peer whose socket drops is forgotten', () async {
+      final shared = await Directory.systemTemp.createTemp('vidctrl_control_');
+      addTearDown(() => shared.delete(recursive: true));
+      final (container, client) = await startControlled(env, dir: shared);
+      final ids = await queue(client, ['a.mp4', 'b.mp4']);
+      await client.call(Methods.subscribe);
+      unawaited(client.call(Methods.wait).catchError((Object _) => null));
+      await caughtUp(client);
+      await started(1);
+
+      await client.close();
+      await pumpEventQueue();
+      env.executor.started.first.finish();
+      await started(2);
+
+      // The window goes on, and tells the clients still there.
+      final later = (await connectIfLive(controlFile(shared)))!;
+      addTearDown(later.close);
+      final told = Heard(later);
+      await later.call(Methods.subscribe, {'snapshot': false});
+      env.executor.started.last.finish();
+      await told.first(Events.jobFinished, job: ids.last);
+      expect(container.read(queueProvider).jobs.map((j) => j.status), [
+        JobStatus.done,
+        JobStatus.done,
+      ]);
     });
   });
 
