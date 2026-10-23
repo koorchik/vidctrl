@@ -81,7 +81,7 @@ jobs:
       - run: flutter pub get
 
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib test tool
+        run: dart format --output=none --set-exit-if-changed lib test tool bin
 
       - name: Analyze
         run: flutter analyze
@@ -98,6 +98,19 @@ jobs:
 
       - name: Build
         run: flutter build ${{ matrix.target }} --release ${{ steps.version.outputs.build_args }}
+
+      # vidctrl-client, the program that lets a script or an AI agent drive
+      # the window, goes where it finds the app: in the Linux bundle, beside
+      # the Windows .exe, and on macOS into the app, by Package (macOS).
+      - name: Build the client
+        shell: bash
+        run: |
+          case "${{ matrix.target }}" in
+            linux) folder=build/linux/x64/release/bundle ;;
+            windows) folder=build/windows/x64/runner/Release ;;
+            macos) folder=build/client && mkdir -p "$folder" ;;
+          esac
+          tool/build_client.sh "$folder"
 
       # Unpacks to a folder named after the app and its version.
       - name: Package (Linux)
@@ -158,19 +171,22 @@ jobs:
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
-        run: tool/package_macos.sh vidctrl-${{ steps.version.outputs.version }}-macos.dmg
+        run: tool/package_macos.sh vidctrl-${{ steps.version.outputs.version }}-macos.dmg build/client/vidctrl-client
 
-      # The packed app runs the FFmpeg inside it, not the PATH's.
-      - name: Check the FFmpeg inside the app
+      # The packed app runs the FFmpeg inside it, not the PATH's, and has
+      # the client beside its own executable.
+      - name: Check the FFmpeg and the client inside the app
         shell: bash
         run: |
           case "${{ matrix.target }}" in
-            linux) bin=build/linux/x64/release/bundle/lib/ffmpeg ;;
-            windows) bin=build/windows/x64/runner/Release ;;
-            macos) bin=build/macos/Build/Products/Release/VidCtrl.app/Contents/MacOS ;;
+            linux) app=build/linux/x64/release/bundle; bin=$app/lib/ffmpeg ;;
+            windows) app=build/windows/x64/runner/Release; bin=$app ;;
+            macos) app=build/macos/Build/Products/Release/VidCtrl.app/Contents/MacOS; bin=$app ;;
           esac
           "$bin/ffmpeg" -hide_banner -version | head -1
           "$bin/ffprobe" -hide_banner -version | head -1
+          "$app/vidctrl-client" --help > "$RUNNER_TEMP/client-help.txt"
+          head -1 "$RUNNER_TEMP/client-help.txt"
 
       - uses: actions/upload-artifact@v7
         with:

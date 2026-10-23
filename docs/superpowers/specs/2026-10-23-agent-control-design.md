@@ -127,7 +127,7 @@ Three pieces:
    `queueProvider`, `qualityProvider` and `estimateCacheProvider`. Being on
    the UI isolate, its calls interleave with the mouse's in order, with no
    locking.
-3. **The command** (`bin/vidctrl_client.dart`, built with `dart compile exe`,
+3. **The command** (`bin/vidctrl_client.dart`, built with `dart build cli`,
    importing only `lib/core`): parses arguments, finds or starts the app,
    sends one request (or subscribes), prints the answer, exits with a code.
 
@@ -381,10 +381,19 @@ must find it in the window and get an agent working in one paste.
 ## Shipping
 
 - The release workflow compiles the command on each system
-  (`dart compile exe bin/vidctrl_client.dart`) and puts it beside the app:
-  Linux in the bundle beside `vidctrl`, Windows beside `vidctrl.exe`, macOS
-  in `Contents/MacOS/`. CI checks it is there, as it checks FFmpeg.
-- **macOS signing.** `dart compile exe` writes a native Mach-O (the Dart
+  (`tool/build_client.sh`, which runs `dart build cli --target
+  bin/vidctrl_client.dart`) and puts it beside the app: Linux in the bundle
+  beside `vidctrl`, Windows beside `vidctrl.exe`, macOS in
+  `Contents/MacOS/`. CI checks it is there and runs `--help`, as it checks
+  FFmpeg. `dart compile exe` cannot be used: it refuses a package whose
+  dependencies have build hooks, and the app's `path_provider` brings
+  `objective_c`, which has one. `dart build cli` runs the hooks and writes
+  `bundle/bin/vidctrl_client` with `bundle/lib/` for the libraries they
+  make. The only one is `objective_c.dylib`, made on macOS and loaded only
+  by Objective-C interop, which the client (importing only `lib/core/`)
+  never calls; so the program alone is copied, and the script stops if
+  `lib/` ever holds anything else.
+- **macOS signing.** `dart build cli` writes a native Mach-O (the Dart
   runtime with the compiled program inside, made so that `codesign` accepts
   it, signed ad hoc by the compiler). `tool/package_macos.sh` re-signs it
   like `ffmpeg` and `ffprobe`: Developer ID, `--options runtime`,

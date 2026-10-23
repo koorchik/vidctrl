@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Makes the macOS download: puts FFmpeg into the app, signs everything inside
-# out, packs a disk image and, with Apple's credentials, has the app and the
-# image notarized so that macOS opens them without a warning. CI runs it
-# (.github/workflows/ci.yml) after `flutter build macos --release` and
-# `tool/fetch_ffmpeg.sh macos`.
+# Makes the macOS download: puts FFmpeg and vidctrl-client into the app,
+# signs everything inside out, packs a disk image and, with Apple's
+# credentials, has the app and the image notarized so that macOS opens them
+# without a warning. CI runs it (.github/workflows/ci.yml) after `flutter
+# build macos --release`, `tool/fetch_ffmpeg.sh macos` and
+# `tool/build_client.sh build/client`.
 #
-#   tool/package_macos.sh vidctrl-1.2.0-macos.dmg
+#   tool/package_macos.sh vidctrl-1.2.0-macos.dmg build/client/vidctrl-client
 #
 # Environment, all optional; without them the app is signed ad hoc and macOS
 # refuses it once downloaded, until its quarantine mark is removed (the
@@ -16,6 +17,7 @@
 set -euo pipefail
 
 dmg="$1"
+client="${2:-}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 app="$root/build/macos/Build/Products/Release/VidCtrl.app"
 ffmpeg="$root/third_party/ffmpeg/macos"
@@ -27,10 +29,16 @@ if [[ ! -x "$ffmpeg/ffmpeg" ]]; then
   echo "error: no FFmpeg in ${ffmpeg#"$root"/}; run tool/fetch_ffmpeg.sh macos" >&2
   exit 1
 fi
+if [[ ! -x "$client" ]]; then
+  echo "error: no vidctrl-client at $client; run tool/build_client.sh" >&2
+  exit 1
+fi
 
 # Beside the app's own executable, where lib/core/ffmpeg/locator.dart looks;
-# the notice and licence among the resources.
+# the notice and licence among the resources. The client goes there too: it
+# finds the app as the .app around its own folder.
 cp "$ffmpeg/ffmpeg" "$ffmpeg/ffprobe" "$app/Contents/MacOS/"
+cp "$client" "$app/Contents/MacOS/vidctrl-client"
 mkdir -p "$app/Contents/Resources/FFmpeg"
 cp "$ffmpeg/FFmpeg-NOTICE.txt" "$ffmpeg/FFmpeg-LICENSE.txt" "$app/Contents/Resources/FFmpeg/"
 
@@ -60,12 +68,12 @@ notarize() {
   fi
 }
 
-# Inside out: the frameworks, FFmpeg, then the app around them.
+# Inside out: the frameworks, FFmpeg and the client, then the app around them.
 shopt -s nullglob
 for code in "$app"/Contents/Frameworks/*.framework "$app"/Contents/Frameworks/*.dylib; do
   sign "$code"
 done
-sign "$app/Contents/MacOS/ffmpeg" "$app/Contents/MacOS/ffprobe"
+sign "$app/Contents/MacOS/ffmpeg" "$app/Contents/MacOS/ffprobe" "$app/Contents/MacOS/vidctrl-client"
 sign --entitlements "$root/macos/Runner/Release.entitlements" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 

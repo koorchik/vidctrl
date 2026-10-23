@@ -29,12 +29,13 @@ flutter test test/app/workspace_test.dart             # one file
 flutter test test/app/workspace_test.dart --plain-name "pause holds the queue"
 
 flutter analyze
-dart format lib test tool                             # CI fails on unformatted code
+dart format lib test tool bin                         # CI fails on unformatted code
 flutter gen-l10n                                      # after editing lib/l10n/*.arb
 flutter test tool/make_icons.dart                     # redraws the app icon files
 flutter test tool/make_screenshots.dart               # redraws the README's pictures (docs/screenshots/)
 dart run tool/desktop_entry.dart                      # Linux: registers the icon with the desktop
 tool/fetch_ffmpeg.sh linux                            # the pinned FFmpeg into third_party/ffmpeg/ (or windows, macos)
+tool/build_client.sh build/linux/x64/release/bundle   # vidctrl-client beside a built app
 
 dart run tool/convert.dart --list                     # the engine without the UI
 dart run tool/convert.dart archive.master clip.mov --dry-run
@@ -58,6 +59,10 @@ VIDCTRL_APP=build/linux/x64/release/bundle/vidctrl dart run bin/vidctrl_client.d
   them here before a change to the engine goes out.
 - CI tests the FFmpeg the app ships: it fetches the pinned one first and
   puts it first on the `PATH`, then checks that the built app carries it.
+- The builds CI makes carry `vidctrl-client` where it finds the app
+  (`tool/build_client.sh`): the Linux bundle, beside `vidctrl.exe`, and
+  `Contents/MacOS/`, where `tool/package_macos.sh` signs it with FFmpeg. CI
+  checks that it is there and that `vidctrl-client --help` runs.
 - A pushed version tag (`v1.2.0`, or `v1.2.0-beta.1` for a pre-release) makes
   the same workflow publish a GitHub release once all three builds pass. The
   tag gives the app its version (`--build-name`) and the downloads their
@@ -238,7 +243,8 @@ open, for a development build, and `VIDCTRL_ENDPOINT=<file>` gives the
 window and the client another endpoint file, so a development copy runs
 beside an installed one. `dart compile exe` refuses this package (a
 dependency, `objective_c`, has build hooks); `dart build cli --target
-bin/vidctrl_client.dart` makes the program.
+bin/vidctrl_client.dart` makes the program, and `tool/build_client.sh`
+copies it beside an app.
 
 ### The seam for tests
 

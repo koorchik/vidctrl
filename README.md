@@ -171,6 +171,56 @@ Also:
   the top. It asks GitHub once after it starts, and again on "Check for
   updates…" in the About menu (the "i" button), which also shows the
   version. Nothing else goes over the internet.
+- **Use with an AI agent:** an agent such as Claude Code can add videos and
+  queue conversions for you while you watch the window, through
+  `vidctrl-client`, a program that comes with the app
+  ([how](#use-with-an-ai-agent)).
+
+## Use with an AI agent
+
+`vidctrl-client` sits beside the app in every download: in the Linux folder
+beside `vidctrl`, in the Windows folder beside `vidctrl.exe`, and inside
+`VidCtrl.app` on macOS (`Contents/MacOS/vidctrl-client`). It lets an AI agent
+that runs commands (Claude Code, Codex, any agent in a terminal) or a script
+drive the open window the way a person does: add videos to its list, queue
+conversions, follow them and report the results. Everything it does appears
+in the window, and it deletes, moves or renames no file. When no window is
+open, it opens one.
+
+The **Use with an AI agent** button in the window's header gives the prompt
+to paste into the agent, with the program's full path filled in. With the
+program on the `PATH` (below) the prompt is this, which `vidctrl-client`
+also prints when run on its own:
+
+```text
+VidCtrl is open on this computer, and the person watches its window. The program `vidctrl-client` controls it: it adds videos to the window's list and queues conversions there.
+
+- Run `vidctrl-client manual` first: it explains every command, the goals and what the results mean. Add `--json` to a command to read its answer as JSON.
+- Finding the videos is your job (with `find`, `du` or the like). Give their paths to `vidctrl-client add`, or straight to `vidctrl-client queue add --goal <goal>`.
+- The window converts one video at a time, and that can take hours. To know when it ends, run `vidctrl-client wait` in the background (or follow `vidctrl-client events`), and tell the person when it returns: each result, and any marked "worth a look by eye".
+- Never delete, move or rename any file. "Remove" only takes a video off the list or a job out of the queue.
+```
+
+The whole guide is `vidctrl-client manual`, also in
+[docs/CLIENT.md](docs/CLIENT.md).
+
+To type just `vidctrl-client` in a terminal, put it on the `PATH`. A link is
+enough: the program follows it back to the app beside it.
+
+```sh
+# Linux, with the download unpacked in ~/Apps/vidctrl
+ln -s ~/Apps/vidctrl/vidctrl-client ~/.local/bin/
+# macOS, with VidCtrl in Applications
+sudo ln -s /Applications/VidCtrl.app/Contents/MacOS/vidctrl-client /usr/local/bin/
+```
+
+On Windows, add the unpacked folder (the one with `vidctrl.exe`) to the
+`Path` in "Edit environment variables for your account".
+
+It must run as the same user, on the same desktop, as the window: it reaches
+the window through a connection on this computer and a file in your user
+folder. An agent that runs its commands in a sandbox must be allowed to run
+`vidctrl-client` outside the sandbox.
 
 ## Status
 
@@ -214,6 +264,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md).
 flutter pub get
 flutter run -d linux          # or: -d windows, -d macos
 flutter build linux --release # result in build/linux/x64/release/bundle
+tool/build_client.sh build/linux/x64/release/bundle  # vidctrl-client beside it
 ```
 
 ## Tests
@@ -286,6 +337,7 @@ lib/core/   the conversion engine, plain Dart with no UI code
 lib/app/    the Flutter UI: sources/ (videos), recipe/ (what to do),
             queue/, estimates/, home/ (the screen)
 lib/l10n/   texts in English and Ukrainian
+bin/        vidctrl-client, which drives the window (it uses only lib/core/)
 tool/       developer tools
 test/       tests, mirroring lib/
 ```
