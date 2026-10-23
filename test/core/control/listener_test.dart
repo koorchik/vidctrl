@@ -95,6 +95,33 @@ void main() {
     expect(calls, 0);
   });
 
+  test('a connection that never says hello is ended', () async {
+    var calls = 0;
+    final listener = await ControlListener.bind(
+      token: 't',
+      handler: (method, params, peer) async => calls++,
+      helloDeadline: const Duration(milliseconds: 200),
+    );
+    addTearDown(listener.close);
+    final silent = await _rawExchange(listener.port, []);
+    expect(_errorIn(silent.single)?.kind, ControlErrorKind.unauthorized);
+    expect(calls, 0);
+  });
+
+  test('a long first line without a break is refused at once', () async {
+    var calls = 0;
+    final listener = await ControlListener.bind(
+      token: 't',
+      handler: (method, params, peer) async => calls++,
+    );
+    addTearDown(listener.close);
+    final endless = await _rawExchange(listener.port, [
+      'x' * 100000,
+    ]).timeout(const Duration(seconds: 2));
+    expect(_errorIn(endless.single)?.kind, ControlErrorKind.unauthorized);
+    expect(calls, 0);
+  });
+
   test('a request before hello is refused', () async {
     var calls = 0;
     final listener = await ControlListener.bind(

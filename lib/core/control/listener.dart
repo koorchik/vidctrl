@@ -25,22 +25,31 @@ abstract interface class ControlPeer {
 /// The window's side of the conversation: a socket on the loopback
 /// interface that only programs knowing [token] may talk to.
 class ControlListener {
-  ControlListener._(this._server, this._token, this._handler) {
+  ControlListener._(
+    this._server,
+    this._token,
+    this._handler,
+    this._helloDeadline,
+  ) {
     _server.listen(_accept);
   }
 
-  /// Listens on a port the system picks, on `127.0.0.1` only.
+  /// Listens on a port the system picks, on `127.0.0.1` only. A connection
+  /// that has not said `hello` within [helloDeadline] is ended; the client
+  /// says it at once, and gives up itself after two seconds.
   static Future<ControlListener> bind({
     required String token,
     required ControlHandler handler,
+    Duration helloDeadline = const Duration(seconds: 5),
   }) async {
     final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-    return ControlListener._(server, token, handler);
+    return ControlListener._(server, token, handler, helloDeadline);
   }
 
   final ServerSocket _server;
   final String _token;
   final ControlHandler _handler;
+  final Duration _helloDeadline;
   final _peers = <_Peer>{};
   bool _closing = false;
 
@@ -74,8 +83,9 @@ class ControlListener {
 
 class _Peer implements ControlPeer {
   _Peer(this._socket, this._listener) {
+    _helloTimer = Timer(_listener._helloDeadline, () => _refuse(0));
     _subscription = utf8.decoder
-        .bind(_socket)
+        .bind(_socket.map(_countUnheard))
         .transform(const LineSplitter())
         .listen(
           _onLine,
@@ -90,8 +100,14 @@ class _Peer implements ControlPeer {
   final Socket _socket;
   final ControlListener _listener;
   late final StreamSubscription<String> _subscription;
+  late final Timer _helloTimer;
   final _closed = Completer<void>();
   bool _authorised = false;
+
+  /// Bytes received before `hello`, which is a short line: a program that
+  /// sends more, or no line break at all, is not a client.
+  int _unheard = 0;
+  static const _unheardLimit = 4096;
 
   /// Set once nothing more is to be written, and lines are ignored.
   bool _ending = false;
@@ -102,6 +118,14 @@ class _Peer implements ControlPeer {
   @override
   void notify(String method, Map<String, Object?> params) {
     if (_authorised) _send(ControlNotification(method, params));
+  }
+
+  List<int> _countUnheard(List<int> bytes) {
+    if (!_authorised && !_ending) {
+      _unheard += bytes.length;
+      if (_unheard > _unheardLimit) _refuse(0);
+    }
+    return bytes;
   }
 
   void _onLine(String line) {
@@ -148,6 +172,7 @@ class _Peer implements ControlPeer {
       return;
     }
     _authorised = true;
+    _helloTimer.cancel();
     _send(ControlResponse(message.id, result: _helloAnswer));
   }
 
@@ -204,6 +229,7 @@ class _Peer implements ControlPeer {
   Future<void> end() {
     if (!_ending) {
       _ending = true;
+      _helloTimer.cancel();
       // A failure means the client has gone already; `done` reports it.
       _socket.close().then((_) {}, onError: (Object _) {});
     }
@@ -214,6 +240,7 @@ class _Peer implements ControlPeer {
     if (_closed.isCompleted) return;
     _closed.complete();
     _ending = true;
+    _helloTimer.cancel();
     _socket.destroy();
     _subscription.cancel();
   }
