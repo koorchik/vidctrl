@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:json_rpc_2/json_rpc_2.dart' as rpc;
+import 'package:stream_channel/stream_channel.dart';
+
 import 'protocol.dart';
 
 /// Answers one request from a client that has said `hello`. Throws a
@@ -81,26 +84,47 @@ class ControlListener {
   }
 }
 
+/// One connection: json_rpc_2 answers the requests, behind a gate that lets
+/// through nothing before a right `hello`.
 class _Peer implements ControlPeer {
   _Peer(this._socket, this._listener) {
-    _helloTimer = Timer(_listener._helloDeadline, () => _refuse(0));
+    _helloTimer = Timer(_listener._helloDeadline, () => _refuse(null));
     _subscription = utf8.decoder
         .bind(_socket.map(_countUnheard))
         .transform(const LineSplitter())
         .listen(
-          _onLine,
+          _lines.add,
           onError: (Object _) => _finish(),
           onDone: _finish,
           cancelOnError: true,
         );
     // A write to a client that has gone shows up here, not at the write.
     _socket.done.then((_) {}, onError: (Object _) => _finish());
+    _messages = jsonLines(_lines.stream, _write);
+    _rpc =
+        rpc.Peer.withoutJson(
+            _messages.transformStream(
+              StreamTransformer.fromHandlers(
+                handleData: _admit,
+                // Not JSON: not one of ours, perhaps a browser posting to
+                // the port.
+                handleError: (_, _, _) => _refuse(null),
+              ),
+            ),
+          )
+          ..registerMethod(Methods.hello, (rpc.Parameters _) => _helloAnswer)
+          ..registerFallback(_serve);
+    unawaited(_rpc.listen());
   }
 
   final Socket _socket;
   final ControlListener _listener;
   late final StreamSubscription<String> _subscription;
   late final Timer _helloTimer;
+  // Synchronous, so a line is dealt with before the next one comes.
+  final _lines = StreamController<String>(sync: true);
+  late final StreamChannel<Object?> _messages;
+  late final rpc.Peer _rpc;
   final _closed = Completer<void>();
   bool _authorised = false;
 
@@ -117,107 +141,85 @@ class _Peer implements ControlPeer {
 
   @override
   void notify(String method, Map<String, Object?> params) {
-    if (_authorised) _send(ControlNotification(method, params));
+    if (_authorised && !_ending) _rpc.sendNotification(method, params);
   }
 
   List<int> _countUnheard(List<int> bytes) {
     if (!_authorised && !_ending) {
       _unheard += bytes.length;
-      if (_unheard > _unheardLimit) _refuse(0);
+      if (_unheard > _unheardLimit) _refuse(null);
     }
     return bytes;
   }
 
-  void _onLine(String line) {
+  /// Passes [message] on to json_rpc_2 once the client has said `hello`.
+  void _admit(Object? message, EventSink<Object?> rpcSide) {
     if (_ending) return;
-    final ControlMessage message;
-    try {
-      message = decodeMessage(line);
-    } on FormatException {
-      // Not one of ours, perhaps a browser posting to the port.
-      _refuse(0);
-      return;
-    }
-    if (!_authorised) {
-      _greet(message);
-    } else if (message is ControlRequest) {
-      unawaited(_serve(message));
-    }
+    if (_authorised || _greet(message)) rpcSide.add(message);
   }
 
   /// The first message must be `hello` with the token, or the connection
-  /// ends.
-  void _greet(ControlMessage message) {
-    if (message is! ControlRequest ||
-        message.method != Methods.hello ||
-        message.params['token'] != _listener._token ||
-        message.params['protocol'] is! int) {
-      _refuse(message is ControlRequest ? message.id : 0);
-      return;
+  /// ends. True when it is, and json_rpc_2 is to answer it.
+  bool _greet(Object? message) {
+    final params = message is Map ? message['params'] : null;
+    if (message is! Map ||
+        message['jsonrpc'] != '2.0' ||
+        message['id'] is! int && message['id'] is! String ||
+        message['method'] != Methods.hello ||
+        params is! Map ||
+        params['token'] != _listener._token ||
+        params['protocol'] is! int) {
+      _refuse(message);
+      return false;
     }
-    final protocol = message.params['protocol'];
+    final protocol = params['protocol'];
     if (protocol != controlProtocol) {
-      _send(
-        ControlResponse(
-          message.id,
-          error: ControlError(
-            ControlErrorKind.badArgument,
-            'This vidctrl-client speaks protocol $protocol, the app speaks '
-            '$controlProtocol; use the vidctrl-client that came with this '
-            'VidCtrl.',
-          ),
+      _answerAndEnd(
+        message,
+        ControlError(
+          ControlErrorKind.badArgument,
+          'This vidctrl-client speaks protocol $protocol, the app speaks '
+          '$controlProtocol; use the vidctrl-client that came with this '
+          'VidCtrl.',
         ),
       );
-      unawaited(end());
-      return;
+      return false;
     }
     _authorised = true;
     _helloTimer.cancel();
-    _send(ControlResponse(message.id, result: _helloAnswer));
+    return true;
   }
 
   static const _helloAnswer = {'protocol': controlProtocol};
 
-  void _refuse(int id) {
-    _send(
-      ControlResponse(
-        id,
-        error: const ControlError(
-          ControlErrorKind.unauthorized,
-          'VidCtrl refused the connection.',
-        ),
-      ),
-    );
+  /// Answers [request] (null when there is none to answer) with
+  /// [ControlErrorKind.unauthorized] and ends the connection.
+  void _refuse(Object? request) => _answerAndEnd(
+    request,
+    const ControlError(
+      ControlErrorKind.unauthorized,
+      'VidCtrl refused the connection.',
+    ),
+  );
+
+  void _answerAndEnd(Object? request, ControlError error) {
+    if (_ending) return;
+    _messages.sink.add(error.toRpc().serialize(request));
     unawaited(end());
   }
 
-  Future<void> _serve(ControlRequest request) async {
-    if (request.method == Methods.hello) {
-      _send(ControlResponse(request.id, result: _helloAnswer));
-      return;
-    }
-    String line;
+  Future<Object?> _serve(rpc.Parameters request) async {
+    final params = request.value == null
+        ? <String, Object?>{}
+        : request.asMap.cast<String, Object?>();
     try {
-      final result = await _listener._handler(
-        request.method,
-        request.params,
-        this,
-      );
-      line = encodeMessage(ControlResponse(request.id, result: result));
+      return await _listener._handler(request.method, params, this);
     } on ControlError catch (e) {
-      line = encodeMessage(ControlResponse(request.id, error: e));
+      throw e.toRpc();
     } on Object catch (e) {
-      line = encodeMessage(
-        ControlResponse(
-          request.id,
-          error: ControlError(ControlErrorKind.badArgument, '$e'),
-        ),
-      );
+      throw ControlError(ControlErrorKind.badArgument, '$e').toRpc();
     }
-    _write(line);
   }
-
-  void _send(ControlMessage message) => _write(encodeMessage(message));
 
   void _write(String line) {
     if (_ending || _closed.isCompleted) return;
@@ -243,5 +245,7 @@ class _Peer implements ControlPeer {
     _helloTimer.cancel();
     _socket.destroy();
     _subscription.cancel();
+    _lines.close();
+    _rpc.close();
   }
 }

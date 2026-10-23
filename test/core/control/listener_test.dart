@@ -33,8 +33,20 @@ Future<List<String>> _rawExchange(int port, List<String> lines) async {
   return received;
 }
 
-ControlError? _errorIn(String line) =>
-    (decodeMessage(line) as ControlResponse).error;
+/// One request as a line of JSON-RPC 2.0, written out by hand.
+String _request(
+  int id,
+  String method, [
+  Map<String, Object?> params = const {},
+]) =>
+    '${jsonEncode({'jsonrpc': '2.0', 'id': id, 'method': method, 'params': params})}\n';
+
+/// The kind of the error answered in [line], if it is one.
+ControlErrorKind? _errorIn(String line) {
+  final error = (jsonDecode(line) as Map)['error'];
+  if (error is! Map) return null;
+  return ControlErrorKind.values.asNameMap()[(error['data'] as Map)['kind']];
+}
 
 void main() {
   test('a call reaches the handler and its answer comes back', () async {
@@ -65,18 +77,15 @@ void main() {
         ),
       ),
     );
-    final hello = encodeMessage(
-      const ControlRequest(1, Methods.hello, {
+    final received = await _rawExchange(listener.port, [
+      _request(1, Methods.hello, {
         'token': 'wrong',
         'protocol': controlProtocol,
       }),
-    );
-    final received = await _rawExchange(listener.port, [
-      '$hello\n',
-      '${encodeMessage(const ControlRequest(2, 'status', {}))}\n',
+      _request(2, 'status'),
     ]);
     expect(received, hasLength(1));
-    expect(_errorIn(received.single)?.kind, ControlErrorKind.unauthorized);
+    expect(_errorIn(received.single), ControlErrorKind.unauthorized);
     expect(calls, 0);
   });
 
@@ -91,7 +100,36 @@ void main() {
       'GET / HTTP/1.1\r\n\r\n',
     ]);
     expect(received, hasLength(1));
-    expect(_errorIn(received.single)?.kind, ControlErrorKind.unauthorized);
+    expect(_errorIn(received.single), ControlErrorKind.unauthorized);
+    expect(calls, 0);
+  });
+
+  test('a line that is not JSON after hello ends the connection', () async {
+    var calls = 0;
+    final listener = await ControlListener.bind(
+      token: 't',
+      handler: (method, params, peer) async => calls++,
+    );
+    addTearDown(listener.close);
+    final socket = await Socket.connect(
+      InternetAddress.loopbackIPv4,
+      listener.port,
+    );
+    final lines = StreamIterator(
+      utf8.decoder.bind(socket).transform(const LineSplitter()),
+    );
+    socket.write(
+      _request(1, Methods.hello, {'token': 't', 'protocol': controlProtocol}),
+    );
+    expect(await lines.moveNext(), isTrue);
+    expect((jsonDecode(lines.current) as Map)['result'], {
+      'protocol': controlProtocol,
+    });
+    socket.write('not JSON\n${_request(2, 'status')}');
+    expect(await lines.moveNext(), isTrue);
+    expect(_errorIn(lines.current), ControlErrorKind.unauthorized);
+    expect(await lines.moveNext().timeout(const Duration(seconds: 5)), isFalse);
+    socket.destroy();
     expect(calls, 0);
   });
 
@@ -104,7 +142,7 @@ void main() {
     );
     addTearDown(listener.close);
     final silent = await _rawExchange(listener.port, []);
-    expect(_errorIn(silent.single)?.kind, ControlErrorKind.unauthorized);
+    expect(_errorIn(silent.single), ControlErrorKind.unauthorized);
     expect(calls, 0);
   });
 
@@ -118,7 +156,7 @@ void main() {
     final endless = await _rawExchange(listener.port, [
       'x' * 100000,
     ]).timeout(const Duration(seconds: 2));
-    expect(_errorIn(endless.single)?.kind, ControlErrorKind.unauthorized);
+    expect(_errorIn(endless.single), ControlErrorKind.unauthorized);
     expect(calls, 0);
   });
 
@@ -129,12 +167,9 @@ void main() {
       handler: (method, params, peer) async => calls++,
     );
     addTearDown(listener.close);
-    final received = await _rawExchange(listener.port, [
-      '${encodeMessage(const ControlRequest(5, 'status', {}))}\n',
-    ]);
-    final answer = decodeMessage(received.single) as ControlResponse;
-    expect(answer.id, 5);
-    expect(answer.error?.kind, ControlErrorKind.unauthorized);
+    final received = await _rawExchange(listener.port, [_request(5, 'status')]);
+    expect((jsonDecode(received.single) as Map)['id'], 5);
+    expect(_errorIn(received.single), ControlErrorKind.unauthorized);
     expect(calls, 0);
   });
 
@@ -144,14 +179,12 @@ void main() {
       handler: (method, params, peer) async => null,
     );
     addTearDown(listener.close);
-    final hello = encodeMessage(
-      const ControlRequest(1, Methods.hello, {'token': 't', 'protocol': 99}),
-    );
-    final received = await _rawExchange(listener.port, ['$hello\n']);
-    final error = _errorIn(received.single);
-    expect(error?.kind, ControlErrorKind.badArgument);
+    final received = await _rawExchange(listener.port, [
+      _request(1, Methods.hello, {'token': 't', 'protocol': 99}),
+    ]);
+    expect(_errorIn(received.single), ControlErrorKind.badArgument);
     expect(
-      error?.message,
+      ((jsonDecode(received.single) as Map)['error'] as Map)['message'],
       'This vidctrl-client speaks protocol 99, the app speaks '
       '$controlProtocol; use the vidctrl-client that came with this VidCtrl.',
     );

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:json_rpc_2/json_rpc_2.dart' as rpc;
+
 import 'endpoint.dart';
 import 'protocol.dart';
 
@@ -12,12 +14,27 @@ class ControlConnection {
         .bind(_socket)
         .transform(const LineSplitter())
         .listen(
-          _onLine,
+          _lines.add,
           onError: (Object _) => _finish(),
           onDone: _finish,
           cancelOnError: true,
         );
     _socket.done.then((_) {}, onError: (Object _) => _finish());
+    final messages = jsonLines(_lines.stream, (line) {
+      if (!_done.isCompleted) _socket.write('$line\n');
+    });
+    _rpc =
+        rpc.Peer.withoutJson(
+            messages.transformStream(
+              StreamTransformer.fromHandlers(
+                // Not JSON: not VidCtrl talking.
+                handleError: (_, _, _) => _finish(),
+              ),
+            ),
+          )
+          // The window asks nothing of a client; what it sends is events.
+          ..registerFallback(_onNotification);
+    unawaited(_rpc.listen());
   }
 
   /// Connects to [endpoint] and says `hello`. Throws [ControlError]:
@@ -68,24 +85,28 @@ class ControlConnection {
 
   final Socket _socket;
   late final StreamSubscription<String> _subscription;
-  final _pending = <int, Completer<Object?>>{};
+  // Synchronous, so an event that comes just before the end is not lost.
+  final _lines = StreamController<String>(sync: true);
+  late final rpc.Peer _rpc;
   // Kept until listened to, so an event that arrives first is not lost.
   final _notifications = StreamController<ControlNotification>();
   final _done = Completer<void>();
-  var _nextId = 1;
 
   /// Throws the window's [ControlError], or [ControlErrorKind.appClosed]
   /// when the connection ends before the answer comes.
   Future<Object?> call(
     String method, [
     Map<String, Object?> params = const {},
-  ]) {
-    if (_done.isCompleted) return Future.error(_appClosed);
-    final id = _nextId++;
-    final answer = Completer<Object?>();
-    _pending[id] = answer;
-    _socket.write('${encodeMessage(ControlRequest(id, method, params))}\n');
-    return answer.future;
+  ]) async {
+    if (_done.isCompleted) throw _appClosed;
+    try {
+      return await _rpc.sendRequest(method, params);
+    } on rpc.RpcException catch (e) {
+      throw ControlError.fromRpc(e);
+    } on StateError {
+      // json_rpc_2's word for a connection that ended first.
+      throw _appClosed;
+    }
   }
 
   /// What the window tells this client unasked; ends with the connection.
@@ -101,41 +122,24 @@ class ControlConnection {
     'VidCtrl was closed.',
   );
 
-  void _onLine(String line) {
-    final ControlMessage message;
-    try {
-      message = decodeMessage(line);
-    } on FormatException {
-      // Not VidCtrl talking.
-      _finish();
-      return;
-    }
-    switch (message) {
-      case ControlResponse(:final id, :final error):
-        final answer = _pending.remove(id);
-        if (answer == null) return;
-        if (error != null) {
-          answer.completeError(error);
-        } else {
-          answer.complete(message.result);
-        }
-      case ControlNotification():
-        _notifications.add(message);
-      case ControlRequest():
-        // The window asks nothing of a client.
-        break;
-    }
+  void _onNotification(rpc.Parameters event) {
+    if (_done.isCompleted) return;
+    _notifications.add(
+      ControlNotification(
+        event.method,
+        event.value == null ? {} : event.asMap.cast<String, Object?>(),
+      ),
+    );
   }
 
+  /// Calls still waiting fail with [ControlErrorKind.appClosed].
   void _finish() {
     if (_done.isCompleted) return;
     _done.complete();
     _socket.destroy();
     _subscription.cancel();
-    for (final answer in _pending.values) {
-      answer.completeError(_appClosed);
-    }
-    _pending.clear();
+    _lines.close();
+    _rpc.close();
     _notifications.close();
   }
 }

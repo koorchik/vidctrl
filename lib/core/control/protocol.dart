@@ -1,4 +1,8 @@
-import 'dart:convert';
+import 'dart:async';
+
+import 'package:json_rpc_2/error_code.dart' as error_code;
+import 'package:json_rpc_2/json_rpc_2.dart';
+import 'package:stream_channel/stream_channel.dart';
 
 /// The version of the conversation between a client and the window. It goes
 /// in the endpoint file and in the `hello` answer.
@@ -27,12 +31,38 @@ enum ControlErrorKind {
 class ControlError implements Exception {
   const ControlError(this.kind, this.message);
 
+  /// The error [toRpc] sent. JSON-RPC's own "method not found" is
+  /// [ControlErrorKind.unknownMethod]; any other error without a kind of
+  /// ours is [ControlErrorKind.badArgument].
+  factory ControlError.fromRpc(RpcException e) {
+    final data = e.data;
+    final kind = ControlErrorKind.values
+        .asNameMap()[data is Map ? data['kind'] : null];
+    return ControlError(
+      kind ??
+          (e.code == error_code.METHOD_NOT_FOUND
+              ? ControlErrorKind.unknownMethod
+              : ControlErrorKind.badArgument),
+      e.message,
+    );
+  }
+
   final ControlErrorKind kind;
   final String message;
+
+  /// This error as JSON-RPC sends it: a code of the kind's position clear of
+  /// JSON-RPC's own, and the kind by name.
+  RpcException toRpc() => RpcException(
+    _errorCodeBase + kind.index,
+    message,
+    data: {'kind': kind.name},
+  );
 
   @override
   String toString() => message;
 }
+
+const _errorCodeBase = 1000;
 
 /// The codes the client exits with.
 abstract final class ExitCode {
@@ -45,101 +75,25 @@ abstract final class ExitCode {
   static const ffmpegMissing = 6;
 }
 
-sealed class ControlMessage {
-  const ControlMessage();
-}
-
-class ControlRequest extends ControlMessage {
-  const ControlRequest(this.id, this.method, this.params);
-
-  final int id;
-  final String method;
-  final Map<String, Object?> params;
-}
-
-class ControlResponse extends ControlMessage {
-  const ControlResponse(this.id, {this.result, this.error});
-
-  final int id;
-  final Object? result;
-  final ControlError? error;
-}
-
 /// A message that wants no answer: an event from the window.
-class ControlNotification extends ControlMessage {
+class ControlNotification {
   const ControlNotification(this.method, this.params);
 
   final String method;
   final Map<String, Object?> params;
 }
 
-/// Error codes are the kind's position plus this, clear of JSON-RPC's own.
-const _errorCodeBase = 1000;
-
-/// One line of JSON-RPC 2.0, without a line break inside.
-String encodeMessage(ControlMessage m) {
-  final Map<String, Object?> json = switch (m) {
-    ControlRequest() => {'id': m.id, 'method': m.method, 'params': m.params},
-    ControlNotification() => {'method': m.method, 'params': m.params},
-    ControlResponse(:final error) when error != null => {
-      'id': m.id,
-      'error': {
-        'code': error.kind.index + _errorCodeBase,
-        'message': error.message,
-        'data': {'kind': error.kind.name},
-      },
-    },
-    ControlResponse() => {'id': m.id, 'result': m.result},
-  };
-  return jsonEncode({'jsonrpc': '2.0', ...json});
-}
-
-/// Throws [FormatException] for anything that is not a request, a response
-/// or a notification.
-ControlMessage decodeMessage(String line) {
-  final Object? json;
-  try {
-    json = jsonDecode(line);
-  } on FormatException {
-    throw const FormatException('Not JSON');
-  }
-  if (json is! Map<String, Object?> || json['jsonrpc'] != '2.0') {
-    throw const FormatException('Not JSON-RPC 2.0');
-  }
-  final id = json['id'];
-  final method = json['method'];
-  if (id != null && id is! int) throw const FormatException('Bad id');
-  if (method != null) {
-    if (method is! String) throw const FormatException('Bad method');
-    final params = json['params'] ?? <String, Object?>{};
-    if (params is! Map<String, Object?>) {
-      throw const FormatException('Bad params');
-    }
-    return id == null
-        ? ControlNotification(method, params)
-        : ControlRequest(id as int, method, params);
-  }
-  if (id is int) {
-    final error = json['error'];
-    if (error == null && json.containsKey('result')) {
-      return ControlResponse(id, result: json['result']);
-    }
-    if (error is Map<String, Object?>) {
-      final data = error['data'];
-      final kind = data is Map<String, Object?> ? data['kind'] : null;
-      return ControlResponse(
-        id,
-        error: ControlError(
-          ControlErrorKind.values.firstWhere(
-            (k) => k.name == kind,
-            orElse: () => ControlErrorKind.badArgument,
-          ),
-          '${error['message'] ?? ''}',
-        ),
-      );
-    }
-  }
-  throw const FormatException('Not a request, response or notification');
+/// One JSON value per line, as a channel json_rpc_2 can talk over: [lines]
+/// come in without their breaks, and each line to send goes to [write] at
+/// once, without one. A line that is not JSON reaches the stream as a
+/// [FormatException].
+StreamChannel<Object?> jsonLines(
+  Stream<String> lines,
+  void Function(String line) write,
+) {
+  final out = StreamController<String>(sync: true);
+  out.stream.listen(write);
+  return jsonDocument.bind(StreamChannel(lines, out.sink));
 }
 
 /// What a client can ask for.

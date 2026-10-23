@@ -16,8 +16,10 @@ dependencies:
     sdk: flutter
   flutter_riverpod: ^3.4.3
   intl: any
+  json_rpc_2: ^4.1.0
   path: ^1.9.1
   path_provider: ^2.1.6
+  stream_channel: ^2.1.4
   window_manager: ^0.5.2
 
 dev_dependencies:
