@@ -526,6 +526,13 @@ The UI renders presets and options generically; it needs no other change.
   developer's computer: run it again after the icon changes, and with
   `--remove` before changing the identifier. A window already open keeps the
   icon it opened with, so restart the app to see a change.
+- **Window size on macOS:** `window_manager` sizes a Mac window with its
+  title bar (28 points), GTK without it, so the same sizes left a Mac 28
+  less inside, and its smallest window was smaller than the panel is made
+  for. `main.dart` adds the bar's height there. A MacBook's 900-point
+  screen, with the menu bar and the Dock, still leaves about 750 inside a
+  window filling it: below the roomier spacing's 790, which "Edit in
+  DaVinci Resolve" needs, but above the archive explanation's 705.
 - **PATH on macOS:** an app opened from the Finder gets
   `/usr/bin:/bin:/usr/sbin:/sbin`, without Homebrew's folders, so
   `FfmpegLocator` looks in `/opt/homebrew/bin` and `/usr/local/bin` itself.

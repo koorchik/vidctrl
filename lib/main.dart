@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,10 +20,17 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerLicenses();
   await windowManager.ensureInitialized();
+  // The sizes are what the app has inside the window. macOS counts the
+  // title bar in a window's size, GTK does not, so the bar is added there:
+  // without it the smallest window was smaller than the panel is made for.
+  final titleBar = Offset(
+    0,
+    Platform.isMacOS ? (await windowManager.getTitleBarHeight()) * 1.0 : 0,
+  );
   await windowManager.waitUntilReadyToShow(
-    const WindowOptions(
-      size: defaultWindowSize,
-      minimumSize: minimumWindowSize,
+    WindowOptions(
+      size: defaultWindowSize + titleBar,
+      minimumSize: minimumWindowSize + titleBar,
       center: true,
     ),
     () async {
