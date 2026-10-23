@@ -1796,6 +1796,36 @@ void main() {
       );
     });
 
+    test('a window does not take over from a running window that does not '
+        'answer', () async {
+      final shared = await Directory.systemTemp.createTemp('vidctrl_control_');
+      addTearDown(() => shared.delete(recursive: true));
+      final silent = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(silent.close);
+      final accepted = <Socket>[];
+      silent.listen(accepted.add);
+      addTearDown(() {
+        for (final socket in accepted) {
+          socket.destroy();
+        }
+      });
+      final busy = Endpoint(
+        port: silent.port,
+        token: 'busy',
+        // This test's own process: running.
+        pid: pid,
+        version: '0.1.0',
+        protocol: controlProtocol,
+      );
+      await controlFile(shared).write(busy);
+
+      final window = await startWindow(env, dir: shared);
+
+      expect(window.read(controlProvider).serving, isFalse);
+      final kept = (await controlFile(shared).read())!;
+      expect((kept.port, kept.token), (busy.port, busy.token));
+    });
+
     test('a window takes over a stale endpoint', () async {
       final shared = await Directory.systemTemp.createTemp('vidctrl_control_');
       addTearDown(() => shared.delete(recursive: true));

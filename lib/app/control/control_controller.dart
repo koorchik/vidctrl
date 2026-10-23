@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/control/connection.dart';
@@ -69,8 +70,10 @@ class ControlController extends Notifier<ControlState>
         await other.close();
         return;
       }
-    } on ControlError {
-      // A window of another version is live there; it keeps the endpoint.
+    } on ControlError catch (e) {
+      // A window is live there that does not answer, or speaks another
+      // protocol; it keeps the endpoint.
+      debugPrint('Not serving vidctrl-client: $e');
       return;
     }
     final token = newToken();

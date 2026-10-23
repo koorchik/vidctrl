@@ -339,7 +339,11 @@ const _errorKinds = [
     'the window could not find FFmpeg and shows what to do '
         '(exit 6).',
   ),
-  ('unauthorized', 'the window refused the connection (exit 2).'),
+  (
+    'unauthorized',
+    'the window is open but refused the connection or did not answer; '
+        'no other window is started (exit 2).',
+  ),
   ('notRunning', 'the window is not open and could not be opened (exit 2).'),
   ('appClosed', 'the window closed meanwhile (exit 4).'),
   ('timeout', '`--timeout` passed; the jobs go on in the window (exit 3).'),
@@ -664,7 +668,8 @@ const _exitCodes = [
   (
     ExitCode.notRunning,
     'VidCtrl is not open and could not be opened (or '
-        '`--no-start` was given), or it refused the connection.',
+        '`--no-start` was given), or it is open but refused the connection '
+        'or did not answer.',
   ),
   (ExitCode.timeout, '`--timeout` passed; the jobs go on in the window.'),
   (ExitCode.appClosed, 'The window closed while waiting or following.'),

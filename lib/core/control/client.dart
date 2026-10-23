@@ -11,6 +11,7 @@ import 'connection.dart';
 import 'endpoint.dart';
 import 'launcher.dart';
 import 'manual.dart';
+import 'process_alive.dart';
 import 'protocol.dart';
 import 'views.dart';
 
@@ -59,8 +60,10 @@ class ClientIo {
     AppLauncher? launcher,
     EndpointFile? endpoint,
     String? os,
+    ProcessAlive? isAlive,
     this.startTimeout = const Duration(seconds: 30),
   }) : os = os ?? Platform.operatingSystem,
+       isAlive = isAlive ?? processIsAlive,
        launcher =
            launcher ??
            AppLauncher(
@@ -85,6 +88,9 @@ class ClientIo {
   final String executable;
   final AppLauncher launcher;
   final EndpointFile endpoint;
+
+  /// Whether the process the endpoint file names still runs.
+  final ProcessAlive isAlive;
 
   /// How long a window that was started has to answer.
   final Duration startTimeout;
@@ -130,7 +136,7 @@ Future<int> _runClient(List<String> args, ClientIo io, _Output output) async {
     return output.fail(e);
   }
   if (command == null) {
-    io.out.write(quickStart('vidctrl-client', os: Platform.operatingSystem));
+    io.out.write(quickStart('vidctrl-client', os: io.os));
     return ExitCode.ok;
   }
   if (command.offline) return command.run(null, output);
@@ -142,7 +148,7 @@ Future<int> _runClient(List<String> args, ClientIo io, _Output output) async {
 
   ControlConnection? connection;
   try {
-    connection = await connectIfLive(io.endpoint);
+    connection = await connectIfLive(io.endpoint, isAlive: io.isAlive);
     if (connection == null && command.name != 'status') {
       if (noStart) {
         throw const ControlError(
@@ -166,8 +172,18 @@ Future<ControlConnection> _start(ClientIo io) async {
   await io.launcher.start();
   final deadline = DateTime.now().add(io.startTimeout);
   bool overdue() => DateTime.now().isAfter(deadline);
+  Future<ControlConnection?> attempt() async {
+    try {
+      return await connectIfLive(io.endpoint, isAlive: io.isAlive);
+    } on ControlError catch (e) {
+      // The window just started may be slow to answer at first.
+      if (e.kind != ControlErrorKind.unauthorized || overdue()) rethrow;
+      return null;
+    }
+  }
+
   ControlConnection? connection;
-  while ((connection = await connectIfLive(io.endpoint)) == null) {
+  while ((connection = await attempt()) == null) {
     if (overdue()) {
       throw ControlError(
         ControlErrorKind.notRunning,
@@ -753,7 +769,11 @@ Future<int> _wait(
   final listening = [connection.notifications.listen(onEvent)];
   ControlConnection? events;
   if (!output.json) {
-    events = await connectIfLive(endpoint);
+    try {
+      events = await connectIfLive(endpoint);
+    } on ControlError {
+      // Then the results come with the answer.
+    }
     if (events != null) {
       listening.add(events.notifications.listen(onEvent));
       try {

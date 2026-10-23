@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:vidctrl/core/control/connection.dart';
 import 'package:vidctrl/core/control/endpoint.dart';
 import 'package:vidctrl/core/control/listener.dart';
+import 'package:vidctrl/core/control/process_alive.dart';
 import 'package:vidctrl/core/control/protocol.dart';
 
 Endpoint _endpoint(int port, String token) => Endpoint(
@@ -47,6 +48,10 @@ ControlErrorKind? _errorIn(String line) {
   if (error is! Map) return null;
   return ControlErrorKind.values.asNameMap()[(error['data'] as Map)['kind']];
 }
+
+Future<bool> _alive(int pid) async => true;
+
+Future<bool> _gone(int pid) async => false;
 
 void main() {
   test('a call reaches the handler and its answer comes back', () async {
@@ -169,6 +174,29 @@ void main() {
     addTearDown(listener.close);
     final received = await _rawExchange(listener.port, [_request(5, 'status')]);
     expect((jsonDecode(received.single) as Map)['id'], 5);
+    expect(_errorIn(received.single), ControlErrorKind.unauthorized);
+    expect(calls, 0);
+  });
+
+  test('a batch before hello is refused and the connection ends', () async {
+    var calls = 0;
+    final listener = await ControlListener.bind(
+      token: 't',
+      handler: (method, params, peer) async => calls++,
+    );
+    addTearDown(listener.close);
+    final hello = {
+      'jsonrpc': '2.0',
+      'id': 1,
+      'method': Methods.hello,
+      'params': {'token': 't', 'protocol': controlProtocol},
+    };
+    final status = {'jsonrpc': '2.0', 'id': 2, 'method': 'status'};
+    // _rawExchange returns only once the listener has ended the connection.
+    final received = await _rawExchange(listener.port, [
+      '${jsonEncode([hello, status])}\n',
+    ]);
+    expect(received, hasLength(1));
     expect(_errorIn(received.single), ControlErrorKind.unauthorized);
     expect(calls, 0);
   });
@@ -314,33 +342,55 @@ void main() {
     );
   });
 
+  test('open says not running when the port refuses', () async {
+    final gone = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final freePort = gone.port;
+    await gone.close();
+    await expectLater(
+      ControlConnection.open(_endpoint(freePort, 't')),
+      throwsA(
+        isA<ControlError>().having(
+          (e) => e.kind,
+          'kind',
+          ControlErrorKind.notRunning,
+        ),
+      ),
+    );
+  });
+
   test('a stale endpoint file is not live', () async {
     final folder = await Directory.systemTemp.createTemp('vidctrl_control');
     addTearDown(() => folder.delete(recursive: true));
     final file = EndpointFile(p.join(folder.path, 'control.json'));
-    expect(await connectIfLive(file), isNull);
+    expect(await connectIfLive(file, isAlive: _alive), isNull);
 
+    await File(file.path).writeAsString('{"port": "not a number"}');
+    expect(await connectIfLive(file, isAlive: _alive), isNull);
+
+    // Nothing listens on its port: stale, whatever runs under its pid.
     final gone = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     final freePort = gone.port;
     await gone.close();
     await file.write(_endpoint(freePort, 't'));
-    expect(await connectIfLive(file), isNull);
+    expect(await connectIfLive(file, isAlive: _alive), isNull);
 
+    // Something there refuses the token, and the window is gone.
     final listener = await ControlListener.bind(
       token: 'other',
       handler: (method, params, peer) async => null,
     );
     addTearDown(listener.close);
     await file.write(_endpoint(listener.port, 't'));
-    expect(await connectIfLive(file), isNull);
+    expect(await connectIfLive(file, isAlive: _gone), isNull);
 
     await file.write(_endpoint(listener.port, 'other'));
-    final live = await connectIfLive(file);
+    final live = await connectIfLive(file, isAlive: _gone);
     expect(live, isNotNull);
     await live!.close();
   });
 
-  test('another program on the port is not mistaken for VidCtrl', () async {
+  test('another program on the port of a window that is gone is not '
+      'mistaken for VidCtrl', () async {
     final folder = await Directory.systemTemp.createTemp('vidctrl_control');
     addTearDown(() => folder.delete(recursive: true));
     final file = EndpointFile(p.join(folder.path, 'control.json'));
@@ -351,6 +401,72 @@ void main() {
       socket.close();
     });
     await file.write(_endpoint(other.port, 't'));
-    expect(await connectIfLive(file), isNull);
+    expect(await connectIfLive(file, isAlive: _gone), isNull);
   });
+
+  test('a running window that does not answer is not taken for a stale '
+      'one', () async {
+    final folder = await Directory.systemTemp.createTemp('vidctrl_control');
+    addTearDown(() => folder.delete(recursive: true));
+    final file = EndpointFile(p.join(folder.path, 'control.json'));
+    final silent = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(silent.close);
+    final accepted = <Socket>[];
+    silent.listen(accepted.add);
+    addTearDown(() {
+      for (final socket in accepted) {
+        socket.destroy();
+      }
+    });
+    await file.write(_endpoint(silent.port, 't'));
+    const quick = Duration(milliseconds: 200);
+
+    await expectLater(
+      connectIfLive(file, isAlive: _alive, timeout: quick),
+      throwsA(
+        isA<ControlError>()
+            .having((e) => e.kind, 'kind', ControlErrorKind.unauthorized)
+            .having(
+              (e) => e.message,
+              'message',
+              'VidCtrl is running but does not answer; try again, or close '
+                  'and reopen its window.',
+            ),
+      ),
+    );
+    // The same silence on the port of a window that is gone: stale.
+    expect(await connectIfLive(file, isAlive: _gone, timeout: quick), isNull);
+  });
+
+  test('a running window that refuses the token is not taken for a stale '
+      'one', () async {
+    final folder = await Directory.systemTemp.createTemp('vidctrl_control');
+    addTearDown(() => folder.delete(recursive: true));
+    final file = EndpointFile(p.join(folder.path, 'control.json'));
+    final listener = await ControlListener.bind(
+      token: 'other',
+      handler: (method, params, peer) async => null,
+    );
+    addTearDown(listener.close);
+    await file.write(_endpoint(listener.port, 't'));
+    await expectLater(
+      connectIfLive(file, isAlive: _alive),
+      throwsA(
+        isA<ControlError>().having(
+          (e) => e.kind,
+          'kind',
+          ControlErrorKind.unauthorized,
+        ),
+      ),
+    );
+  });
+
+  test(
+    'the window running these tests is alive, a pid of none is not',
+    () async {
+      expect(await processIsAlive(pid), isTrue);
+      expect(await processIsAlive(0), isFalse);
+      expect(await processIsAlive(-1), isFalse);
+    },
+  );
 }

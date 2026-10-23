@@ -9,6 +9,7 @@ import 'package:vidctrl/core/control/endpoint.dart';
 import 'package:vidctrl/core/control/launcher.dart';
 import 'package:vidctrl/core/control/listener.dart';
 import 'package:vidctrl/core/control/manual.dart';
+import 'package:vidctrl/core/control/process_alive.dart';
 import 'package:vidctrl/core/control/protocol.dart';
 import 'package:vidctrl/core/control/words.dart';
 
@@ -124,6 +125,7 @@ Future<_Run> _run(
   String os = 'linux',
   Map<String, String> environment = const {'HOME': '/home/alice'},
   String workingDirectory = '/home/alice/work',
+  ProcessAlive? isAlive,
 }) async {
   out ??= StringBuffer();
   err ??= StringBuffer();
@@ -138,6 +140,7 @@ Future<_Run> _run(
       os: os,
       launcher: launcher ?? _FakeLauncher(),
       endpoint: _endpoint,
+      isAlive: isAlive,
     ),
   );
   return _Run(code, '$out', '$err');
@@ -795,6 +798,93 @@ void main() {
     expect(run.err, contains('Starting VidCtrl'));
     expect(statuses, 3);
     expect(run.out, contains('The queue is empty'));
+  });
+
+  test('a stale endpoint file starts the window', () async {
+    final gone = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final deadPort = gone.port;
+    await gone.close();
+    await _endpoint.write(
+      Endpoint(
+        port: deadPort,
+        token: 'old',
+        pid: pid,
+        version: '0.1.0',
+        protocol: controlProtocol,
+      ),
+    );
+    final launcher = _FakeLauncher(() async {
+      await _FakeApp.start(_endpoint, {
+        Methods.queueList: (_, _) => {
+          'paused': false,
+          'busy': false,
+          'jobs': <Object?>[],
+        },
+      });
+    });
+    final run = await _run(['queue'], launcher: launcher);
+    expect(run.exitCode, ExitCode.ok, reason: run.err);
+    expect(launcher.starts, 1);
+  });
+
+  test('a file whose window is gone, with another program on its port, '
+      'starts the window', () async {
+    final other = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(other.close);
+    other.listen((socket) => socket.destroy());
+    await _endpoint.write(
+      Endpoint(
+        port: other.port,
+        token: 'old',
+        pid: 4242,
+        version: '0.1.0',
+        protocol: controlProtocol,
+      ),
+    );
+    final launcher = _FakeLauncher(() async {
+      await _FakeApp.start(_endpoint, {
+        Methods.queueList: (_, _) => {
+          'paused': false,
+          'busy': false,
+          'jobs': <Object?>[],
+        },
+      });
+    });
+    final run = await _run(
+      ['queue'],
+      launcher: launcher,
+      isAlive: (pid) async => pid != 4242,
+    );
+    expect(run.exitCode, ExitCode.ok, reason: run.err);
+    expect(launcher.starts, 1);
+  });
+
+  test('a running window that does not answer exits 2 and starts no '
+      'other', () async {
+    final silent = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(silent.close);
+    final accepted = <Socket>[];
+    silent.listen(accepted.add);
+    addTearDown(() {
+      for (final socket in accepted) {
+        socket.destroy();
+      }
+    });
+    await _endpoint.write(
+      Endpoint(
+        port: silent.port,
+        token: 't',
+        // This test's own process: running.
+        pid: pid,
+        version: '0.1.0',
+        protocol: controlProtocol,
+      ),
+    );
+    final launcher = _FakeLauncher();
+    final run = await _run(['queue'], launcher: launcher);
+    expect(run.exitCode, ExitCode.notRunning);
+    expect(run.err, contains('running but does not answer'));
+    expect(launcher.starts, 0);
   });
 
   test('a window that cannot be started exits 2', () async {

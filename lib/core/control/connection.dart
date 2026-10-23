@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:json_rpc_2/json_rpc_2.dart' as rpc;
 
 import 'endpoint.dart';
+import 'process_alive.dart';
 import 'protocol.dart';
 
 /// The client's side of the conversation with the open window.
@@ -144,18 +145,30 @@ class ControlConnection {
   }
 }
 
-/// A connection to the window [file] names, or null when there is none to
-/// be had: no file, nothing listening on its port, or something there that
-/// refuses the token (a file left by a window that is gone, or another
-/// program on that port now). Throws when the window speaks another
-/// protocol, as starting another would not help.
-Future<ControlConnection?> connectIfLive(EndpointFile file) async {
+/// A connection to the window [file] names, or null when the file is stale:
+/// missing or damaged, nothing listening on its port, or its window's
+/// process gone (another program may have the port now). Throws
+/// [ControlErrorKind.unauthorized] when the window is running but refuses
+/// the token or does not answer within [timeout], and the window's own
+/// error when it speaks another protocol: starting another window would
+/// take this one's place while its owner still watches it.
+Future<ControlConnection?> connectIfLive(
+  EndpointFile file, {
+  ProcessAlive isAlive = processIsAlive,
+  Duration timeout = const Duration(seconds: 2),
+}) async {
   final endpoint = await file.read();
   if (endpoint == null) return null;
   try {
-    return await ControlConnection.open(endpoint);
+    return await ControlConnection.open(endpoint, timeout: timeout);
   } on ControlError catch (e) {
     if (e.kind == ControlErrorKind.badArgument) rethrow;
-    return null;
+    if (e.kind == ControlErrorKind.notRunning) return null;
+    if (!await isAlive(endpoint.pid)) return null;
+    throw const ControlError(
+      ControlErrorKind.unauthorized,
+      'VidCtrl is running but does not answer; try again, or close and '
+      'reopen its window.',
+    );
   }
 }

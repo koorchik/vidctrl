@@ -150,7 +150,11 @@ Three pieces:
   protocol version, or the server closes it. A browser can post to a
   loopback port but cannot read the file, so it cannot pass the token; a
   first line that is not JSON closes the connection too.
-- A stale file (no such process, or the port refuses) means "not running".
+- A stale file (missing or damaged, the port refuses, or no such process)
+  means "not running". A window whose port accepts and whose process runs
+  but that refuses `hello` or does not answer it in time is not stale: the
+  client exits 2 and starts no other window, and a newcomer does not take
+  over.
 
 ### One window
 

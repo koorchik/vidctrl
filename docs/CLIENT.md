@@ -51,7 +51,7 @@ How every command works:
   - `busy`: the window cannot do that right now (exit 5).
   - `unknownMethod`: the open window is of another version and does not know the request (exit 5).
   - `ffmpegMissing`: the window could not find FFmpeg and shows what to do (exit 6).
-  - `unauthorized`: the window refused the connection (exit 2).
+  - `unauthorized`: the window is open but refused the connection or did not answer; no other window is started (exit 2).
   - `notRunning`: the window is not open and could not be opened (exit 2).
   - `appClosed`: the window closed meanwhile (exit 4).
   - `timeout`: `--timeout` passed; the jobs go on in the window (exit 3).
@@ -1103,7 +1103,7 @@ The same for every command:
 |---|---|
 | 0 | Done. For `wait`: every job ended done or skipped, those worth a look by eye included (flagged in the output). |
 | 1 | At least one job failed or was cancelled. |
-| 2 | VidCtrl is not open and could not be opened (or `--no-start` was given), or it refused the connection. |
+| 2 | VidCtrl is not open and could not be opened (or `--no-start` was given), or it is open but refused the connection or did not answer. |
 | 3 | `--timeout` passed; the jobs go on in the window. |
 | 4 | The window closed while waiting or following. |
 | 5 | Bad arguments: an unknown command, goal, option, choice, video or job; or the client itself went wrong. |
