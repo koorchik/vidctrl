@@ -195,6 +195,13 @@ Future<Object?> queueConvertWhole(
       'Job ${job.id} is not a sample; it converts the whole video already.',
     );
   }
+  // As the window, which offers it under a finished sample only.
+  if (job.status != JobStatus.done) {
+    throw badArgument(
+      'Job ${job.id} is a sample not done yet; the whole video can be '
+      'queued once the sample is done.',
+    );
+  }
   return _addedBy(env, ref.read(queueProvider.notifier).convertWhole(job.id));
 }
 

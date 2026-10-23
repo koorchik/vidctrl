@@ -391,6 +391,16 @@ Future<Object?> _queueAdd(
       ready.add(video);
     }
   }
+  if (ready.isEmpty) {
+    // Every video was skipped, as `videos.add` with nothing to add.
+    final reasons = [
+      for (final s in skipped)
+        s['reason'] == 'unreadable'
+            ? 'video ${s['video']} cannot be read'
+            : 'nothing found at ${s['video']}',
+    ];
+    throw badArgument('Nothing was queued: ${reasons.join('; ')}.');
+  }
   final result = ref
       .read(queueProvider.notifier)
       .addVideos(ready, recipe: recipe, output: output);

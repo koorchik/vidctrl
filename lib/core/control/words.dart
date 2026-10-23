@@ -46,7 +46,7 @@ String statusWords(String status) => switch (status) {
 
 String planWords(String plan) => switch (plan) {
   'skip' => 'Already fine: nothing to do',
-  'remux' => 'Moved to a new file type, untouched',
+  'remux' => 'Copied into a new file type, untouched',
   'audioOnly' => 'Only the sound is converted',
   'encode' => 'Converted',
   'unsupported' => 'This goal cannot do anything with it',

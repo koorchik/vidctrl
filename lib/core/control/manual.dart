@@ -273,8 +273,9 @@ String _commandsPart(String c, Map<String, GoalWords> words) => [
   for (final (kind, meaning) in _errorKinds) '  - `$kind`: $meaning',
   '- Start the window before running commands side by side: two commands '
       'started at the same moment with no window open can each open one. '
-      'Any command but `status` opens it, for example `$c queue`; then run '
-      '`$c events` in the background beside the others.',
+      'Any command but `status`, `manual` and `help` opens it, for example '
+      '`$c queue`; then run `$c events` in the background beside the '
+      'others.',
   '',
   for (final doc in commandDocs(c, words)) _commandSection(c, doc),
   '### What `--json` gives',

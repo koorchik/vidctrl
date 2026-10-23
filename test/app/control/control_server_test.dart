@@ -624,6 +624,31 @@ void main() {
       expect(container.read(queueProvider).jobs.single.sourceId, a);
     });
 
+    test('nothing to queue, only paths with nothing there and videos that '
+        'cannot be read, is a bad argument that says why', () async {
+      final notes = p.join(folder.path, 'notes.txt');
+      File(notes).writeAsStringSync('');
+      final missing = p.join(folder.path, 'missing.mp4');
+      final (container, client) = await startControlled(env);
+      final unreadable = await addVideo(client, notes);
+
+      await expectLater(
+        client.call(Methods.queueAdd, {
+          'videos': [unreadable, missing],
+          'goal': 'remux',
+        }),
+        _failsWith(
+          ControlErrorKind.badArgument,
+          allOf(
+            contains('Nothing was queued'),
+            contains('video $unreadable cannot be read'),
+            contains('nothing found at $missing'),
+          ),
+        ),
+      );
+      expect(container.read(queueProvider).jobs, isEmpty);
+    });
+
     test('a video still being read is waited for', () async {
       final (container, client) = await startControlled(env);
       final a = video('a.mp4');
@@ -1004,6 +1029,21 @@ void main() {
         client.call(Methods.queueConvertWhole, {'job': whole.id}),
         _failsWith(ControlErrorKind.badArgument, contains('sample')),
       );
+    });
+
+    test('convert whole waits, as the window\'s button, until the sample '
+        'is done', () async {
+      final (container, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4', 'b.mp4'], sample: 'start');
+      await started(1);
+
+      for (final id in ids) {
+        await expectLater(
+          client.call(Methods.queueConvertWhole, {'job': id}),
+          _failsWith(ControlErrorKind.badArgument, contains('done')),
+        );
+      }
+      expect(jobs(container), hasLength(2));
     });
 
     test('convert anyway converts a video kept as it is', () async {

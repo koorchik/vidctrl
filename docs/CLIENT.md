@@ -56,7 +56,7 @@ How every command works:
   - `appClosed`: the window closed meanwhile (exit 4).
   - `timeout`: `--timeout` passed; the jobs go on in the window (exit 3).
   - `unexpected`: the client itself went wrong; the message says how (exit 5).
-- Start the window before running commands side by side: two commands started at the same moment with no window open can each open one. Any command but `status` opens it, for example `vidctrl-client queue`; then run `vidctrl-client events` in the background beside the others.
+- Start the window before running commands side by side: two commands started at the same moment with no window open can each open one. Any command but `status`, `manual` and `help` opens it, for example `vidctrl-client queue`; then run `vidctrl-client events` in the background beside the others.
 
 ### `vidctrl-client add <paths…>`
 
@@ -318,6 +318,7 @@ With `--json`: `goal` (string): the goal's id; `options` (object): every option 
 Errors:
 
 - An unknown goal, option or choice, a choice of an option this computer does not offer other than the one made here anyway, a video id not in the list, or a `--subfolder` that is not one folder's name: exit 5, with the valid ones named.
+- Nothing to queue, every path or video skipped (nothing found there, or it cannot be read): exit 5, with the reason for each.
 
 ### `vidctrl-client queue remove <jobs…>`
 
@@ -461,7 +462,7 @@ Errors:
 
 Queues the whole video after a sample, as the window's button does.
 
-For a sample job, as "Convert the whole video" under it in the window: a new job converts the whole video the sample was taken from, with the same goal, options and folder, into the output folder rather than `Samples`.
+For a sample job that is done, as "Convert the whole video" under it in the window: a new job converts the whole video the sample was taken from, with the same goal, options and folder, into the output folder rather than `Samples`.
 
 Example:
 
@@ -479,7 +480,7 @@ With `--json`: `added` (list of Job) and `alreadyQueued` (bool), as for `queue c
 
 Errors:
 
-- A job that is not in the queue, or not a sample: exit 5.
+- A job that is not in the queue, not a sample, or a sample not done yet: exit 5.
 
 ### `vidctrl-client pause`
 
@@ -1061,7 +1062,7 @@ Each id and its words (the `...Text` fields in JSON), then what to make of it.
 What a goal would do to a video (Preview `plan`):
 
 - `skip`: Already fine: nothing to do. Queued, the job ends `skipped` and writes no file.
-- `remux`: Moved to a new file type, untouched. Quick: the picture and sound are copied.
+- `remux`: Copied into a new file type, untouched. Quick: the picture and sound are copied.
 - `audioOnly`: Only the sound is converted. Quick: the picture is copied.
 - `encode`: Converted. The picture is converted: this takes time.
 - `unsupported`: This goal cannot do anything with it. For example, a goal for pictures given a sound file. Queued, the job ends `skipped`.

@@ -607,6 +607,8 @@ List<CommandDoc> commandDocs(
           'computer does not offer other than the one made here anyway, a '
           'video id not in the list, or a `--subfolder` that is not one '
           'folder\'s name: exit 5, with the valid ones named.',
+      'Nothing to queue, every path or video skipped (nothing found '
+          'there, or it cannot be read): exit 5, with the reason for each.',
     ],
   ),
   CommandDoc(
@@ -729,10 +731,10 @@ List<CommandDoc> commandDocs(
         'queues the whole video after a sample, as the window\'s button '
         'does',
     about: [
-      'For a sample job, as "Convert the whole video" under it in the '
-          'window: a new job converts the whole video the sample was taken '
-          'from, with the same goal, options and folder, into the output '
-          'folder rather than `Samples`.',
+      'For a sample job that is done, as "Convert the whole video" under '
+          'it in the window: a new job converts the whole video the sample '
+          'was taken from, with the same goal, options and folder, into the '
+          'output folder rather than `Samples`.',
     ],
     examples: ['$c queue convert-whole 3 --json'],
     text: addedJobText(_againAnswer),
@@ -741,7 +743,10 @@ List<CommandDoc> commandDocs(
           'convert-anyway`.',
     ],
     shapes: ['Job', 'Quality'],
-    errors: ['A job that is not in the queue, or not a sample: exit 5.'],
+    errors: [
+      'A job that is not in the queue, not a sample, or a sample not done '
+          'yet: exit 5.',
+    ],
   ),
   CommandDoc(
     'pause',
