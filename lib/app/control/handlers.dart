@@ -8,9 +8,7 @@ import '../../core/control/listener.dart';
 import '../../core/control/protocol.dart';
 import '../../core/control/views.dart';
 import '../../core/estimate/size_estimator.dart';
-import '../../core/ffmpeg/capabilities.dart';
 import '../../core/scenarios/registry.dart';
-import '../../core/scenarios/scenario.dart';
 import '../../l10n/app_localizations.dart';
 import '../build_info.dart';
 import '../estimates/estimate_cache.dart';
@@ -118,7 +116,7 @@ Future<Object?> _goals(
                 : scenarioSubtitle(l10n, scenario.id),
             options: [
               for (final option in preset.options)
-                if (_offered(preset, option, env.capabilities))
+                if (optionOffered(preset, option, env.capabilities))
                   OptionView(
                     id: option.id,
                     title: optionTitle(l10n, preset.id, option.id),
@@ -137,23 +135,6 @@ Future<Object?> _goals(
           ).toJson(),
     ],
   };
-}
-
-/// Whether the panel shows [option], with the goal's defaults or with one
-/// other option changed: the archive's speed row appears only once HEVC is
-/// chosen on a computer whose graphics card makes HEVC alone. An option this
-/// computer cannot use at all is never shown.
-bool _offered(Preset preset, PresetOption option, Capabilities capabilities) {
-  bool shownWith(OptionValues values) =>
-      optionVisible(preset, option, values, capabilities) ||
-      advancedOptionVisible(preset, option, values);
-  if (shownWith(const {})) return true;
-  for (final other in preset.options) {
-    for (final choice in other.choices) {
-      if (shownWith({other.id: choice})) return true;
-    }
-  }
-  return false;
 }
 
 // ---- Videos -------------------------------------------------------------
@@ -244,7 +225,9 @@ Future<Object?> _videosList(
   if (params['goal'] == null && params['options'] != null) {
     throw badArgument('Options go with a goal.');
   }
-  final recipe = params['goal'] == null ? null : recipeFrom(ref, params);
+  final recipe = params['goal'] == null
+      ? null
+      : recipeFrom(ref, params, env.capabilities);
   return {
     'videos': [
       for (final video in ref.read(sourcesProvider).videos)
@@ -329,7 +312,7 @@ Future<Object?> _queueAdd(
   Map<String, Object?> params,
 ) async {
   // Everything is checked before anything is added.
-  final recipe = recipeFrom(ref, params, withSample: true);
+  final recipe = recipeFrom(ref, params, env.capabilities, withSample: true);
   final output = outputFrom(ref, params);
   final references = [
     for (final reference in listParam(params, 'videos'))

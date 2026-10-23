@@ -13,6 +13,7 @@ import 'package:vidctrl/app/sources/sources_controller.dart';
 import 'package:vidctrl/core/control/connection.dart';
 import 'package:vidctrl/core/control/endpoint.dart';
 import 'package:vidctrl/core/control/protocol.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
 import 'package:vidctrl/core/output/output_namer.dart';
 
 import '../../support/control.dart';
@@ -395,6 +396,7 @@ void main() {
     });
 
     test('an unknown goal or choice lists the valid ones', () async {
+      env = FakeEnvironment(capabilities: withGpu({'av1_nvenc'}));
       final (container, client) = await startControlled(env);
       final id = await addVideo(client, video('a.mp4'));
 
@@ -435,6 +437,51 @@ void main() {
         _failsWith(
           ControlErrorKind.badArgument,
           allOf(contains('resolve.studio'), contains('resolve.free')),
+        ),
+      );
+      expect(container.read(queueProvider).jobs, isEmpty);
+    });
+
+    test('a choice the panel does not offer on this computer is refused, '
+        'naming what it offers', () async {
+      // No graphics card encoder works here: the panel has no speed row.
+      final (container, client) = await startControlled(env);
+      final id = await addVideo(client, video('a.mp4'));
+
+      await expectLater(
+        client.call(Methods.queueAdd, {
+          'videos': [id],
+          'goal': 'archive',
+          'options': {'speed': 'gpu'},
+        }),
+        _failsWith(
+          ControlErrorKind.badArgument,
+          allOf(contains('speed'), contains('Options here: codec.')),
+        ),
+      );
+      expect(container.read(queueProvider).jobs, isEmpty);
+    });
+
+    test('without AV1 the archive takes no codec choice', () async {
+      env = FakeEnvironment(
+        capabilities: const Capabilities(
+          ffmpegVersion: 'test',
+          encoders: {'libx265', 'libx264', 'aac'},
+          filters: {'xpsnr'},
+        ),
+      );
+      final (container, client) = await startControlled(env);
+      final id = await addVideo(client, video('a.mp4'));
+
+      await expectLater(
+        client.call(Methods.queueAdd, {
+          'videos': [id],
+          'goal': 'archive',
+          'options': {'codec': 'av1'},
+        }),
+        _failsWith(
+          ControlErrorKind.badArgument,
+          allOf(contains('codec'), contains('no options on this computer')),
         ),
       );
       expect(container.read(queueProvider).jobs, isEmpty);

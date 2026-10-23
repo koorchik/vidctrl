@@ -2,9 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../core/control/protocol.dart';
+import '../../core/ffmpeg/capabilities.dart';
 import '../../core/output/output_namer.dart';
 import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
+import '../home/scenario_texts.dart';
 import '../recipe/recipe.dart';
 import '../recipe/recipe_controller.dart';
 import '../sources/sources_controller.dart';
@@ -44,10 +46,12 @@ SourceVideo? findVideo(SourcesState state, Object reference) {
 
 /// The goal and options asked for in [params], or the panel's goal and
 /// options where no goal is named; options given then change the panel's.
-/// The panel itself is left as it is.
+/// Only the options the panel offers on this computer can be given. The
+/// panel itself is left as it is.
 Recipe recipeFrom(
   Ref ref,
-  Map<String, Object?> params, {
+  Map<String, Object?> params,
+  Capabilities capabilities, {
   bool withSample = false,
 }) {
   final goal = params['goal'];
@@ -57,7 +61,7 @@ Recipe recipeFrom(
     presetId: preset.id,
     values: {
       if (goal == null) ...panel.values,
-      ..._options(preset, params['options']),
+      ..._options(preset, params['options'], capabilities),
     },
     sample: withSample ? _sample(params['sample']) : SampleChoice.none,
   );
@@ -86,11 +90,22 @@ Preset _preset(Object goal) {
   throw badArgument('There is no goal "$goal". Goals: ${goals.join(', ')}.');
 }
 
-OptionValues _options(Preset preset, Object? options) {
+OptionValues _options(
+  Preset preset,
+  Object? options,
+  Capabilities capabilities,
+) {
   if (options == null) return const {};
   if (options is! Map) {
     throw badArgument('"options" must map option ids to choice ids.');
   }
+  final offered = [
+    for (final option in preset.options)
+      if (optionOffered(preset, option, capabilities)) option,
+  ];
+  final here = offered.isEmpty
+      ? 'The goal ${preset.id} has no options on this computer.'
+      : 'Options here: ${[for (final o in offered) o.id].join(', ')}.';
   final values = <String, String>{};
   for (final MapEntry(:key, :value) in options.entries) {
     final option = preset.options.where((o) => o.id == key).firstOrNull;
@@ -98,8 +113,14 @@ OptionValues _options(Preset preset, Object? options) {
       throw badArgument(
         preset.options.isEmpty
             ? 'The goal ${preset.id} has no options.'
-            : 'The goal ${preset.id} has no option "$key". Options: '
-                  '${[for (final o in preset.options) o.id].join(', ')}.',
+            : 'The goal ${preset.id} has no option "$key". $here',
+      );
+    }
+    if (!offered.contains(option)) {
+      // As on the panel, which does not show the row here.
+      throw badArgument(
+        'The option ${option.id} of ${preset.id} cannot be chosen on this '
+        'computer. $here',
       );
     }
     if (value is! String || !option.choices.contains(value)) {
@@ -111,6 +132,27 @@ OptionValues _options(Preset preset, Object? options) {
     values[option.id] = value;
   }
   return values;
+}
+
+/// Whether the panel shows [option], with the goal's defaults or with one
+/// other option changed: the archive's speed row appears only once HEVC is
+/// chosen on a computer whose graphics card makes HEVC alone. An option this
+/// computer cannot use at all is never shown.
+bool optionOffered(
+  Preset preset,
+  PresetOption option,
+  Capabilities capabilities,
+) {
+  bool shownWith(OptionValues values) =>
+      optionVisible(preset, option, values, capabilities) ||
+      advancedOptionVisible(preset, option, values);
+  if (shownWith(const {})) return true;
+  for (final other in preset.options) {
+    for (final choice in other.choices) {
+      if (shownWith({other.id: choice})) return true;
+    }
+  }
+  return false;
 }
 
 SampleChoice _sample(Object? sample) => switch (sample) {
