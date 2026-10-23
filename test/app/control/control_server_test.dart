@@ -126,27 +126,29 @@ void main() {
   });
 
   group('goals', () {
-    test('lists each goal with its words and choices', () async {
+    test('lists each goal by its ids, with its options and choices', () async {
       final (_, client) = await startControlled(env);
 
       final goals = (await client.call(Methods.goals) as Map)['goals'] as List;
       final archive = goals.first as Map;
-      expect(archive['id'], 'archive.master');
-      expect(archive['scenario'], 'archive');
-      expect(archive['title'], 'Archive');
-      expect(archive['subtitle'], 'no quality loss');
+      // The words for them are in the manual, not here.
+      expect(archive, {
+        'id': 'archive.master',
+        'scenario': 'archive',
+        'options': [
+          {
+            'id': 'codec',
+            'defaultChoice': 'av1',
+            'advanced': false,
+            'choices': ['av1', 'hevc'],
+          },
+        ],
+      });
       expect(
         goals.map((g) => (g as Map)['id']),
         containsAll(['remux.container', 'resolve.studio', 'resolve.free']),
       );
-      final codec = (archive['options'] as List).cast<Map>().single;
-      expect(codec['id'], 'codec');
-      expect(codec['defaultChoice'], 'av1');
-      expect((codec['choices'] as List).map((c) => (c as Map)['id']), [
-        'av1',
-        'hevc',
-      ]);
-      expect(((codec['choices'] as List).first as Map)['hint'], isNotEmpty);
+      expectMachineJson(goals);
     });
 
     test('leaves out what this computer cannot do', () async {
@@ -1188,10 +1190,6 @@ void main() {
         ['DONE', 'DONE'],
       );
       expect((jobs.last as Map)['sample'], 'MIDDLE');
-      final details = (answers[7] as Map)['details'] as List;
-      // The fake ffprobe tells of the file alone.
-      expect(details.single, containsPair('group', 'FILE'));
-      expect(details.single, containsPair('number', 1));
       expect(
         ((answers[2] as Map)['skipped'] as List).single,
         containsPair('reason', 'UNREADABLE'),
@@ -1388,8 +1386,8 @@ void main() {
       );
     });
 
-    test('details of a video give its encoding as the window shows it, or '
-        'the whole report', () async {
+    test('details of a video give ffprobe\'s report, and the window\'s '
+        'sections when asked for them', () async {
       final a = p.join(folder.path, 'a.mov');
       File(a).writeAsStringSync('');
       final raw = {
@@ -1425,21 +1423,25 @@ void main() {
       final answer =
           await client.call(Methods.videosDetails, {'video': a}) as Map;
 
+      // For a program: the video and ffprobe's whole report, no words.
+      expect(answer.keys, unorderedEquals(['info', 'raw']));
       expect(answer['info'], containsPair('path', a));
-      final sections = (answer['details'] as List).cast<Map>();
+      expect(answer['raw'], raw);
+      expectMachineJson(answer);
+
+      // For people: the window's sections too, in its words.
+      final words = await client.call(Methods.videosDetails, {
+        'video': a,
+        'sections': true,
+      }) as Map;
+      expect(words['raw'], raw);
+      final sections = (words['sections'] as List).cast<Map>();
       expect(sections.first['title'], 'Video track 1');
       expect(
         sections.first['rows'],
         contains(equals(['Resolution', '3840×2160'])),
       );
       expect(sections.map((s) => s['title']), contains('File'));
-
-      final report = await client.call(Methods.videosDetails, {
-        'video': a,
-        'raw': true,
-      }) as Map;
-      expect(report['raw'], raw);
-      expect(report, isNot(contains('details')));
     });
 
     test('details of a job read its result', () async {

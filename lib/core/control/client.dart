@@ -427,7 +427,6 @@ _Command? _command(ArgResults top, ClientIo io) {
           'video': _video(args.single, io)
         else
           'job': _jobId(job, 'details --job'),
-        if (raw) 'raw': true,
       };
       return _Command(
         'details',
@@ -435,7 +434,9 @@ _Command? _command(ArgResults top, ClientIo io) {
           c!,
           o,
           Methods.videosDetails,
-          params,
+          // The window's words are asked for only to be printed: JSON has
+          // ffprobe's report alone, with --raw or without.
+          {...params, if (!o.json && !raw) 'sections': true},
           (a) =>
               raw ? reportText(a) : detailsText(a, job: params['job'] as int?),
         ),

@@ -12,9 +12,20 @@ void main() {
       'status': 'DONE',
       'options': {'speed': 'fast'},
       'jobs': {'WAITING': 2},
-      'details': [
-        {'group': 'VIDEO', 'title': 'Video track 1'},
-      ],
+      'choices': ['av1', 'hevc'],
+    });
+  });
+
+  test('ffprobe\'s report passes as it is, its own tags and all', () {
+    expectMachineJson({
+      'raw': {
+        'format': {
+          'tags': {'title': 'Family trip'},
+        },
+        'streams': [
+          {'codec_type': 'audio', 'status': 'whatever'},
+        ],
+      },
     });
   });
 
@@ -34,6 +45,17 @@ void main() {
 
   test('a field of words fails', () {
     expect(() => expectMachineJson({'fooText': 'Done'}), fails);
+    for (final key in ['title', 'subtitle', 'label', 'hint', 'rows']) {
+      expect(
+        () => expectMachineJson({
+          'goals': [
+            {'id': 'archive.master', key: 'Archive'},
+          ],
+        }),
+        fails,
+        reason: key,
+      );
+    }
   });
 
   test('a count of jobs by a status that is no code fails', () {

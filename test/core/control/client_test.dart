@@ -191,6 +191,37 @@ Map<String, Object?> _video(int id) => {
   'hdr': false,
 };
 
+/// The window's goals: Archive's, and one of a newer window this client has
+/// no words for.
+const _goalsAnswer = {
+  'goals': [
+    {
+      'id': 'archive.master',
+      'scenario': 'archive',
+      'options': [
+        {
+          'id': 'codec',
+          'defaultChoice': 'av1',
+          'advanced': false,
+          'choices': ['av1', 'hevc'],
+        },
+      ],
+    },
+    {
+      'id': 'future.goal',
+      'scenario': 'future',
+      'options': [
+        {
+          'id': 'depth',
+          'defaultChoice': 'deep',
+          'advanced': true,
+          'choices': ['deep', 'shallow'],
+        },
+      ],
+    },
+  ],
+};
+
 /// What the window answers about results: a job worth a look by eye, its
 /// comparison, a video's details and an estimate.
 final _resultAnswers = <String, _Answer>{
@@ -228,15 +259,12 @@ final _resultAnswers = <String, _Answer>{
         },
   Methods.videosDetails: (params, _) => {
     'info': _video(1),
-    if (params['raw'] == true)
-      'raw': {
-        'format': {'format_name': 'mov'},
-      }
-    else
-      'details': [
+    'raw': {
+      'format': {'format_name': 'mov'},
+    },
+    if (params['sections'] == true)
+      'sections': [
         {
-          'group': 'VIDEO',
-          'number': 1,
           'title': 'Video track 1',
           'rows': [
             ['Format', 'H.265 / HEVC'],
@@ -244,8 +272,6 @@ final _resultAnswers = <String, _Answer>{
           ],
         },
         {
-          'group': 'FILE',
-          'number': 1,
           'title': 'File',
           'rows': [
             ['Size', '1.5 GB'],
@@ -520,18 +546,28 @@ void main() {
           {'job': 2, 'wait': false},
           'Job 2: Comparing with the original',
         ),
-        (['details', '1'], Methods.videosDetails, {'video': 1}, 'Resolution: '),
+        (
+          ['details', '1'],
+          Methods.videosDetails,
+          {'video': 1, 'sections': true},
+          'Resolution: ',
+        ),
         (
           ['details', 'a.mov'],
           Methods.videosDetails,
-          {'video': '/home/alice/work/a.mov'},
+          {'video': '/home/alice/work/a.mov', 'sections': true},
           'Video track 1',
         ),
-        (['details', '--job', '2'], Methods.videosDetails, {'job': 2}, 'File'),
+        (
+          ['details', '--job', '2'],
+          Methods.videosDetails,
+          {'job': 2, 'sections': true},
+          'File',
+        ),
         (
           ['details', '1', '--raw'],
           Methods.videosDetails,
-          {'video': 1, 'raw': true},
+          {'video': 1},
           '"format_name": "mov"',
         ),
         (
@@ -567,6 +603,16 @@ void main() {
         expect(run.exitCode, ExitCode.ok, reason: '$args ${run.err}');
         expectMachineJson(jsonDecode(run.out));
       }
+      // A program gets the video and ffprobe's report, not the window's
+      // words; --raw changes nothing there.
+      for (final args in [
+        ['details', '1', '--json'],
+        ['details', '1', '--raw', '--json'],
+      ]) {
+        final run = await _run(args);
+        expect(app.paramsOf(Methods.videosDetails), {'video': 1});
+        expect((jsonDecode(run.out) as Map).keys, ['info', 'raw']);
+      }
 
       // Refused before the window is asked anything.
       final asked = app.calls.length;
@@ -590,6 +636,37 @@ void main() {
       expect(app.calls.length, asked);
     },
   );
+
+  test('goals prints the words for the ids the window sends; those of a '
+      'goal it does not know, by their ids', () async {
+    await _FakeApp.start(_endpoint, {Methods.goals: (_, _) => _goalsAnswer});
+
+    final run = await _run(['goals']);
+
+    expect(run.exitCode, ExitCode.ok, reason: run.err);
+    expect(
+      run.out,
+      startsWith(
+        'Archive, no quality loss: --goal archive\n'
+        '  Format: --opt codec=…\n'
+        '    Smallest file: av1 (the default). Plays on computers',
+      ),
+    );
+    expect(run.out, contains('    Works everywhere: hevc. The same look'));
+    expect(
+      run.out,
+      endsWith(
+        'future.goal: --goal future\n'
+        '  depth (under More options…): --opt depth=…\n'
+        '    deep (the default)\n'
+        '    shallow\n',
+      ),
+    );
+
+    final json = await _run(['goals', '--json']);
+    expect(jsonDecode(json.out), _goalsAnswer);
+    expectMachineJson(jsonDecode(json.out));
+  });
 
   test('--json prints the answer as JSON', () async {
     final answer = {
@@ -1045,28 +1122,7 @@ void main() {
         'busy': true,
         'jobs': {'RUNNING': 1, 'WAITING': 2, 'DONE': 3},
       },
-      Methods.goals: (_, _) => {
-        'goals': [
-          {
-            'id': 'archive.master',
-            'scenario': 'archive',
-            'title': 'Archive',
-            'subtitle': 'no quality loss',
-            'options': [
-              {
-                'id': 'codec',
-                'title': 'Format',
-                'defaultChoice': 'av1',
-                'advanced': false,
-                'choices': [
-                  {'id': 'av1', 'label': 'Smallest file', 'hint': 'Slower.'},
-                  {'id': 'hevc', 'label': 'Plays everywhere', 'hint': ''},
-                ],
-              },
-            ],
-          },
-        ],
-      },
+      Methods.goals: (_, _) => _goalsAnswer,
       Methods.videosAdd: (_, _) => {
         'videos': [
           {'path': '/videos/a.mov', 'id': 1, 'result': 'ADDED'},

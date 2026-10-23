@@ -2,8 +2,9 @@ import 'codes.dart';
 
 // The shapes the window sends and the client prints. In JSON the keys are
 // the field names and an absent value is left out, never null. A value that
-// is one of a few is a code of codes.dart, never words: the client's words
-// for people are in words.dart.
+// is one of a few is a code of codes.dart, never words, nor the window's
+// labels: the client's words for people are in words.dart, and the goals'
+// in manual_words.g.dart.
 
 T? _opt<T>(Map<String, Object?> json, String key) => json[key] as T?;
 
@@ -270,37 +271,34 @@ class StatusView {
   };
 }
 
+/// A goal by its ids; its words, and what its options and choices mean,
+/// are in the manual.
 class GoalView {
   const GoalView({
     required this.id,
     required this.scenario,
-    required this.title,
-    required this.subtitle,
     required this.options,
   });
 
   factory GoalView.fromJson(Map<String, Object?> json) => GoalView(
     id: json['id'] as String,
     scenario: json['scenario'] as String,
-    title: json['title'] as String,
-    subtitle: json['subtitle'] as String? ?? '',
     options: [
       for (final o in (json['options'] as List?) ?? const [])
         OptionView.fromJson(_map(o)),
     ],
   );
 
+  /// The preset id.
   final String id;
+
+  /// The scenario id.
   final String scenario;
-  final String title;
-  final String subtitle;
   final List<OptionView> options;
 
   Map<String, Object?> toJson() => {
     'id': id,
     'scenario': scenario,
-    'title': title,
-    'subtitle': subtitle,
     'options': [for (final o in options) o.toJson()],
   };
 }
@@ -308,7 +306,6 @@ class GoalView {
 class OptionView {
   const OptionView({
     required this.id,
-    required this.title,
     required this.defaultChoice,
     required this.advanced,
     required this.choices,
@@ -316,44 +313,24 @@ class OptionView {
 
   factory OptionView.fromJson(Map<String, Object?> json) => OptionView(
     id: json['id'] as String,
-    title: json['title'] as String,
     defaultChoice: json['defaultChoice'] as String,
     advanced: json['advanced'] as bool? ?? false,
-    choices: [
-      for (final c in (json['choices'] as List?) ?? const [])
-        ChoiceView.fromJson(_map(c)),
-    ],
+    choices: _strings(json['choices']),
   );
 
   final String id;
-  final String title;
   final String defaultChoice;
   final bool advanced;
-  final List<ChoiceView> choices;
+
+  /// The choices' ids, as `--opt` takes them.
+  final List<String> choices;
 
   Map<String, Object?> toJson() => {
     'id': id,
-    'title': title,
     'defaultChoice': defaultChoice,
     'advanced': advanced,
-    'choices': [for (final c in choices) c.toJson()],
+    'choices': choices,
   };
-}
-
-class ChoiceView {
-  const ChoiceView({required this.id, required this.label, required this.hint});
-
-  factory ChoiceView.fromJson(Map<String, Object?> json) => ChoiceView(
-    id: json['id'] as String,
-    label: json['label'] as String,
-    hint: json['hint'] as String? ?? '',
-  );
-
-  final String id;
-  final String label;
-  final String hint;
-
-  Map<String, Object?> toJson() => {'id': id, 'label': label, 'hint': hint};
 }
 
 /// How a job ended, as `wait` reports it.

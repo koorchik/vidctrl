@@ -207,11 +207,11 @@ is an error that lists the valid ones.
 | Command | What the window does | Notes |
 |---|---|---|
 | `status` | — | running or not, version, FFmpeg state, queue summary (running, paused, counts per status) |
-| `goals` | the goal tiles and their rows | ids, English title and subtitle from the ARB, options with choices and the default, the hint (`choiceHint`) per choice |
+| `goals` | the goal tiles and their rows | goal, option and choice ids, the default, whether under "More options…"; the text output takes the English words (title, subtitle, `choiceHint`) from the client's manual |
 | `add <paths…>` | dropping files | same expansion of folders as a drop (`expandDroppedPaths`), same "each path once"; waits until each is probed (`--no-wait` skips); prints each video's id and whether it is readable |
 | `videos [--goal g] [--opt …]` | the video list | path, size, duration, resolution, codecs, HDR; with a goal: what the plan would be (skip, remux, encode, unsupported, kept as is) and the expected size and closeness if known |
 | `estimate <videos…> --goal g [--opt …]` | selecting videos, which measures them | runs `EstimateCache.measure` only while the queue is idle, as the preview does; the result lands in the shared cache, so the list shows it too |
-| `details <video\|job> [--raw]` | "Video details" | `--raw` gives the whole ffprobe report |
+| `details <video\|job> [--raw]` | "Video details" | the text output gives the window's sections, in its words; `--raw` prints the whole ffprobe report instead, which `--json` always gives |
 | `remove <videos…>` | removing from the list | off the list only; the file stays on disk, and the output says so |
 | `queue` | the queue pane | each job: id, video, goal and options, sample or not, status, progress and time left, "checking the quality… try N", output path, chosen quality and outcome |
 | `queue add <videos…> [--goal g] [--opt k=v]… [--sample start\|middle] [--out next\|<folder>] [--subfolder Name]` | Add to queue | paths not in the list yet are added first; an identical pending job is reported as already queued, not added; without `--goal` the panel's current goal and options are used (like the button) and the output says which; without `--sample` the whole video, whatever the panel's sample choice; without `--out` the panel's output setting (remembered, maybe a custom folder) |
@@ -272,7 +272,12 @@ carries ids, numbers, paths and, for every value that is one of a few, a
 code in SCREAMING_SNAKE_CASE, and no words (no `...Text` fields; only an
 error's `message`, beside its `code`, is for people). Goal, option and
 choice ids stay as `--goal` and `--opt` take them (`archive.master`,
-`speed=fast`), so input and output share one spelling. The codes are
+`speed=fast`), so input and output share one spelling. Nor does it carry
+the window's labels: `goals` gives ids, and the words for each goal,
+option and choice are in the manual (`help goals`); `details` gives the
+video and ffprobe's whole report, and the window's sections, in its
+words, are asked for (`sections`) only by the text output. `manual
+--json` is the manual itself and keeps the goals' words. The codes are
 listed once, in `lib/core/control/codes.dart`; a Dart enum's value becomes
 its code by `codeOf` (`audioOnly` is `AUDIO_ONLY`), and the manual
 explains each one:

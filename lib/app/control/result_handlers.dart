@@ -110,13 +110,15 @@ String _notComparable(QueueJob job, AppEnvironment env) {
       'original.';
 }
 
-/// "Video details" of a video in the list, or of a finished job's result.
+/// "Video details" of a video in the list, or of a finished job's result:
+/// the video and ffprobe's whole report; with `sections`, also what the
+/// window shows, in its words.
 Future<Object?> videosDetails(
   Ref ref,
   AppEnvironment env,
   Map<String, Object?> params,
 ) async {
-  final raw = _flag(params, 'raw', or: false);
+  final sections = _flag(params, 'sections', or: false);
   if (params['video'] != null && params['job'] != null) {
     throw badArgument('Name a video ("video") or a job ("job"), not both.');
   }
@@ -151,7 +153,9 @@ Future<Object?> videosDetails(
   }
   return {
     'info': view,
-    if (raw) 'raw': info.raw else 'details': _details(info.raw),
+    'raw': info.raw,
+    // Only for the client's text: a program reads `raw`.
+    if (sections) 'sections': _sections(info.raw),
   };
 }
 
@@ -177,15 +181,13 @@ Future<SourceVideo> _readVideo(Ref ref, Object reference) async {
   return video;
 }
 
-/// The window's "Video details" in English: each track, then the file, each
-/// by its kind's code and its number among that kind.
-List<Map<String, Object?>> _details(Map<String, Object?> raw) {
+/// The window's "Video details" in English, for people: each track, then
+/// the file, by its title and rows of label and value.
+List<Map<String, Object?>> _sections(Map<String, Object?> raw) {
   final l10n = lookupAppLocalizations(const Locale('en'));
   return [
     for (final section in orderedDetails(encodingDetails(raw)))
       {
-        'group': codeOf(section.group),
-        'number': section.number,
         'title': groupTitle(l10n, section.group, section.number),
         'rows': [
           for (final row in section.rows)

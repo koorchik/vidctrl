@@ -1,6 +1,5 @@
 import 'dart:io' show Platform;
 
-import '../media/media_details.dart' show DetailGroup;
 import '../scenarios/registry.dart';
 import '../scenarios/scenario.dart';
 import 'codes.dart';
@@ -437,7 +436,7 @@ final _errorCodes = [
 String _jsonPart() => '''
 ## JSON
 
-Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never words; goal, option and choice ids as `--goal` and `--opt` take them. `[X]` is a list; `?` marks a field left out when not known; only `cancel` gives `null`. Here and in the `→` answers, an untyped field is a string.
+Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never words, not even the window's labels; goal, option and choice ids as `--goal` and `--opt` take them. `[X]` is a list; `?` marks a field left out when not known; only `cancel` gives `null`. Here and in the `→` answers, an untyped field is a string.
 
 - Video: `id` int, `path`, `status`, `sizeBytes`? int, `durationSeconds`? number, `width`? int, `height`? int, `videoCodec`?, `audioCodecs` [string], `hdr` bool, `preview`? Preview.
 - Preview: `goal`, `plan`, `expectedBytes`? int, `measured` bool (by encoding pieces), `measuring` bool, `closeness`?.
@@ -445,7 +444,7 @@ Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never word
 - Quality: `outcome`, `value`? int (lower is better), `standardValue`? int, `vmaf`? number, `xpsnr`? number (of the poorest piece), `share` number (expected size / original's).
 - Outcome: `jobId` int, `path`, `status`, `outputPath`?, `needsALook` bool.
 - Status: `state`, `version`, `busy` bool, `paused` bool, `jobs` {status: int}.
-- Goal: `id` (`archive.master`), `scenario`, `title`, `subtitle`, `options` [{`id`, `title`, `defaultChoice`, `advanced` bool, `choices` [{`id`, `label`, `hint`}]}].
+- Goal: `id` (`archive.master`), `scenario`, `options` [{`id`, `defaultChoice`, `advanced` bool, `choices` [string]}]; what each is for is under "Goals".
 - Error, on stderr: `{"error": {"code", "message"}}`; read `code`, the message is for people.
 ''';
 
@@ -465,29 +464,19 @@ How the window stands.
 - `jobs` (object): how many jobs there are in each status, by its code, as `{"WAITING": 2, "DONE": 1}`.
 ''',
   'Goal': '''
-A goal, with the options this computer offers.
+A goal, with the options this computer offers. What it is for, and its options and choices, are in `help goals`, by these ids.
 
 - `id` (string): the goal's full id, as `archive.master`; `--goal` takes it always.
 - `scenario` (string): its kind, as `archive`; `--goal` takes it when the kind has one goal only.
-- `title` (string): its name in the window.
-- `subtitle` (string): what sets it apart from a like one; may be empty.
 - `options` (list of Option).
 ''',
   'Option': '''
 One option of a goal: `--opt <id>=<choice>`.
 
 - `id` (string).
-- `title` (string): its name in the window.
 - `defaultChoice` (string): the choice made when none is given.
 - `advanced` (bool): under "More options…" in the window.
-- `choices` (list of Choice).
-''',
-  'Choice': '''
-One choice of an option.
-
-- `id` (string): what `--opt` takes.
-- `label` (string): its name in the window.
-- `hint` (string): what it trades away; may be empty.
+- `choices` (list of string): what `--opt` takes, as `["av1", "hevc"]`.
 ''',
   'Video': '''
 A video in the window's list.
@@ -770,18 +759,6 @@ const _comparisonNotes = [
   ),
 ];
 
-/// What a section of `details` describes.
-String _groupNote(DetailGroup group) => switch (group) {
-  DetailGroup.file => 'The file as a whole: its type, size and length.',
-  DetailGroup.video => 'A picture track.',
-  DetailGroup.audio => 'A sound track.',
-  DetailGroup.subtitle => 'A subtitle track.',
-  DetailGroup.timecode => 'A timecode track, as cameras write.',
-  DetailGroup.data => 'A data track, such as a camera\'s notes.',
-  DetailGroup.attachment => 'A file carried inside, such as a font or a cover.',
-  DetailGroup.chapters => 'The chapters.',
-};
-
 /// Every kind of code the JSON carries, each code with what it means, as
 /// the manual's "Codes" lists them.
 final List<CodeKind> codeKinds = [
@@ -876,15 +853,6 @@ final List<CodeKind> codeKinds = [
     codes: [
       for (final (code, brief, note) in _comparisonNotes)
         (code: code, brief: brief, meaning: note),
-    ],
-  ),
-  (
-    name: 'detailGroup',
-    title: 'Details',
-    where: '`details[].group`',
-    codes: [
-      for (final group in DetailGroup.values)
-        (code: codeOf(group), brief: '', meaning: _groupNote(group)),
     ],
   ),
   (

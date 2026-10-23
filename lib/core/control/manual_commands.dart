@@ -3,7 +3,6 @@ import 'dart:convert';
 import '../ffmpeg/capabilities.dart';
 import '../ffmpeg/command_builder.dart';
 import '../ffmpeg/command_text.dart';
-import '../media/media_details.dart' show DetailGroup;
 import '../media/media_info.dart';
 import '../media/video_files.dart' show videoExtensions;
 import '../scenarios/archive.dart';
@@ -103,11 +102,20 @@ class CommandDoc {
 
 Preset get _firstGoal => scenarios.first.presets.first;
 
-/// A goal as `goals` gives it, from the words here.
-GoalView _goalView(Preset preset, Map<String, GoalWords> words) {
-  final scenario = scenarios.firstWhere((s) => s.presets.contains(preset));
-  return GoalView.fromJson(goalJson(scenario, preset, words[preset.id]));
-}
+/// A goal as `goals` gives it, every option offered.
+GoalView _goalView(Preset preset) => GoalView(
+  id: preset.id,
+  scenario: scenarios.firstWhere((s) => s.presets.contains(preset)).id,
+  options: [
+    for (final option in preset.options)
+      OptionView(
+        id: option.id,
+        defaultChoice: option.defaultChoice,
+        advanced: option.advanced,
+        choices: option.choices,
+      ),
+  ],
+);
 
 // Samples for what the commands print, in the client's own words.
 
@@ -335,12 +343,42 @@ final _compareAnswer = {
   'vmaf': 94.1,
 };
 
-final _detailsAnswer = {
-  'info': _video.toJson(),
-  'details': [
+/// ffprobe's report on [_video], shortened.
+const _report = {
+  'streams': [
     {
-      'group': codeOf(DetailGroup.video),
-      'number': 1,
+      'index': 0,
+      'codec_name': 'hevc',
+      'profile': 'Main 10',
+      'codec_type': 'video',
+      'width': 3840,
+      'height': 2160,
+      'pix_fmt': 'yuv420p10le',
+      'r_frame_rate': '25/1',
+    },
+    {
+      'index': 1,
+      'codec_name': 'aac',
+      'codec_type': 'audio',
+      'sample_rate': '48000',
+      'channels': 2,
+    },
+  ],
+  'format': {
+    'format_name': 'mov,mp4,m4a,3gp,3g2,mj2',
+    'duration': '754.200000',
+    'size': '4200000000',
+  },
+};
+
+final _detailsAnswer = {'info': _video.toJson(), 'raw': _report};
+
+/// What the client is sent to print the details: the window's sections
+/// too, in its words.
+final _detailsForPeople = {
+  ..._detailsAnswer,
+  'sections': [
+    {
       'title': 'Video track 1',
       'rows': [
         [
@@ -354,8 +392,6 @@ final _detailsAnswer = {
       ],
     },
     {
-      'group': codeOf(DetailGroup.audio),
-      'number': 1,
       'title': 'Audio track 1',
       'rows': [
         ['Codec', 'AAC (Advanced Audio Coding) · LC'],
@@ -364,8 +400,6 @@ final _detailsAnswer = {
       ],
     },
     {
-      'group': codeOf(DetailGroup.file),
-      'number': 1,
       'title': 'File',
       'rows': [
         ['Container', 'QuickTime / MOV'],
@@ -509,11 +543,8 @@ List<CommandDoc> commandDocs(
     summary: 'how a video or a result is made, as "Video details" shows it',
     brief:
         'How a video, or a done job\'s result, is encoded, track by track; '
-        '`--raw`: ffprobe\'s report.',
-    answer:
-        '`{info: Video, details: [{group, number: int, title, rows: [[string]]}]}` or '
-        '`{info: Video, raw: object}`',
-    codes: ['detailGroup'],
+        '`--raw`: ffprobe\'s report. JSON: that report always.',
+    answer: '`{info: Video, raw: object}`',
     about: [
       'As "Video details" in the window: how the file is encoded, track by '
           'track (picture, then sound, then the file as a whole), in the '
@@ -525,21 +556,20 @@ List<CommandDoc> commandDocs(
       ('--job <job>', 'the result of this job instead of a video in the list.'),
       (
         '--raw',
-        'FFmpeg\'s whole report on the file (ffprobe\'s JSON), instead of '
-            'the details.',
+        'print FFmpeg\'s whole report on the file (ffprobe\'s JSON) instead '
+            'of the details; with `--json` it changes nothing.',
       ),
     ],
-    examples: ['$c details 0', '$c details --job 1 --raw --json'],
-    text: detailsText(_detailsAnswer),
+    examples: ['$c details 0', '$c details --job 1 --json'],
+    text: detailsText(_detailsForPeople),
     json: [
       '`info` (Video): the video; for a job, its result, with the `id` of '
-          'the video it was made from. `details` (list): for each track and '
-          'the file, `group` (string: what it describes, see "Details"), '
-          '`number` (int: its place among those of its group, from 1), '
-          '`title` (string) and `rows` (list of [label, value], both '
-          'strings), in the window\'s words. With `--raw`, `raw` (object) '
-          'instead of '
-          '`details`: ffprobe\'s report as it gave it.',
+          'the video it was made from. `raw` (object): ffprobe\'s report as '
+          'it gave it (`-show_format -show_streams -show_chapters`), every '
+          'detail the window shows read from it: `streams` (each track, by '
+          '`codec_type`), `format` (the file) and `chapters`. The window\'s '
+          'words for them are printed only without `--json`. Here '
+          'shortened:',
       ..._jsonBlock(_detailsAnswer),
     ],
     shapes: ['Video'],
@@ -1154,14 +1184,15 @@ List<CommandDoc> commandDocs(
           '`queue add`, but for the choice the goal makes here anyway.',
     ],
     examples: ['$c goals', '$c goals --json'],
-    text: goalsText([_goalView(_firstGoal, words)]),
+    text: goalsText([_goalView(_firstGoal)], words: words),
     json: [
-      '`goals` (list of Goal), in the order of the panel.',
+      '`goals` (list of Goal), in the order of the panel: ids only. What '
+          'each goal, option and choice is for is below, by those ids.',
       ..._jsonBlock({
-        'goals': [_goalView(_firstGoal, words).toJson()],
+        'goals': [_goalView(_firstGoal).toJson()],
       }),
     ],
-    shapes: ['Goal'],
+    shapes: ['Goal', 'Option'],
   ),
   CommandDoc(
     'manual',
@@ -1177,8 +1208,10 @@ List<CommandDoc> commandDocs(
     text: ['# vidctrl-client', '…'],
     json: [
       'the same as data: `commands` (list: `name`, `arguments`, '
-          '`description`, `options`), `goals` (list: like Goal, with `goal`, '
-          'the name `--goal` takes, and a `hint` for each goal and option), '
+          '`description`, `options`), `goals` (list: like Goal, with every '
+          'option, `goal`, the name `--goal` takes, and the window\'s words: '
+          '`title`, `subtitle` and `hint` for a goal, `title` and `hint` for '
+          'an option, and each choice as `id`, `label` and `hint`), '
           '`exitCodes` (object: code to meaning), `events` (list: `name`, '
           '`fields`, `description`) and `codes` (object: for each kind of '
           'code, as the manual\'s "Codes" lists them, a list of `code` and '

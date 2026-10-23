@@ -35,7 +35,7 @@ VidCtrl deletes no file: "remove" takes a video off the list or a job out of the
 
 - `add <paths…> [--no-wait]`: Adds files, and the videos in folders, to the list, and waits until each is read. Results in `Converted` count too: give files, not a folder of results. → `{videos: [{path, id?: int, result}]}`
 - `videos [--goal <goal>] [--opt <option>=<choice>]`: The list; with `--goal`, each video's `preview` (sizes measured only for the panel's goal while the queue is idle; else `estimate`). → `{videos: [Video]}`
-- `details <video> | --job <job> [--raw]`: How a video, or a done job's result, is encoded, track by track; `--raw`: ffprobe's report. → `{info: Video, details: [{group, number: int, title, rows: [[string]]}]}` or `{info: Video, raw: object}`
+- `details <video> | --job <job> [--raw]`: How a video, or a done job's result, is encoded, track by track; `--raw`: ffprobe's report. JSON: that report always. → `{info: Video, raw: object}`
 - `estimate <videos…> [--goal <goal>] [--opt <option>=<choice>]`: Measures expected size and closeness by encoding pieces, seconds to a minute each; without `--goal`, the panel's. `BUSY` while converting. → `{videos: [Video]}` with `preview`
 - `remove <videos…>`: Takes videos off the list; files stay on disk, jobs in the queue. → `{removed: [int]}`
 - `queue`: The jobs, in order. → `{paused: bool, busy: bool, jobs: [Job]}`
@@ -62,7 +62,7 @@ VidCtrl deletes no file: "remove" takes a video off the list or a job out of the
 
 ## JSON
 
-Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never words; goal, option and choice ids as `--goal` and `--opt` take them. `[X]` is a list; `?` marks a field left out when not known; only `cancel` gives `null`. Here and in the `→` answers, an untyped field is a string.
+Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never words, not even the window's labels; goal, option and choice ids as `--goal` and `--opt` take them. `[X]` is a list; `?` marks a field left out when not known; only `cancel` gives `null`. Here and in the `→` answers, an untyped field is a string.
 
 - Video: `id` int, `path`, `status`, `sizeBytes`? int, `durationSeconds`? number, `width`? int, `height`? int, `videoCodec`?, `audioCodecs` [string], `hdr` bool, `preview`? Preview.
 - Preview: `goal`, `plan`, `expectedBytes`? int, `measured` bool (by encoding pieces), `measuring` bool, `closeness`?.
@@ -70,7 +70,7 @@ Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never word
 - Quality: `outcome`, `value`? int (lower is better), `standardValue`? int, `vmaf`? number, `xpsnr`? number (of the poorest piece), `share` number (expected size / original's).
 - Outcome: `jobId` int, `path`, `status`, `outputPath`?, `needsALook` bool.
 - Status: `state`, `version`, `busy` bool, `paused` bool, `jobs` {status: int}.
-- Goal: `id` (`archive.master`), `scenario`, `title`, `subtitle`, `options` [{`id`, `title`, `defaultChoice`, `advanced` bool, `choices` [{`id`, `label`, `hint`}]}].
+- Goal: `id` (`archive.master`), `scenario`, `options` [{`id`, `defaultChoice`, `advanced` bool, `choices` [string]}]; what each is for is under "Goals".
 - Error, on stderr: `{"error": {"code", "message"}}`; read `code`, the message is for people.
 
 ## Codes
@@ -86,7 +86,6 @@ Where each kind is found, then its codes; in full in `vidctrl-client help <comma
 - **Adding** (`add`'s `result`, `queue add`'s `skipped[].reason`): `ADDED`; `KNOWN` listed already; `NOT_FOUND` nothing there, or no longer listed; `UNREADABLE` listed, not a video FFmpeg opens.
 - **Samples** (Job `sample`): `START`; `MIDDLE`.
 - **Comparisons** (`compare`'s and `COMPARE_FINISHED`'s `status`): `MEASURED`; `FAILED` only in the event, with `errorLines`.
-- **Details** (`details[].group`): `FILE`; `VIDEO`; `AUDIO`; `SUBTITLE`; `TIMECODE`; `DATA`; `ATTACHMENT`; `CHAPTERS`.
 - **Errors** (`error.code`, with the exit code): `BAD_ARGUMENT` 5, not valid; `NOT_FOUND` 5; `BUSY` 5, not now; `UNKNOWN_METHOD` 5, another version; `FFMPEG_MISSING` 6; `UNAUTHORIZED` 2, refused or no answer; `NOT_RUNNING` 2; `APP_CLOSED` 4; `TIMEOUT` 3, the jobs go on; `UNEXPECTED` 5, the client went wrong.
 - **Events** (`events`' `event`, with `time` but on `APP_CLOSING`, and these fields): `SNAPSHOT` `{videos: [Video], jobs: [Job], paused: bool, busy: bool}`, first; `VIDEO_ADDED` a Video; `VIDEO_READY` a Video; `VIDEO_UNREADABLE` a Video; `VIDEO_REMOVED` `{video: int}`; `JOB_ADDED` a Job; `JOB_CHECKING` `{job: int, attempt: int}`; `JOB_STARTED` a Job; `JOB_PROGRESS` `{job: int, fraction: number, remainingSeconds?: number}`; `JOB_FINISHED` a Job; `JOB_REMOVED` `{job: int}`; `QUEUE_PAUSED`; `QUEUE_RESUMED`; `QUEUE_IDLE` nothing more to do; `COMPARE_FINISHED` as `compare` answers, or with `errorLines`; `APP_CLOSING` the window closes.
 
@@ -229,13 +228,13 @@ As "Video details" in the window: how the file is encoded, track by track (pictu
 Options:
 
 - `--job <job>`: the result of this job instead of a video in the list.
-- `--raw`: FFmpeg's whole report on the file (ffprobe's JSON), instead of the details.
+- `--raw`: print FFmpeg's whole report on the file (ffprobe's JSON) instead of the details; with `--json` it changes nothing.
 
 Examples:
 
 ```sh
 vidctrl-client details 0
-vidctrl-client details --job 1 --raw --json
+vidctrl-client details --job 1 --json
 ```
 
 It prints, for example:
@@ -258,10 +257,10 @@ File:
   Size: 4.20 GB
 ```
 
-With `--json`: `info` (Video): the video; for a job, its result, with the `id` of the video it was made from. `details` (list): for each track and the file, `group` (string: what it describes, see "Details"), `number` (int: its place among those of its group, from 1), `title` (string) and `rows` (list of [label, value], both strings), in the window's words. With `--raw`, `raw` (object) instead of `details`: ffprobe's report as it gave it.
+With `--json`: `info` (Video): the video; for a job, its result, with the `id` of the video it was made from. `raw` (object): ffprobe's report as it gave it (`-show_format -show_streams -show_chapters`), every detail the window shows read from it: `streams` (each track, by `codec_type`), `format` (the file) and `chapters`. The window's words for them are printed only without `--json`. Here shortened:
 
 ```json
-{"info":{"id":0,"path":"/home/alice/Videos/beach.mov","status":"READY","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false},"details":[{"group":"VIDEO","number":1,"title":"Video track 1","rows":[["Codec","H.265 / HEVC (High Efficiency Video Coding) · Main 10 · level 5.1"],["Resolution","3840×2160"],["Frame rate","25 fps (25/1)"],["Bit depth","10-bit"],["Chroma subsampling","4:2:0"]]},{"group":"AUDIO","number":1,"title":"Audio track 1","rows":[["Codec","AAC (Advanced Audio Coding) · LC"],["Channels","2 (stereo)"],["Sample rate","48 kHz"]]},{"group":"FILE","number":1,"title":"File","rows":[["Container","QuickTime / MOV"],["Size","4.20 GB"]]}]}
+{"info":{"id":0,"path":"/home/alice/Videos/beach.mov","status":"READY","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false},"raw":{"streams":[{"index":0,"codec_name":"hevc","profile":"Main 10","codec_type":"video","width":3840,"height":2160,"pix_fmt":"yuv420p10le","r_frame_rate":"25/1"},{"index":1,"codec_name":"aac","codec_type":"audio","sample_rate":"48000","channels":2}],"format":{"format_name":"mov,mp4,m4a,3gp,3g2,mj2","duration":"754.200000","size":"4200000000"}}}
 ```
 
 Errors:
@@ -1006,10 +1005,10 @@ Archive, no quality loss: --goal archive
     Fast: gpu. The graphics card encodes: several times faster. Busy footage comes out the same size, calm footage up to 2.5 times larger.
 ```
 
-With `--json`: `goals` (list of Goal), in the order of the panel.
+With `--json`: `goals` (list of Goal), in the order of the panel: ids only. What each goal, option and choice is for is below, by those ids.
 
 ```json
-{"goals":[{"id":"archive.master","scenario":"archive","title":"Archive","subtitle":"no quality loss","options":[{"id":"codec","title":"Format","defaultChoice":"av1","advanced":false,"choices":[{"id":"av1","label":"Smallest file","hint":"Plays on computers (Macs from M1) and newer devices: iPhone 15 Pro and later, TVs from about 2020."},{"id":"hevc","label":"Works everywhere","hint":"The same look in a file up to a third larger. Plays almost everywhere, older iPhones, Macs and TVs included."}]},{"id":"speed","title":"Speed","defaultChoice":"cpu","advanced":false,"choices":[{"id":"cpu","label":"Thorough","hint":"The processor encodes: slower, and the file is the smallest."},{"id":"gpu","label":"Fast","hint":"The graphics card encodes: several times faster. Busy footage comes out the same size, calm footage up to 2.5 times larger."}]}]}]}
+{"goals":[{"id":"archive.master","scenario":"archive","options":[{"id":"codec","defaultChoice":"av1","advanced":false,"choices":["av1","hevc"]},{"id":"speed","defaultChoice":"cpu","advanced":false,"choices":["cpu","gpu"]}]}]}
 ```
 
 Each goal, by the name `--goal` takes, with its options and their choices. The full id (as `archive.master`) is taken too. An option is offered only where it makes a difference on this computer: `vidctrl-client goals` shows which are here; another is taken only with the choice the goal makes here anyway. A file with no picture is `UNSUPPORTED` by every goal but "Get the sound" and "Remove personal data".
@@ -1136,7 +1135,7 @@ It prints, for example:
 …
 ```
 
-With `--json`: the same as data: `commands` (list: `name`, `arguments`, `description`, `options`), `goals` (list: like Goal, with `goal`, the name `--goal` takes, and a `hint` for each goal and option), `exitCodes` (object: code to meaning), `events` (list: `name`, `fields`, `description`) and `codes` (object: for each kind of code, as the manual's "Codes" lists them, a list of `code` and `description`). Here with one of each:
+With `--json`: the same as data: `commands` (list: `name`, `arguments`, `description`, `options`), `goals` (list: like Goal, with every option, `goal`, the name `--goal` takes, and the window's words: `title`, `subtitle` and `hint` for a goal, `title` and `hint` for an option, and each choice as `id`, `label` and `hint`), `exitCodes` (object: code to meaning), `events` (list: `name`, `fields`, `description`) and `codes` (object: for each kind of code, as the manual's "Codes" lists them, a list of `code` and `description`). Here with one of each:
 
 ```json
 {"commands":[{"name":"resume","arguments":"","description":"lets a paused queue go on","options":[]}],"goals":[{"id":"archive.master","scenario":"archive","goal":"archive","title":"Archive","subtitle":"no quality loss","hint":"Camera videos take far less space and look the same as the originals. Dates, camera details, sound and colours are kept.","options":[{"id":"codec","title":"Format","hint":"","defaultChoice":"av1","advanced":false,"choices":[{"id":"av1","label":"Smallest file","hint":"Plays on computers (Macs from M1) and newer devices: iPhone 15 Pro and later, TVs from about 2020."},{"id":"hevc","label":"Works everywhere","hint":"The same look in a file up to a third larger. Plays almost everywhere, older iPhones, Macs and TVs included."}]},{"id":"speed","title":"Speed","hint":"","defaultChoice":"cpu","advanced":false,"choices":[{"id":"cpu","label":"Thorough","hint":"The processor encodes: slower, and the file is the smallest."},{"id":"gpu","label":"Fast","hint":"The graphics card encodes: several times faster. Busy footage comes out the same size, calm footage up to 2.5 times larger."}]}]}],"exitCodes":{"0":"Done. For `wait`: every job ended done or skipped, those worth a look by eye included (flagged in the output)."},"events":[{"name":"SNAPSHOT","fields":"`videos` (list of Video), `jobs` (list of Job), `paused` (bool), `busy` (bool)","description":"How everything stands; first, unless `--since-now`."}],"codes":{"jobStatus":[{"code":"WAITING","description":"Waiting. In the queue, its turn not come yet."}]}}
@@ -1179,12 +1178,10 @@ How the window stands.
 
 ### Goal
 
-A goal, with the options this computer offers.
+A goal, with the options this computer offers. What it is for, and its options and choices, are in `help goals`, by these ids.
 
 - `id` (string): the goal's full id, as `archive.master`; `--goal` takes it always.
 - `scenario` (string): its kind, as `archive`; `--goal` takes it when the kind has one goal only.
-- `title` (string): its name in the window.
-- `subtitle` (string): what sets it apart from a like one; may be empty.
 - `options` (list of Option).
 
 ### Option
@@ -1192,18 +1189,9 @@ A goal, with the options this computer offers.
 One option of a goal: `--opt <id>=<choice>`.
 
 - `id` (string).
-- `title` (string): its name in the window.
 - `defaultChoice` (string): the choice made when none is given.
 - `advanced` (bool): under "More options…" in the window.
-- `choices` (list of Choice).
-
-### Choice
-
-One choice of an option.
-
-- `id` (string): what `--opt` takes.
-- `label` (string): its name in the window.
-- `hint` (string): what it trades away; may be empty.
+- `choices` (list of string): what `--opt` takes, as `["av1", "hevc"]`.
 
 ### Video
 
@@ -1355,19 +1343,6 @@ Job `sample`:
 
 - `MEASURED`: Compared: `closeness`, `xpsnr` and, where measured, `vmaf` say how close.
 - `FAILED`: Only in `COMPARE_FINISHED`: it could not be compared; `errorLines` says why. `compare` exits 5 instead.
-
-### Details
-
-`details[].group`:
-
-- `FILE`: The file as a whole: its type, size and length.
-- `VIDEO`: A picture track.
-- `AUDIO`: A sound track.
-- `SUBTITLE`: A subtitle track.
-- `TIMECODE`: A timecode track, as cameras write.
-- `DATA`: A data track, such as a camera's notes.
-- `ATTACHMENT`: A file carried inside, such as a font or a cover.
-- `CHAPTERS`: The chapters.
 
 ### Errors
 

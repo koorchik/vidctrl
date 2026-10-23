@@ -2,6 +2,8 @@ import 'dart:math';
 
 import '../media/media_details.dart' show formatBytes, fullReport;
 import 'codes.dart';
+import 'manual.dart' show ChoiceWords, GoalWords, OptionWords;
+import 'manual_words.g.dart';
 import 'protocol.dart';
 import 'views.dart';
 import 'words.dart';
@@ -42,32 +44,48 @@ String _queueState(bool busy, bool paused) => paused
     : 'idle';
 
 /// The goals, each by the shortest name `--goal` takes: its kind's when
-/// that kind has no other.
-List<String> goalsText(List<GoalView> goals) {
+/// that kind has no other. The window sends ids only; the words are the
+/// manual's ([words]), and a goal, option or choice they lack goes by its
+/// id, as one of a newer window would.
+List<String> goalsText(
+  List<GoalView> goals, {
+  Map<String, GoalWords> words = manualGoalWords,
+}) {
   String name(GoalView goal) =>
       goals.where((g) => g.scenario == goal.scenario).length == 1
       ? goal.scenario
       : goal.id;
-  // A label that only repeats the id ("yes") is said once.
-  String choiceName(ChoiceView choice) =>
-      choice.label.toLowerCase() == choice.id
-      ? choice.id
-      : '${choice.label}: ${choice.id}';
   return [
     for (final (i, goal) in goals.indexed) ...[
       if (i > 0) '',
-      '${goal.title}${goal.subtitle.isEmpty ? '' : ', ${goal.subtitle}'}: '
-          '--goal ${name(goal)}',
-      for (final option in goal.options) ...[
-        '  ${option.title}${option.advanced ? ' (under More options…)' : ''}: '
-            '--opt ${option.id}=…',
-        for (final choice in option.choices)
-          '    ${choiceName(choice)}'
-              '${choice.id == option.defaultChoice ? ' (the default)' : ''}'
-              '${choice.hint.isEmpty ? '' : '. ${choice.hint}'}',
-      ],
+      '${_goalTitle(goal, words[goal.id])}: --goal ${name(goal)}',
+      for (final option in goal.options)
+        ..._optionText(option, words[goal.id]?.options[option.id]),
     ],
   ];
+}
+
+String _goalTitle(GoalView goal, GoalWords? words) => words == null
+    ? goal.id
+    : [words.title, if (words.subtitle.isNotEmpty) words.subtitle].join(', ');
+
+List<String> _optionText(OptionView option, OptionWords? words) => [
+  '  ${words?.title ?? option.id}'
+      '${option.advanced ? ' (under More options…)' : ''}: '
+      '--opt ${option.id}=…',
+  for (final choice in option.choices)
+    _choiceText(choice, words?.choices[choice], option.defaultChoice),
+];
+
+/// A choice's label and id, and its hint; a label that only repeats the id
+/// ("yes") is said once.
+String _choiceText(String choice, ChoiceWords? words, String defaultChoice) {
+  final named = words == null || words.label.toLowerCase() == choice
+      ? choice
+      : '${words.label}: $choice';
+  final standard = choice == defaultChoice ? ' (the default)' : '';
+  final hint = words == null || words.hint.isEmpty ? '' : '. ${words.hint}';
+  return '    $named$standard$hint';
 }
 
 /// One line of a `videos.add` answer.
@@ -103,8 +121,9 @@ List<String> _factsText(VideoView video) {
   return [if (facts.isNotEmpty) '  ${facts.join(', ')}'];
 }
 
-/// A `videos.details` answer: the video, or the result of [job], then each
-/// track's details as the window's "Video details" shows them.
+/// A `videos.details` answer asked with `sections`: the video, or the
+/// result of [job], then each track's details as the window's "Video
+/// details" shows them, in its words.
 List<String> detailsText(Map<String, Object?> answer, {int? job}) {
   final info = VideoView.fromJson(
     Map<String, Object?>.from(answer['info'] as Map),
@@ -116,7 +135,7 @@ List<String> detailsText(Map<String, Object?> answer, {int? job}) {
       'Job $job\'s result: ${info.path}',
       ..._factsText(info),
     ],
-    for (final section in (answer['details'] as List?) ?? const []) ...[
+    for (final section in (answer['sections'] as List?) ?? const []) ...[
       '${(section as Map)['title']}:',
       for (final row in section['rows'] as List)
         '  ${(row as List).first}: ${row.last}',

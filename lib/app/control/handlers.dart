@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
@@ -10,9 +9,7 @@ import '../../core/control/listener.dart';
 import '../../core/control/protocol.dart';
 import '../../core/control/views.dart';
 import '../../core/scenarios/registry.dart';
-import '../../l10n/app_localizations.dart';
 import '../build_info.dart';
-import '../home/scenario_texts.dart';
 import '../providers.dart';
 import '../queue/queue_controller.dart';
 import '../sources/sources_controller.dart';
@@ -141,46 +138,32 @@ Map<String, Object?> _status(Ref ref) {
   ).toJson();
 }
 
+/// The goals by their ids, with the options this computer offers; the
+/// words for them are in the client's manual.
 Future<Object?> _goals(
   Ref ref,
   AppEnvironment env,
   Map<String, Object?> params,
-) async {
-  final l10n = lookupAppLocalizations(const Locale('en'));
-  return {
-    'goals': [
-      for (final scenario in scenarios)
-        for (final preset in scenario.presets)
-          GoalView(
-            id: preset.id,
-            scenario: scenario.id,
-            title: scenarioTitle(l10n, scenario.id),
-            // Resolve's two are told apart as on the panel's tile.
-            subtitle: scenario.presets.length > 1
-                ? presetTitle(l10n, preset.id)
-                : scenarioSubtitle(l10n, scenario.id),
-            options: [
-              for (final option in preset.options)
-                if (optionOffered(preset, option, env.capabilities))
-                  OptionView(
-                    id: option.id,
-                    title: optionTitle(l10n, preset.id, option.id),
-                    defaultChoice: option.defaultChoice,
-                    advanced: option.advanced,
-                    choices: [
-                      for (final choice in option.choices)
-                        ChoiceView(
-                          id: choice,
-                          label: choiceLabel(l10n, preset.id, choice),
-                          hint: choiceHint(l10n, option.id, choice),
-                        ),
-                    ],
-                  ),
-            ],
-          ).toJson(),
-    ],
-  };
-}
+) async => {
+  'goals': [
+    for (final scenario in scenarios)
+      for (final preset in scenario.presets)
+        GoalView(
+          id: preset.id,
+          scenario: scenario.id,
+          options: [
+            for (final option in preset.options)
+              if (optionOffered(preset, option, env.capabilities))
+                OptionView(
+                  id: option.id,
+                  defaultChoice: option.defaultChoice,
+                  advanced: option.advanced,
+                  choices: option.choices,
+                ),
+          ],
+        ).toJson(),
+  ],
+};
 
 // ---- Videos -------------------------------------------------------------
 

@@ -71,15 +71,12 @@ void main() {
     final goal = GoalView(
       id: 'archive.master',
       scenario: 'archive',
-      title: 'Archive',
-      subtitle: 'no quality loss',
       options: [
         OptionView(
           id: 'speed',
-          title: 'Speed',
-          defaultChoice: 'fast',
+          defaultChoice: 'gpu',
           advanced: false,
-          choices: [ChoiceView(id: 'fast', label: 'Fast', hint: 'Bigger')],
+          choices: ['cpu', 'gpu'],
         ),
       ],
     );

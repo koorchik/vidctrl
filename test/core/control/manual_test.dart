@@ -7,10 +7,10 @@ import 'package:vidctrl/app/sources/sources_controller.dart';
 import 'package:vidctrl/core/control/client.dart';
 import 'package:vidctrl/core/control/codes.dart';
 import 'package:vidctrl/core/control/manual.dart';
+import 'package:vidctrl/core/control/manual_words.g.dart';
 import 'package:vidctrl/core/control/protocol.dart';
 import 'package:vidctrl/core/control/views.dart';
 import 'package:vidctrl/core/control/words.dart';
-import 'package:vidctrl/core/media/media_details.dart' show DetailGroup;
 import 'package:vidctrl/core/scenarios/registry.dart';
 
 import '../../../tool/make_manual.dart'
@@ -106,6 +106,33 @@ void main() {
     final goals = commandHelp('goals');
     expect(goals, contains('#### Archive, no quality loss: `--goal archive`'));
     expect(goals, contains('`av1`: Smallest file (the default).'));
+  });
+
+  test('help goals has the window\'s words for every id goals --json '
+      'gives', () {
+    final goals = commandHelp('goals');
+    for (final s in scenarios) {
+      for (final preset in s.presets) {
+        final words = manualGoalWords[preset.id]!;
+        expect(goals, contains(words.title), reason: preset.id);
+        expect(goals, contains(words.subtitle), reason: preset.id);
+        expect(goals, contains(words.hint), reason: preset.id);
+        for (final o in preset.options) {
+          final option = words.options[o.id]!;
+          expect(goals, contains('`--opt ${o.id}=…`: ${option.title}'));
+          expect(goals, contains(option.hint), reason: o.id);
+          for (final c in o.choices) {
+            final choice = option.choices[c]!;
+            expect(goals, contains('`$c`'), reason: '${preset.id} $c');
+            // A label that only repeats the id is said by the id.
+            if (choice.label.toLowerCase() != c) {
+              expect(goals, contains(choice.label), reason: c);
+            }
+            expect(goals, contains(choice.hint), reason: c);
+          }
+        }
+      }
+    }
   });
 
   test('the manual says which goal to choose', () {
@@ -293,15 +320,12 @@ void main() {
     const goal = GoalView(
       id: 'archive.master',
       scenario: 'archive',
-      title: 'Archive',
-      subtitle: '',
       options: [
         OptionView(
           id: 'codec',
-          title: 'Format',
           defaultChoice: 'av1',
           advanced: false,
-          choices: [ChoiceView(id: 'av1', label: 'Smallest file', hint: '')],
+          choices: ['av1'],
         ),
       ],
     );
@@ -342,7 +366,6 @@ void main() {
       ...AddResultCodes.all,
       ...SampleCodes.all,
       ...ComparisonCodes.all,
-      ...DetailGroup.values.map(codeOf),
       for (final kind in ControlErrorKind.values) kind.code,
       ...ClientErrorCodes.all,
     ];

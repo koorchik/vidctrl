@@ -17,16 +17,22 @@ const _codeKeys = {
   'group',
 };
 
-/// Fails unless [json] is fit for a program: no key ends in `Text`, every
-/// value under a key of [_codeKeys] is a code, and so is every key of a
-/// Status's `jobs` object. Only those keys are checked for codes: a value
-/// under any other key may be anything.
+/// The keys of the window's labels, which JSON leaves to the manual.
+const _wordKeys = {'title', 'subtitle', 'label', 'hint', 'rows'};
+
+/// Fails unless [json] is fit for a program: no key ends in `Text` or is
+/// one of [_wordKeys], every value under a key of [_codeKeys] is a code, and
+/// so is every key of a Status's `jobs` object. Only those keys are checked
+/// for codes: a value under any other key may be anything. `raw` is
+/// ffprobe's report as it gave it, so what is in it is not checked.
 void expectMachineJson(Object? json, {String at = r'$'}) {
   switch (json) {
     case final Map<Object?, Object?> map:
       for (final MapEntry(:key, :value) in map.entries) {
         final path = '$at.$key';
+        if (key == 'raw') continue;
         expect(key, isNot(endsWith('Text')), reason: '$path is words');
+        expect(_wordKeys, isNot(contains(key)), reason: '$path is words');
         if (_codeKeys.contains(key) && value is! Map && value is! List) {
           expect(value, matches(codePattern), reason: '$path is no code');
         }
