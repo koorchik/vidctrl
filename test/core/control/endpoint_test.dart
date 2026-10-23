@@ -1,0 +1,82 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
+import 'package:vidctrl/core/control/endpoint.dart';
+
+void main() {
+  test('the endpoint lives in the runtime folder on Linux', () {
+    expect(
+      endpointPath(
+        os: 'linux',
+        environment: {
+          'XDG_RUNTIME_DIR': '/run/user/1000',
+          'HOME': '/home/alice',
+        },
+      ),
+      '/run/user/1000/vidctrl/control.json',
+    );
+    expect(
+      endpointPath(os: 'linux', environment: {'HOME': '/home/alice'}),
+      '/home/alice/.cache/vidctrl/control.json',
+    );
+  });
+
+  test('on macOS and Windows it lives in the per-user app folder', () {
+    expect(
+      endpointPath(os: 'macos', environment: {'HOME': '/Users/alice'}),
+      '/Users/alice/Library/Application Support/app.camctrl.vidctrl/control.json',
+    );
+    expect(
+      endpointPath(
+        os: 'windows',
+        environment: {'LOCALAPPDATA': r'C:\Users\alice\AppData\Local'},
+      ),
+      r'C:\Users\alice\AppData\Local\VidCtrl\control.json',
+    );
+  });
+
+  test(
+    'a written endpoint reads back and only its owner can read it',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('endpoint');
+      addTearDown(() => dir.delete(recursive: true));
+      final file = EndpointFile(p.join(dir.path, 'sub', 'control.json'));
+      const e = Endpoint(
+        port: 4242,
+        token: 't',
+        pid: 1,
+        version: '',
+        protocol: 1,
+      );
+      await file.write(e);
+      final back = (await file.read())!;
+      expect(
+        (back.port, back.token, back.pid, back.version, back.protocol),
+        (4242, 't', 1, '', 1),
+      );
+      if (!Platform.isWindows) {
+        expect(FileStat.statSync(file.path).modeString(), 'rw-------');
+      }
+      await file.delete();
+      expect(await file.read(), isNull);
+      await file.delete();
+    },
+  );
+
+  test('a malformed endpoint file reads as none', () async {
+    final dir = await Directory.systemTemp.createTemp('endpoint');
+    addTearDown(() => dir.delete(recursive: true));
+    final path = p.join(dir.path, 'control.json');
+    await File(path).writeAsString('{');
+    expect(await EndpointFile(path).read(), isNull);
+    await File(path).writeAsString('{"port": "x"}');
+    expect(await EndpointFile(path).read(), isNull);
+  });
+
+  test('tokens differ and are long', () {
+    expect(newToken(), isNot(newToken()));
+    expect(newToken().length, greaterThanOrEqualTo(43));
+    expect(newToken(), isNot(contains('=')));
+  });
+}
