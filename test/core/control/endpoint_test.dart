@@ -64,6 +64,34 @@ void main() {
     },
   );
 
+  test('a folder made for the endpoint is for its owner only', () async {
+    final dir = await Directory.systemTemp.createTemp('endpoint');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = EndpointFile(p.join(dir.path, 'sub', 'control.json'));
+    const e = Endpoint(port: 1, token: 't', pid: 1, version: '', protocol: 1);
+    await file.write(e);
+    if (!Platform.isWindows) {
+      expect(
+        FileStat.statSync(p.join(dir.path, 'sub')).modeString(),
+        'rwx------',
+      );
+    }
+  });
+
+  test('writing again replaces the endpoint and leaves no temp file', () async {
+    final dir = await Directory.systemTemp.createTemp('endpoint');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = EndpointFile(p.join(dir.path, 'control.json'));
+    await file.write(
+      const Endpoint(port: 1, token: 'a', pid: 1, version: '', protocol: 1),
+    );
+    await file.write(
+      const Endpoint(port: 2, token: 'b', pid: 1, version: '', protocol: 1),
+    );
+    expect((await file.read())!.port, 2);
+    expect(File('${file.path}.tmp').existsSync(), isFalse);
+  });
+
   test('a malformed endpoint file reads as none', () async {
     final dir = await Directory.systemTemp.createTemp('endpoint');
     addTearDown(() => dir.delete(recursive: true));

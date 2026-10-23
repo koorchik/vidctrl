@@ -107,15 +107,36 @@ class EndpointFile {
 
   Future<void> write(Endpoint e) async {
     final file = File(path);
-    await file.parent.create(recursive: true);
-    // Written aside and renamed, so a client never reads half a file.
+    final folder = file.parent;
+    final unixLike = Platform.isLinux || Platform.isMacOS;
+    final folderIsNew = !await folder.exists();
+    await folder.create(recursive: true);
+    // A folder made here, like ~/.cache/vidctrl, is for this user only.
+    if (unixLike && folderIsNew) await _chmod('700', folder.path);
+    // Written aside and renamed, so a client never reads half a file. The
+    // file is made empty and restricted before the token goes in, so the
+    // token is never readable by others.
     final temporary = File('$path.tmp');
-    await temporary.writeAsString(jsonEncode(e.toJson()));
-    if (Platform.isLinux || Platform.isMacOS) {
-      // Before the rename, so the token is never readable by others.
-      await Process.run('chmod', ['600', temporary.path]);
+    try {
+      await temporary.writeAsString('');
+      if (unixLike) await _chmod('600', temporary.path);
+      await temporary.writeAsString(jsonEncode(e.toJson()));
+      await temporary.rename(path);
+    } on Object {
+      try {
+        await temporary.delete();
+      } on Object {
+        // Nothing left to clean.
+      }
+      rethrow;
     }
-    await temporary.rename(path);
+  }
+
+  static Future<void> _chmod(String mode, String target) async {
+    final result = await Process.run('chmod', [mode, target]);
+    if (result.exitCode != 0) {
+      throw FileSystemException('chmod $mode failed: ${result.stderr}', target);
+    }
   }
 
   Future<void> delete() async {
