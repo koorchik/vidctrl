@@ -177,12 +177,15 @@ Future<SourceVideo> _readVideo(Ref ref, Object reference) async {
   return video;
 }
 
-/// The window's "Video details" in English: each track, then the file.
+/// The window's "Video details" in English: each track, then the file, each
+/// by its kind's code and its number among that kind.
 List<Map<String, Object?>> _details(Map<String, Object?> raw) {
   final l10n = lookupAppLocalizations(const Locale('en'));
   return [
     for (final section in orderedDetails(encodingDetails(raw)))
       {
+        'group': codeOf(section.group),
+        'number': section.number,
         'title': groupTitle(l10n, section.group, section.number),
         'rows': [
           for (final row in section.rows)

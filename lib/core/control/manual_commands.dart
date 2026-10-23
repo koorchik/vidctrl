@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../ffmpeg/capabilities.dart';
 import '../ffmpeg/command_builder.dart';
 import '../ffmpeg/command_text.dart';
+import '../media/media_details.dart' show DetailGroup;
 import '../media/media_info.dart';
 import '../media/video_files.dart' show videoExtensions;
 import '../scenarios/archive.dart';
@@ -323,6 +324,8 @@ final _detailsAnswer = {
   'info': _video.toJson(),
   'details': [
     {
+      'group': codeOf(DetailGroup.video),
+      'number': 1,
       'title': 'Video track 1',
       'rows': [
         [
@@ -336,6 +339,8 @@ final _detailsAnswer = {
       ],
     },
     {
+      'group': codeOf(DetailGroup.audio),
+      'number': 1,
       'title': 'Audio track 1',
       'rows': [
         ['Codec', 'AAC (Advanced Audio Coding) · LC'],
@@ -344,6 +349,8 @@ final _detailsAnswer = {
       ],
     },
     {
+      'group': codeOf(DetailGroup.file),
+      'number': 1,
       'title': 'File',
       'rows': [
         ['Container', 'QuickTime / MOV'],
@@ -460,8 +467,11 @@ List<CommandDoc> commandDocs(
     json: [
       '`info` (Video): the video; for a job, its result, with the `id` of '
           'the video it was made from. `details` (list): for each track and '
-          'the file, `title` (string) and `rows` (list of [label, value], '
-          'both strings). With `--raw`, `raw` (object) instead of '
+          'the file, `group` (string: what it describes, see "Details"), '
+          '`number` (int: its place among those of its group, from 1), '
+          '`title` (string) and `rows` (list of [label, value], both '
+          'strings), in the window\'s words. With `--raw`, `raw` (object) '
+          'instead of '
           '`details`: ffprobe\'s report as it gave it.',
       ..._jsonBlock(_detailsAnswer),
     ],

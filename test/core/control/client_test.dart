@@ -198,7 +198,7 @@ final _resultAnswers = <String, _Answer>{
     'job': {
       ..._job(
         2,
-        'done',
+        'DONE',
         outputPath: '/videos/Converted/clip2_av1-crf20-check.mp4',
       ),
       'outputBytes': 1000000,
@@ -223,7 +223,6 @@ final _resultAnswers = <String, _Answer>{
           'job': params['job'],
           'status': 'MEASURED',
           'closeness': 'SAME',
-          'closenessText': 'Looks the same as the original',
           'vmaf': 96.2,
           'xpsnr': 43.0,
         },
@@ -236,6 +235,8 @@ final _resultAnswers = <String, _Answer>{
     else
       'details': [
         {
+          'group': 'VIDEO',
+          'number': 1,
           'title': 'Video track 1',
           'rows': [
             ['Format', 'H.265 / HEVC'],
@@ -243,6 +244,8 @@ final _resultAnswers = <String, _Answer>{
           ],
         },
         {
+          'group': 'FILE',
+          'number': 1,
           'title': 'File',
           'rows': [
             ['Size', '1.5 GB'],
@@ -554,6 +557,15 @@ void main() {
         expect(run.exitCode, ExitCode.ok, reason: '$args ${run.err}');
         expect(app.paramsOf(method), params, reason: '$args');
         expect(run.out, contains(printed), reason: '$args');
+      }
+      for (final args in [
+        ['compare', '2', '--json'],
+        ['details', '1', '--json'],
+        ['job', '2', '--json'],
+      ]) {
+        final run = await _run(args);
+        expect(run.exitCode, ExitCode.ok, reason: '$args ${run.err}');
+        expectMachineJson(jsonDecode(run.out));
       }
 
       // Refused before the window is asked anything.

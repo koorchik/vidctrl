@@ -177,8 +177,9 @@ Future<Object?> queueConvertAnyway(
   final job = jobFrom(ref, params);
   if (job.status != JobStatus.skipped || !job.keptAsIs) {
     throw badArgument(
-      'Job ${job.id} was not kept as it is; only a job that ended skipped '
-      'with the outcome NOT_WORTH_IT can be converted anyway.',
+      'Job ${job.id} was not kept as it is; only a job kept as it is, '
+      'because converting would hardly make it smaller, can be converted '
+      'anyway.',
     );
   }
   return _addedBy(env, ref.read(queueProvider.notifier).convertAnyway(job.id));

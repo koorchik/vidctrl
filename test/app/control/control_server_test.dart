@@ -1188,6 +1188,10 @@ void main() {
         ['DONE', 'DONE'],
       );
       expect((jobs.last as Map)['sample'], 'MIDDLE');
+      final details = (answers[7] as Map)['details'] as List;
+      // The fake ffprobe tells of the file alone.
+      expect(details.single, containsPair('group', 'FILE'));
+      expect(details.single, containsPair('number', 1));
       expect(
         ((answers[2] as Map)['skipped'] as List).single,
         containsPair('reason', 'UNREADABLE'),

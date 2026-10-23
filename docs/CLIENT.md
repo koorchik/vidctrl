@@ -168,10 +168,10 @@ File:
   Size: 4.20 GB
 ```
 
-With `--json`: `info` (Video): the video; for a job, its result, with the `id` of the video it was made from. `details` (list): for each track and the file, `title` (string) and `rows` (list of [label, value], both strings). With `--raw`, `raw` (object) instead of `details`: ffprobe's report as it gave it.
+With `--json`: `info` (Video): the video; for a job, its result, with the `id` of the video it was made from. `details` (list): for each track and the file, `group` (string: what it describes, see "Details"), `number` (int: its place among those of its group, from 1), `title` (string) and `rows` (list of [label, value], both strings), in the window's words. With `--raw`, `raw` (object) instead of `details`: ffprobe's report as it gave it.
 
 ```json
-{"info":{"id":0,"path":"/home/alice/Videos/beach.mov","status":"READY","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false},"details":[{"title":"Video track 1","rows":[["Codec","H.265 / HEVC (High Efficiency Video Coding) · Main 10 · level 5.1"],["Resolution","3840×2160"],["Frame rate","25 fps (25/1)"],["Bit depth","10-bit"],["Chroma subsampling","4:2:0"]]},{"title":"Audio track 1","rows":[["Codec","AAC (Advanced Audio Coding) · LC"],["Channels","2 (stereo)"],["Sample rate","48 kHz"]]},{"title":"File","rows":[["Container","QuickTime / MOV"],["Size","4.20 GB"]]}]}
+{"info":{"id":0,"path":"/home/alice/Videos/beach.mov","status":"READY","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false},"details":[{"group":"VIDEO","number":1,"title":"Video track 1","rows":[["Codec","H.265 / HEVC (High Efficiency Video Coding) · Main 10 · level 5.1"],["Resolution","3840×2160"],["Frame rate","25 fps (25/1)"],["Bit depth","10-bit"],["Chroma subsampling","4:2:0"]]},{"group":"AUDIO","number":1,"title":"Audio track 1","rows":[["Codec","AAC (Advanced Audio Coding) · LC"],["Channels","2 (stereo)"],["Sample rate","48 kHz"]]},{"group":"FILE","number":1,"title":"File","rows":[["Container","QuickTime / MOV"],["Size","4.20 GB"]]}]}
 ```
 
 Errors:
@@ -1119,6 +1119,19 @@ How a comparison ended (`compare`'s and `COMPARE_FINISHED`'s `status`):
 
 - `MEASURED`: Compared: `closeness`, `xpsnr` and, where measured, `vmaf` say how close.
 - `FAILED`: Only in `COMPARE_FINISHED`: it could not be compared; `errorLines` says why. `compare` exits 5 instead.
+
+### Details
+
+What a section of `details` describes (its `group`):
+
+- `FILE`: The file as a whole: its type, size and length.
+- `VIDEO`: A picture track.
+- `AUDIO`: A sound track.
+- `SUBTITLE`: A subtitle track.
+- `TIMECODE`: A timecode track, as cameras write.
+- `DATA`: A data track, such as a camera's notes.
+- `ATTACHMENT`: A file carried inside, such as a font or a cover.
+- `CHAPTERS`: The chapters.
 
 ## Waiting and events
 

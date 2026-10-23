@@ -10,6 +10,7 @@ import 'package:vidctrl/core/control/manual.dart';
 import 'package:vidctrl/core/control/protocol.dart';
 import 'package:vidctrl/core/control/views.dart';
 import 'package:vidctrl/core/control/words.dart';
+import 'package:vidctrl/core/media/media_details.dart' show DetailGroup;
 import 'package:vidctrl/core/scenarios/registry.dart';
 
 import '../../../tool/make_manual.dart'
@@ -271,6 +272,7 @@ void main() {
       ...AddResultCodes.all,
       ...SampleCodes.all,
       ...ComparisonCodes.all,
+      ...DetailGroup.values.map(codeOf),
       for (final kind in ControlErrorKind.values) kind.code,
       ...ClientErrorCodes.all,
     ];

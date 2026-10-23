@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import '../media/media_details.dart' show DetailGroup;
 import '../scenarios/registry.dart';
 import '../scenarios/scenario.dart';
 import 'codes.dart';
@@ -687,6 +688,18 @@ const _comparisonNotes = [
   ),
 ];
 
+/// What a section of `details` describes.
+String _groupNote(DetailGroup group) => switch (group) {
+  DetailGroup.file => 'The file as a whole: its type, size and length.',
+  DetailGroup.video => 'A picture track.',
+  DetailGroup.audio => 'A sound track.',
+  DetailGroup.subtitle => 'A subtitle track.',
+  DetailGroup.timecode => 'A timecode track, as cameras write.',
+  DetailGroup.data => 'A data track, such as a camera\'s notes.',
+  DetailGroup.attachment => 'A file carried inside, such as a font or a cover.',
+  DetailGroup.chapters => 'The chapters.',
+};
+
 /// One kind of code: where it is found, and each code with its meaning.
 typedef CodeKind = ({
   String name,
@@ -774,6 +787,15 @@ final List<CodeKind> codeKinds = [
         'How a comparison ended (`compare`\'s and `COMPARE_FINISHED`\'s '
         '`status`)',
     codes: _comparisonNotes,
+  ),
+  (
+    name: 'detailGroup',
+    title: 'Details',
+    where: 'What a section of `details` describes (its `group`)',
+    codes: [
+      for (final group in DetailGroup.values)
+        (codeOf(group), _groupNote(group)),
+    ],
   ),
   (
     name: 'error',

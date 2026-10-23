@@ -14,11 +14,13 @@ const _codeKeys = {
   'code',
   'kind',
   'event',
+  'group',
 };
 
 /// Fails unless [json] is fit for a program: no key ends in `Text`, every
-/// value under a key that holds a code is one, and so is every key of a
-/// Status's `jobs` object.
+/// value under a key of [_codeKeys] is a code, and so is every key of a
+/// Status's `jobs` object. Only those keys are checked for codes: a value
+/// under any other key may be anything.
 void expectMachineJson(Object? json, {String at = r'$'}) {
   switch (json) {
     case final Map<Object?, Object?> map:
