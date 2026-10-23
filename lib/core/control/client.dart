@@ -430,9 +430,15 @@ _Command? _command(ArgResults top, ClientIo io) {
       final job = args.isEmpty ? null : _jobId(args.single, 'cancel');
       return _Command(
         'cancel',
-        (c, o) => _call(c!, o, Methods.queueCancel, {
-          'job': ?job,
-        }, (a) => [cancelledText(a['cancelled'] as int?)]),
+        (c, o) => _call(c!, o, Methods.queueCancel, {'job': ?job}, (a) {
+          final ended = a['job'];
+          return [
+            cancelledText(
+              a['cancelled'] as int?,
+              ended: ended == null ? null : JobView.fromJson(_object(ended)),
+            ),
+          ];
+        }),
       );
     case 'wait':
       final jobs = [

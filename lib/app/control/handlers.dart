@@ -564,7 +564,14 @@ Future<Object?> _queueCancel(
     await ref.read(queueProvider.notifier).cancelActive();
     await _untilEnded(ref, active.id, within: const Duration(seconds: 1));
   }
-  return {'cancelled': active.id};
+  final ended = ref
+      .read(queueProvider)
+      .jobs
+      .where((job) => job.id == active.id)
+      .firstOrNull;
+  if (ended?.status == JobStatus.cancelled) return {'cancelled': active.id};
+  // It ended otherwise first, or was taken out of the queue meanwhile.
+  return {'cancelled': null, if (ended != null) 'job': jobView(ended).toJson()};
 }
 
 /// Completes once job [id] is no longer under way, or after [within].

@@ -334,8 +334,9 @@ class QueueController extends Notifier<QueueState> {
         ),
       );
       _activeHandle = handle;
-      // Asked to shut down while this job was starting.
-      if (_shuttingDown) unawaited(handle.cancel());
+      // Asked to shut down, or taken out of the queue, while this job was
+      // starting: nothing could be cancelled then.
+      if (_shuttingDown || _find(job.id) == null) unawaited(handle.cancel());
       final updates = handle.progress.listen(
         (progress) => _update(job.id, (j) => j.copyWith(progress: progress)),
       );

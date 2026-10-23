@@ -146,8 +146,25 @@ class FakeExecutor implements JobExecutor {
     for (final handle in started) handle.job.input.path.split('/').last,
   ];
 
+  /// When set, each start waits until [releaseStarts], as a real start
+  /// takes a moment: the job is under way with nothing to cancel yet.
+  bool holdStarts = false;
+  final _heldStarts = <Completer<void>>[];
+
+  void releaseStarts() {
+    for (final waiting in _heldStarts) {
+      waiting.complete();
+    }
+    _heldStarts.clear();
+  }
+
   @override
   Future<ConversionHandle> start(ConversionJob job) async {
+    if (holdStarts) {
+      final waiting = Completer<void>();
+      _heldStarts.add(waiting);
+      await waiting.future;
+    }
     final handle = FakeHandle(job);
     started.add(handle);
     return handle;

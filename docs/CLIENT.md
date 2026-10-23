@@ -37,7 +37,7 @@ VidCtrl deletes no file: "remove" takes a video off the list or a job out of the
 How every command works:
 
 - `vidctrl-client <command> [arguments] [options]`; options may come before or after the arguments.
-- `--json` prints the answer as one JSON document on stdout (`events`: one per line). Without it, lines for people. The JSON has ids and numbers, and English words beside the ids in fields ending in `Text`. A value that is not known is left out, never `null`; only `cancel` answers `null`, when no job was converting.
+- `--json` prints the answer as one JSON document on stdout (`events`: one per line). Without it, lines for people. The JSON has ids and numbers, and English words beside the ids in fields ending in `Text`. A value that is not known is left out, never `null`; only `cancel` answers `null`, when nothing was cancelled.
 - `--no-start`: do not open the window when it is not open; exit 2 instead.
 - `--help` prints the command's part of this guide.
 - Videos are given by id or by path, jobs by id. A reference made only of digits is an id: a file named `3` in the current folder is given as `./3`.
@@ -517,11 +517,14 @@ It prints, for example:
 ```
 Job 1: Cancelled; the queue goes on with the next one.
 
+# When it ended before it could be cancelled:
+Job 0: Not cancelled; it ended first: Done. /home/alice/Videos/beach.mov
+
 # When no job is converting:
 No job is converting; nothing was cancelled.
 ```
 
-With `--json`: `cancelled` (int, or null when no job was converting).
+With `--json`: `cancelled` (int, or null when nothing was cancelled); `job` (Job, optional): when it ended otherwise before it could be cancelled (done, say), how it ended.
 
 ```json
 {"cancelled":1}

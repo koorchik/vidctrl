@@ -61,10 +61,12 @@ Recipe recipeFrom(
   final preset = goal == null ? findPreset(panel.presetId)! : _preset(goal);
   return Recipe(
     presetId: preset.id,
-    values: {
-      if (goal == null) ...panel.values,
-      ..._options(preset, params['options'], capabilities),
-    },
+    values: _options(
+      preset,
+      goal == null ? panel.values : const {},
+      params['options'],
+      capabilities,
+    ),
     sample: withSample ? _sample(params['sample']) : SampleChoice.none,
   );
 }
@@ -92,12 +94,16 @@ Preset _preset(Object goal) {
   throw badArgument('There is no goal "$goal". Goals: ${goals.join(', ')}.');
 }
 
+/// [base] with the [options] asked for. An option the panel does not
+/// offer, given the choice made here anyway, is left out, so the recipe is
+/// the one the goal's defaults make.
 OptionValues _options(
   Preset preset,
+  OptionValues base,
   Object? options,
   Capabilities capabilities,
 ) {
-  if (options == null) return const {};
+  if (options == null) return base;
   if (options is! Map) {
     throw badArgument('"options" must map option ids to choice ids.');
   }
@@ -108,7 +114,7 @@ OptionValues _options(
   final here = offered.isEmpty
       ? 'The goal ${preset.id} has no options on this computer.'
       : 'Options here: ${[for (final o in offered) o.id].join(', ')}.';
-  final values = <String, String>{};
+  final values = {...base};
   for (final MapEntry(:key, :value) in options.entries) {
     final option = preset.options.where((o) => o.id == key).firstOrNull;
     if (option == null) {
@@ -126,12 +132,16 @@ OptionValues _options(
     }
     // As on the panel, which does not show the row here; naming what
     // happens anyway changes nothing, so a script may name it everywhere.
-    final anyway = _madeAnyway(preset, option, capabilities);
-    if (!offered.contains(option) && value != anyway) {
-      throw badArgument(
-        'The option ${option.id} of ${preset.id} cannot be chosen on this '
-        'computer: it is always $anyway here. $here',
-      );
+    if (!offered.contains(option)) {
+      final anyway = _madeAnyway(preset, option, capabilities);
+      if (value != anyway) {
+        throw badArgument(
+          'The option ${option.id} of ${preset.id} cannot be chosen on this '
+          'computer: it is always $anyway here. $here',
+        );
+      }
+      values.remove(option.id);
+      continue;
     }
     values[option.id] = value;
   }

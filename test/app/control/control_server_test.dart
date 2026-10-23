@@ -493,6 +493,33 @@ void main() {
       expect(container.read(queueProvider).jobs, hasLength(1));
     });
 
+    test('naming the choice made here anyway queues the same job as the '
+        'default', () async {
+      env = FakeEnvironment(
+        capabilities: const Capabilities(
+          ffmpegVersion: 'test',
+          encoders: {'libx265', 'libx264', 'aac'},
+          filters: {'xpsnr'},
+        ),
+      );
+      final (container, client) = await startControlled(env);
+      final id = await addVideo(client, video('a.mp4'));
+      await client.call(Methods.queueAdd, {
+        'videos': [id],
+        'goal': 'archive',
+      });
+
+      final again = await client.call(Methods.queueAdd, {
+        'videos': [id],
+        'goal': 'archive',
+        'options': {'codec': 'hevc'},
+      }) as Map;
+
+      expect(again['added'], isEmpty);
+      expect(again['alreadyQueued'], [id]);
+      expect(container.read(queueProvider).jobs, hasLength(1));
+    });
+
     test('without AV1 the archive takes codec hevc only', () async {
       env = FakeEnvironment(
         capabilities: const Capabilities(
@@ -706,6 +733,69 @@ void main() {
         client.call(Methods.queueCancel, {'job': 42}),
         _failsWith(ControlErrorKind.notFound, contains('42')),
       );
+    });
+
+    /// Until the job [id] is under way, its conversion maybe not started.
+    Future<void> underWay(ProviderContainer container, int id) async {
+      bool active() =>
+          jobs(container)
+              .any((job) => job.id == id && job.status == JobStatus.running);
+      for (var i = 0; i < 100 && !active(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(active(), isTrue);
+    }
+
+    test('cancel of a job just starting asks again until it stops', () async {
+      env.executor.holdStarts = true;
+      final (container, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4', 'b.mp4']);
+      await underWay(container, ids.first);
+
+      final cancelling = client.call(Methods.queueCancel);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      env.executor.holdStarts = false;
+      env.executor.releaseStarts();
+
+      expect(await cancelling, {'cancelled': ids.first});
+      expect(env.executor.started.first.cancelRequested, isTrue);
+      expect(jobs(container).first.status, JobStatus.cancelled);
+    });
+
+    test('cancel of a job that ends first says how it ended', () async {
+      env.executor.holdStarts = true;
+      final (container, client) = await startControlled(env);
+      final id = (await queue(client, ['a.mp4'])).single;
+      await underWay(container, id);
+
+      final cancelling = client.call(Methods.queueCancel);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      env.executor.releaseStarts();
+      await started(1);
+      env.executor.started.single.finish();
+
+      final answer = await cancelling as Map;
+      expect(answer['cancelled'], isNull);
+      expect(answer['job'], containsPair('status', 'done'));
+      expect(jobs(container).single.status, JobStatus.done);
+    });
+
+    test('remove of a job just starting stops its conversion', () async {
+      env.executor.holdStarts = true;
+      final (container, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4']);
+      await underWay(container, ids.single);
+
+      await client.call(Methods.queueRemove, {'jobs': ids});
+      expect(jobs(container), isEmpty);
+      env.executor.releaseStarts();
+      await started(1);
+
+      expect(env.executor.started.single.cancelRequested, isTrue);
+      for (var i = 0; i < 100 && container.read(queueProvider).busy; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(container.read(queueProvider).busy, isFalse);
     });
 
     test('cancel stops a job still choosing its quality', () async {

@@ -197,9 +197,18 @@ String pausedText({required bool paused}) => paused
           'job under way is held where the system allows.'
     : 'The queue goes on.';
 
-String cancelledText(int? job) => job == null
-    ? 'No job is converting; nothing was cancelled.'
-    : 'Job $job: Cancelled; the queue goes on with the next one.';
+/// A `queue.cancel` answer: the job cancelled, or the one that ended
+/// otherwise before it could be.
+String cancelledText(int? cancelled, {JobView? ended}) => switch ((
+  cancelled,
+  ended,
+)) {
+  (final id?, _) => 'Job $id: Cancelled; the queue goes on with the next one.',
+  (null, final job?) =>
+    'Job ${job.id}: Not cancelled; it ended first: '
+        '${statusWords(job.status)}. ${job.path}',
+  _ => 'No job is converting; nothing was cancelled.',
+};
 
 /// A `queue.convertAnyway` or `queue.convertWhole` answer.
 List<String> addedJobText(Map<String, Object?> answer) {

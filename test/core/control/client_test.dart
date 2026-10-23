@@ -310,7 +310,9 @@ void main() {
         Methods.queueClearFinished: (_, _) => {'removed': <int>[]},
         Methods.queuePause: (_, _) => {'paused': true},
         Methods.queueResume: (_, _) => {'paused': false},
-        Methods.queueCancel: (params, _) => {'cancelled': params['job'] ?? 1},
+        Methods.queueCancel: (params, _) => params['job'] == 3
+            ? {'cancelled': null, 'job': _job(3, 'done')}
+            : {'cancelled': params['job'] ?? 1},
         Methods.queueConvertAnyway: (_, _) => {
           'added': [_job(5, 'waiting')],
           'alreadyQueued': false,
@@ -356,6 +358,12 @@ void main() {
           'Job 1: Cancelled',
         ),
         (['cancel', '2'], Methods.queueCancel, {'job': 2}, 'Job 2: Cancelled'),
+        (
+          ['cancel', '3'],
+          Methods.queueCancel,
+          {'job': 3},
+          'Job 3: Not cancelled; it ended first: Done.',
+        ),
         (
           ['queue', 'convert-anyway', '0'],
           Methods.queueConvertAnyway,

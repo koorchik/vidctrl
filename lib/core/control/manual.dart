@@ -272,7 +272,7 @@ String _commandsPart(String c, Map<String, GoalWords> words) => [
       'one per line). Without it, lines for people. The JSON has ids and '
       'numbers, and English words beside the ids in fields ending in '
       '`Text`. A value that is not known is left out, never `null`; only '
-      '`cancel` answers `null`, when no job was converting.',
+      '`cancel` answers `null`, when nothing was cancelled.',
   '- `--no-start`: do not open the window when it is not open; exit 2 '
       'instead.',
   '- `--help` prints the command\'s part of this guide.',
@@ -918,13 +918,19 @@ List<_CommandDoc> _commands(
     text: [
       cancelledText(1),
       '',
+      '# When it ended before it could be cancelled:',
+      cancelledText(null, ended: _doneJob),
+      '',
       '# When no job is converting:',
       cancelledText(null),
     ],
     json: [
-      '`cancelled` (int, or null when no job was converting).',
+      '`cancelled` (int, or null when nothing was cancelled); `job` (Job, '
+          'optional): when it ended otherwise before it could be cancelled '
+          '(done, say), how it ended.',
       ..._jsonBlock({'cancelled': 1}),
     ],
+    shapes: ['Job', 'Quality'],
     errors: [
       'A job that is not in the queue, or not the one converting: exit 5, '
           'and nothing is cancelled.',
