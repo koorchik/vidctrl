@@ -291,23 +291,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get agentPromptLabel => 'Paste this into your agent';
 
   @override
-  String get agentProgramLabel => 'The program the agent uses';
+  String agentPromptIntro(String client) {
+    return 'VidCtrl is open on this computer, and the person watches its window. The program `$client` controls it: it adds videos to the window\'s list and queues conversions there.';
+  }
 
   @override
-  String get agentKindCommands =>
-      'Agents that run commands (Claude Code, Codex, a terminal): paste the text above.';
+  String agentPromptManual(String client) {
+    return '- Run `$client manual` first: it explains every command, the goals and what the results mean. Add `--json` to a command to read its answer as JSON.';
+  }
 
   @override
-  String get agentKindChat =>
-      'A chat that cannot run commands cannot use VidCtrl; use an agent that can.';
-
-  @override
-  String get agentKindSandbox =>
-      'If your agent runs in a sandbox, let it run this program outside it.';
+  String agentPromptPowerShell(String client) {
+    return '- In PowerShell, put & before a quoted path: `& $client manual`.';
+  }
 
   @override
   String get agentMissing =>
-      'This build has no vidctrl-client beside it. Build it with tool/build_client.sh.';
+      'This build has no vidctrl-client beside it. In the project folder, run:';
+
+  @override
+  String get agentMissingAfter => 'Then open this window again.';
 
   @override
   String get camctrlQuestion => 'Shooting on Blackmagic?';

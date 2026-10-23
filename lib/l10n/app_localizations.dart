@@ -584,35 +584,35 @@ abstract class AppLocalizations {
   /// **'Paste this into your agent'**
   String get agentPromptLabel;
 
-  /// No description provided for @agentProgramLabel.
+  /// The prompt's first paragraph. {client} is the program's path, quoted; keep the backticks.
   ///
   /// In en, this message translates to:
-  /// **'The program the agent uses'**
-  String get agentProgramLabel;
+  /// **'VidCtrl is open on this computer, and the person watches its window. The program `{client}` controls it: it adds videos to the window\'s list and queues conversions there.'**
+  String agentPromptIntro(String client);
 
-  /// No description provided for @agentKindCommands.
+  /// The prompt's first point. Keep the command, manual and --json as they are.
   ///
   /// In en, this message translates to:
-  /// **'Agents that run commands (Claude Code, Codex, a terminal): paste the text above.'**
-  String get agentKindCommands;
+  /// **'- Run `{client} manual` first: it explains every command, the goals and what the results mean. Add `--json` to a command to read its answer as JSON.'**
+  String agentPromptManual(String client);
 
-  /// No description provided for @agentKindChat.
+  /// The prompt's point on Windows, when the path is quoted.
   ///
   /// In en, this message translates to:
-  /// **'A chat that cannot run commands cannot use VidCtrl; use an agent that can.'**
-  String get agentKindChat;
-
-  /// No description provided for @agentKindSandbox.
-  ///
-  /// In en, this message translates to:
-  /// **'If your agent runs in a sandbox, let it run this program outside it.'**
-  String get agentKindSandbox;
+  /// **'- In PowerShell, put & before a quoted path: `& {client} manual`.'**
+  String agentPromptPowerShell(String client);
 
   /// No description provided for @agentMissing.
   ///
   /// In en, this message translates to:
-  /// **'This build has no vidctrl-client beside it. Build it with tool/build_client.sh.'**
+  /// **'This build has no vidctrl-client beside it. In the project folder, run:'**
   String get agentMissing;
+
+  /// No description provided for @agentMissingAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'Then open this window again.'**
+  String get agentMissingAfter;
 
   /// No description provided for @camctrlQuestion.
   ///

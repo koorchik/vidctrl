@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../core/control/manual.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Where `vidctrl-client` is in a download: in the same folder as the app's
 /// own program ([appExecutable]), on macOS `Contents/MacOS/` too. Null when
@@ -28,8 +29,16 @@ final operatingSystemProvider = Provider<String>(
   (ref) => Platform.operatingSystem,
 );
 
-/// The `vidctrl-client` beside this app, or null.
-final clientExecutableProvider = Provider<String?>(
+/// The folder of the app's own program, where `vidctrl-client` belongs (on
+/// macOS `Contents/MacOS`); tests set another.
+final appFolderProvider = Provider<String>(
+  (ref) => p.dirname(Platform.resolvedExecutable),
+);
+
+/// The `vidctrl-client` beside this app, or null. Looked for again each
+/// time "Use with an AI agent" opens, so a client built while the app runs
+/// is found.
+final clientExecutableProvider = Provider.autoDispose<String?>(
   (ref) => clientExecutable(
     appExecutable: Platform.resolvedExecutable,
     os: ref.watch(operatingSystemProvider),
@@ -37,20 +46,26 @@ final clientExecutableProvider = Provider<String?>(
   ),
 );
 
-/// English names of the app's languages, for asking the agent to answer in
-/// the person's.
-const agentLanguageNames = {'en': 'English', 'uk': 'Ukrainian'};
+/// What builds `vidctrl-client` into [appFolder], run in the project's
+/// folder: for a development build, which has none beside it.
+String buildClientCommand(String appFolder, {required String os}) =>
+    'tool/build_client.sh ${shellWord(appFolder, os: os)}';
 
-/// What "Use with an AI agent" gives to paste into an agent: the quick start
-/// with the program's path quoted for [os]'s terminal, in English like the
-/// manual and the program's answers, and a line asking the agent to answer
-/// in [languageName] when the person reads another language.
-String agentPrompt({
+/// What "Use with an AI agent" gives to paste into an agent, in the app's
+/// language: what the program at [clientPath] is, quoted for [os]'s
+/// terminal, and to read its manual. In English it is the client's
+/// [quickStart].
+String agentPrompt(
+  AppLocalizations l10n, {
   required String clientPath,
-  required String languageName,
   required String os,
 }) {
-  final start = quickStart(clientPath, os: os);
-  if (languageName == 'English') return start;
-  return '$start\nAnswer me in $languageName.\n';
+  final c = shellWord(clientPath, os: os);
+  return [
+    l10n.agentPromptIntro(c),
+    '',
+    l10n.agentPromptManual(c),
+    if (needsCallOperator(clientPath, os: os)) l10n.agentPromptPowerShell(c),
+    '',
+  ].join('\n');
 }

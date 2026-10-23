@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/platform/open_external.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../control/agent_prompt.dart';
 import '../../theme.dart';
@@ -15,11 +14,12 @@ Future<void> showAgentDialog(BuildContext context) =>
     showDialog<void>(context: context, builder: (_) => const AgentDialog());
 
 /// What was copied last, for its button to say so for a moment.
-enum _Copied { prompt, program }
+enum _Copied { prompt, command }
 
 /// "Use with an AI agent": the text to paste into an agent so it can drive
 /// this window through `vidctrl-client`, with the program's real path in it,
-/// and which agents can use it. It changes nothing; it only copies text.
+/// in the app's language. In a build without the program, the command that
+/// builds it instead. It changes nothing; it only copies text.
 class AgentDialog extends ConsumerStatefulWidget {
   const AgentDialog({super.key});
 
@@ -49,6 +49,45 @@ class _AgentDialogState extends ConsumerState<AgentDialog> {
     });
   }
 
+  /// What a build without the program says: the command that makes it,
+  /// with its own Copy, and to open this window again.
+  List<Widget> _howToBuild(
+    String command, {
+    required BoxDecoration box,
+    required TextStyle style,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    final text = Theme.of(context).textTheme.bodyMedium;
+    final copied = _copied == _Copied.command;
+    return [
+      Text(l10n.agentMissing, style: text),
+      const SizedBox(height: 6),
+      Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: box,
+              child: SelectableText(command, style: style),
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: copied ? l10n.copied : l10n.copy,
+            onPressed: () => _copy(command, _Copied.command),
+            icon: Icon(
+              copied ? Icons.check_rounded : Icons.copy_rounded,
+              size: 18,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 6),
+      Text(l10n.agentMissingAfter, style: text),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -56,30 +95,15 @@ class _AgentDialogState extends ConsumerState<AgentDialog> {
     final scheme = theme.colorScheme;
     final look = AppLook.of(context);
     final client = ref.watch(clientExecutableProvider);
+    final os = ref.watch(operatingSystemProvider);
     final prompt = client == null
         ? null
-        : agentPrompt(
-            clientPath: client,
-            languageName: agentLanguageNames[l10n.localeName] ?? 'English',
-            os: ref.watch(operatingSystemProvider),
-          );
+        : agentPrompt(l10n, clientPath: client, os: os);
     const mono = TextStyle(fontFamily: monoFontFamily, fontSize: 12.5);
     final box = BoxDecoration(
       color: scheme.surfaceContainerLowest,
       borderRadius: BorderRadius.circular(look.panelRadius),
       border: Border.all(color: scheme.outlineVariant),
-    );
-
-    Widget kind(IconData icon, Hue? hue, String text) => Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: hue?.deep ?? scheme.onSurfaceVariant),
-          const SizedBox(width: 10),
-          Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
-        ],
-      ),
     );
 
     // Tight, to leave the prompt as much room as a small window allows.
@@ -125,84 +149,36 @@ class _AgentDialogState extends ConsumerState<AgentDialog> {
               ],
             ),
             const SizedBox(height: 8),
-            Flexible(
-              child: Container(
-                width: double.infinity,
-                decoration: box,
-                // Always shown, so a prompt cut off at a small window is
-                // plainly one to scroll.
-                child: Scrollbar(
-                  controller: _scroll,
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
+            if (prompt != null)
+              Flexible(
+                child: Container(
+                  width: double.infinity,
+                  decoration: box,
+                  // Always shown, so a prompt cut off at a small window is
+                  // plainly one to scroll.
+                  child: Scrollbar(
                     controller: _scroll,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    child: prompt == null
-                        ? Text(l10n.agentMissing)
-                        : SelectableText(
-                            prompt,
-                            style: mono.copyWith(height: 1.35),
-                          ),
-                  ),
-                ),
-              ),
-            ),
-            if (client != null) ...[
-              const SizedBox(height: 12),
-              ControlLabel(l10n.agentProgramLabel),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      controller: _scroll,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
-                        vertical: 6,
+                        vertical: 10,
                       ),
-                      decoration: box,
-                      child: SelectableText(client, maxLines: 1, style: mono),
+                      child: SelectableText(
+                        prompt.trimRight(),
+                        style: mono.copyWith(height: 1.35),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    tooltip: _copied == _Copied.program
-                        ? l10n.copied
-                        : l10n.copy,
-                    onPressed: () => _copy(client, _Copied.program),
-                    icon: Icon(
-                      _copied == _Copied.program
-                          ? Icons.check_rounded
-                          : Icons.copy_rounded,
-                      size: 18,
-                    ),
-                  ),
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    onPressed: () => revealInFileManager(client),
-                    icon: const Icon(Icons.folder_open_rounded, size: 18),
-                    label: Text(l10n.showInFolder),
-                  ),
-                ],
+                ),
+              )
+            else
+              ..._howToBuild(
+                buildClientCommand(ref.watch(appFolderProvider), os: os),
+                box: box,
+                style: mono,
               ),
-            ],
-            const SizedBox(height: 6),
-            kind(
-              Icons.terminal_rounded,
-              look.hues?.green,
-              l10n.agentKindCommands,
-            ),
-            kind(
-              Icons.chat_bubble_outline_rounded,
-              look.hues?.amber,
-              l10n.agentKindChat,
-            ),
-            kind(Icons.shield_outlined, look.hues?.blue, l10n.agentKindSandbox),
           ],
         ),
       ),

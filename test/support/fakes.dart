@@ -453,6 +453,7 @@ class FakeEnvironment {
     this.build = const BuildInfo(),
     this.releases,
     this.clientPath = '/opt/vidctrl/vidctrl-client',
+    this.appFolder = '/home/alice/work/vidctrl/build/linux/x64/debug/bundle',
     this.os = 'linux',
   });
 
@@ -466,7 +467,11 @@ class FakeEnvironment {
   final ReleaseSource? releases;
 
   /// Where vidctrl-client is beside the app; null for a build without it.
-  final String? clientPath;
+  /// A test may set it while the app runs, as when the client is built then.
+  String? clientPath;
+
+  /// The folder of the app's own program, where a missing client is built.
+  final String appFolder;
 
   /// The system the app takes itself to run on (`Platform.operatingSystem`),
   /// whatever the tests run on; Linux by default.
@@ -501,7 +506,8 @@ class FakeEnvironment {
     environmentProvider.overrideWith((ref) async => environment),
     buildInfoProvider.overrideWithValue(build),
     releaseSourceProvider.overrideWithValue(releases),
-    clientExecutableProvider.overrideWithValue(clientPath),
+    clientExecutableProvider.overrideWith((ref) => clientPath),
+    appFolderProvider.overrideWithValue(appFolder),
     operatingSystemProvider.overrideWithValue(os),
   ];
 }

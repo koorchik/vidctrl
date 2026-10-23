@@ -10,6 +10,7 @@ import 'package:vidctrl/app/home/widgets/agent_dialog.dart';
 import 'package:vidctrl/app/providers.dart';
 import 'package:vidctrl/app/theme.dart';
 import 'package:vidctrl/app/window.dart';
+import 'package:vidctrl/core/control/manual.dart';
 import 'package:vidctrl/core/control/words.dart';
 import 'package:vidctrl/l10n/app_localizations.dart';
 
@@ -38,59 +39,99 @@ Future<void> _openFromHeader(WidgetTester tester, {String? tooltip}) async {
   await tester.pumpAndSettle();
 }
 
+const _folder = '/home/alice/work/vidctrl/build/linux/x64/debug/bundle';
+
+final _en = lookupAppLocalizations(const Locale('en'));
+final _uk = lookupAppLocalizations(const Locale('uk'));
+
 void main() {
   group('the prompt', () {
-    test('names the program, the manual, waiting and the rule about files', () {
-      final text = agentPrompt(
-        clientPath: _client,
-        languageName: 'English',
-        os: 'linux',
-      );
-      expect(text, contains("'$_client' manual"));
-      expect(text, contains("'$_client' wait"));
-      expect(text, contains(filesRule));
-      expect(text, isNot(contains('Answer me')));
-      expect(speaksOfDeleting(text), isFalse);
+    test('in English it is the quick start the client prints', () {
+      for (final (client, os) in [
+        (_client, 'linux'),
+        (r'C:\Apps\VidCtrl\vidctrl-client.exe', 'windows'),
+        ('vidctrl-client', 'windows'),
+      ]) {
+        expect(
+          agentPrompt(_en, clientPath: client, os: os),
+          quickStart(client, os: os),
+          reason: '$client on $os',
+        );
+      }
     });
 
-    test('in Ukrainian the agent is asked to answer in Ukrainian', () {
-      final text = agentPrompt(
-        clientPath: _client,
-        languageName: 'Ukrainian',
-        os: 'linux',
+    test('names the program, its manual and --json, in either language, '
+        'and nothing about deleting', () {
+      for (final l10n in [_en, _uk]) {
+        final text = agentPrompt(l10n, clientPath: _client, os: 'linux');
+        expect(text, contains("`'$_client'`"));
+        expect(text, contains("`'$_client' manual`"));
+        expect(text, contains('`--json`'));
+        expect(text, isNot(contains('Answer me')));
+        expect(speaksOfDeleting(text), isFalse, reason: text);
+      }
+    });
+
+    test('in Ukrainian it is in Ukrainian', () {
+      final text = agentPrompt(_uk, clientPath: _client, os: 'linux');
+      expect(
+        text,
+        startsWith(
+          "VidCtrl відкритий на цьому комп'ютері, і людина стежить за його "
+          "вікном. Програма `'$_client'` керує ним:",
+        ),
       );
-      expect(text.trimRight(), endsWith('Answer me in Ukrainian.'));
-      expect(speaksOfDeleting(text), isFalse);
+      expect(text, contains("- Спершу запусти `'$_client' manual`:"));
     });
 
     test('on Windows the path is in double quotes, with PowerShell\'s & '
         'said once', () {
-      final text = agentPrompt(
-        clientPath: r'C:\Apps\VidCtrl\vidctrl-client.exe',
-        languageName: 'English',
-        os: 'windows',
-      );
-      expect(text, contains(r'`"C:\Apps\VidCtrl\vidctrl-client.exe" wait`'));
+      const client = r'C:\Apps\VidCtrl\vidctrl-client.exe';
+      final text = agentPrompt(_en, clientPath: client, os: 'windows');
+      expect(text, contains('`"$client" manual`'));
       expect(
         text,
         contains(
           '- In PowerShell, put & before a quoted path: '
-          r'`& "C:\Apps\VidCtrl\vidctrl-client.exe" manual`.',
+          '`& "$client" manual`.',
         ),
       );
       expect('&'.allMatches(text), hasLength(2));
-      expect(speaksOfDeleting(text), isFalse);
+      expect(
+        agentPrompt(_uk, clientPath: client, os: 'windows'),
+        contains(
+          '- У PowerShell пиши & перед шляхом у лапках: `& "$client" manual`.',
+        ),
+      );
+      for (final l10n in [_en, _uk]) {
+        final text = agentPrompt(l10n, clientPath: client, os: 'windows');
+        expect(speaksOfDeleting(text), isFalse, reason: text);
+      }
     });
 
-    test('the README shows the same prompt', () {
+    test('the README shows the English prompt', () {
       final readme = File('README.md').readAsStringSync();
       final prompt = agentPrompt(
+        _en,
         clientPath: '/home/alice/Apps/vidctrl/vidctrl-client',
-        languageName: 'English',
         os: 'linux',
       );
       expect(readme, contains('```text\n$prompt```'));
     });
+  });
+
+  test('the command that builds the client names the app\'s folder', () {
+    expect(
+      buildClientCommand(_folder, os: 'linux'),
+      "tool/build_client.sh '$_folder'",
+    );
+    expect(
+      buildClientCommand(
+        r'C:\Users\alice\vidctrl\build\windows\x64\runner\Debug',
+        os: 'windows',
+      ),
+      r'tool/build_client.sh "C:\Users\alice\vidctrl\build\windows\x64\runner\Debug"',
+    );
   });
 
   test('the program is found beside the app, or reported missing', () {
@@ -133,25 +174,19 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Paste this into your agent'), findsOneWidget);
-    expect(find.text('The program the agent uses'), findsOneWidget);
-    expect(find.text('Show in folder'), findsOneWidget);
-    expect(find.textContaining('Claude Code, Codex'), findsOneWidget);
-    expect(find.textContaining('cannot run commands'), findsOneWidget);
-    expect(find.textContaining('sandbox'), findsOneWidget);
+    final prompt = agentPrompt(_en, clientPath: _client, os: 'linux');
+    expect(find.text(prompt.trimRight()), findsOneWidget);
+    // Nothing else: no program row, no kinds of agent.
+    expect(find.text('Show in folder'), findsNothing);
+    expect(find.textContaining('Claude Code'), findsNothing);
+    expect(find.textContaining('sandbox'), findsNothing);
 
-    await tester.tap(find.text('Copy').first);
+    await tester.tap(find.text('Copy'));
     await tester.pump();
-    expect(copied, [
-      agentPrompt(clientPath: _client, languageName: 'English', os: 'linux'),
-    ]);
+    expect(copied, [prompt]);
     expect(find.text('Copied'), findsOneWidget);
     await tester.pump(const Duration(seconds: 2));
     expect(find.text('Copied'), findsNothing);
-
-    // The program's own Copy gives its path alone.
-    await tester.tap(find.byTooltip('Copy'));
-    await tester.pump();
-    expect(copied.last, _client);
   });
 
   testWidgets('on Windows the window copies the path in double quotes', (
@@ -162,13 +197,13 @@ void main() {
     final copied = _catchClipboard(tester);
     await _openFromHeader(tester);
 
-    await tester.tap(find.text('Copy').first);
+    await tester.tap(find.text('Copy'));
     await tester.pump();
     expect(copied.single, contains('`"$client" manual`'));
     expect(copied.single, contains('`& "$client" manual`'));
   });
 
-  testWidgets('in Ukrainian the window copies a prompt asking for Ukrainian', (
+  testWidgets('in Ukrainian the window copies the Ukrainian prompt', (
     tester,
   ) async {
     await pumpApp(
@@ -179,9 +214,9 @@ void main() {
     final copied = _catchClipboard(tester);
     await _openFromHeader(tester, tooltip: 'Робота з ШІ-агентом');
 
-    await tester.tap(find.text('Копіювати').first);
+    await tester.tap(find.text('Копіювати'));
     await tester.pump();
-    expect(copied.single, endsWith('Answer me in Ukrainian.\n'));
+    expect(copied, [agentPrompt(_uk, clientPath: _client, os: 'linux')]);
   });
 
   testWidgets('no button on the engine-missing screen', (tester) async {
@@ -205,27 +240,73 @@ void main() {
     expect(find.text('Use with an AI agent'), findsNothing);
   });
 
-  testWidgets('without the program the window says how to build it and '
-      'cannot copy', (tester) async {
+  testWidgets('without the program the window gives the command that '
+      'builds it, and cannot copy a prompt', (tester) async {
     await pumpApp(tester, FakeEnvironment(clientPath: null));
+    final copied = _catchClipboard(tester);
     await _openFromHeader(tester);
 
     expect(
       find.text(
-        'This build has no vidctrl-client beside it. Build it with '
-        'tool/build_client.sh.',
+        'This build has no vidctrl-client beside it. In the project folder, '
+        'run:',
       ),
       findsOneWidget,
     );
-    expect(find.textContaining('Run `'), findsNothing);
-    expect(find.text('Show in folder'), findsNothing);
-    final copy = tester.widget<ButtonStyleButton>(
+    final command = "tool/build_client.sh '$_folder'";
+    expect(find.text(command), findsOneWidget);
+    expect(find.text('Then open this window again.'), findsOneWidget);
+    expect(find.textContaining('manual'), findsNothing);
+    final copyPrompt = tester.widget<ButtonStyleButton>(
       find.ancestor(
         of: find.text('Copy'),
         matching: find.bySubtype<ButtonStyleButton>(),
       ),
     );
-    expect(copy.onPressed, isNull);
+    expect(copyPrompt.onPressed, isNull);
+
+    await tester.tap(find.byTooltip('Copy'));
+    await tester.pump();
+    expect(copied, [command]);
+  });
+
+  testWidgets('a program built while the app runs is found when the window '
+      'opens again', (tester) async {
+    final env = FakeEnvironment(clientPath: null);
+    await pumpApp(tester, env);
+    await _openFromHeader(tester);
+    expect(find.text('Then open this window again.'), findsOneWidget);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    env.clientPath = _client;
+    await _openFromHeader(tester);
+    expect(find.text('Then open this window again.'), findsNothing);
+    expect(
+      find.text(agentPrompt(_en, clientPath: _client, os: 'linux').trimRight()),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('in Ukrainian the window says in Ukrainian how to build it', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      FakeEnvironment(clientPath: null),
+      locale: const Locale('uk'),
+    );
+    await _openFromHeader(tester, tooltip: 'Робота з ШІ-агентом');
+
+    expect(
+      find.text(
+        'Поруч із цією збіркою немає vidctrl-client. У теці проєкту '
+        'виконайте:',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text("tool/build_client.sh '$_folder'"), findsOneWidget);
+    expect(find.text('Потім відкрийте це вікно ще раз.'), findsOneWidget);
   });
 
   testWidgets('the About menu opens the same window', (tester) async {
@@ -242,28 +323,40 @@ void main() {
   group('fits the window', () {
     setUpAll(loadRealFonts);
 
-    // The prompt scrolls in its box at the smallest window, where a long
-    // path may not leave room for all of it; everything else is in view.
-    // From the size the window opens at, the whole prompt shows, with
-    // Windows' longer path and its line on PowerShell too.
+    // Everything in view at every window size, the whole prompt too, with
+    // Windows' longer path and its line on PowerShell; or, with no program,
+    // the command that builds it.
     final cases = [
       for (final look in Look.values)
-        for (final locale in const [Locale('en'), Locale('uk')]) ...[
+        for (final locale in const [Locale('en'), Locale('uk')])
           for (final size in const [minimumWindowSize, defaultWindowSize])
-            (look: look, locale: locale, size: size, os: 'linux'),
-          (look: look, locale: locale, size: defaultWindowSize, os: 'windows'),
-        ],
+            for (final os in const ['linux', 'windows'])
+              for (final missing in const [false, true])
+                (
+                  look: look,
+                  locale: locale,
+                  size: size,
+                  os: os,
+                  missing: missing,
+                ),
     ];
-    for (final (:look, :locale, :size, :os) in cases) {
+    for (final (:look, :locale, :size, :os, :missing) in cases) {
       testWidgets('${size.width.round()} x ${size.height.round()}, '
-          '${locale.languageCode}, ${look.name}, $os', (tester) async {
+          '${locale.languageCode}, ${look.name}, $os'
+          '${missing ? ', no program' : ''}', (tester) async {
+        final windows = os == 'windows';
         await pumpApp(
           tester,
           FakeEnvironment(
             os: os,
-            clientPath: os == 'windows'
+            clientPath: missing
+                ? null
+                : windows
                 ? r'C:\Users\alice\Apps\VidCtrl\vidctrl-client.exe'
                 : '/home/alice/Apps/vidctrl/vidctrl-client',
+            appFolder: windows
+                ? r'C:\Users\alice\Projects\vidctrl\build\windows\x64\runner\Debug'
+                : _folder,
           ),
           locale: locale,
           look: look,
@@ -274,28 +367,25 @@ void main() {
 
         expect(tester.takeException(), isNull);
         final window = Offset.zero & size;
-        for (final text in [l10n.agentKindSandbox, l10n.close]) {
-          expect(
-            window.contains(tester.getBottomRight(find.text(text))),
-            isTrue,
-          );
+        final lowest = [
+          missing
+              ? find.text(l10n.agentMissingAfter)
+              : find.byType(SelectableText),
+          find.text(l10n.close),
+        ];
+        for (final finder in lowest) {
+          expect(window.contains(tester.getBottomRight(finder)), isTrue);
         }
-        final prompt = tester.state<ScrollableState>(
-          find
-              .descendant(
-                of: find.byType(AgentDialog),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        if (size == defaultWindowSize) {
-          expect(prompt.position.maxScrollExtent, 0);
-        } else {
-          // At least five lines of it in view, less the box's padding.
-          expect(
-            prompt.position.viewportDimension - 20,
-            greaterThanOrEqualTo(5 * 12.5 * 1.35),
+        if (!missing) {
+          final prompt = tester.state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(AgentDialog),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
           );
+          expect(prompt.position.maxScrollExtent, 0);
         }
       });
     }

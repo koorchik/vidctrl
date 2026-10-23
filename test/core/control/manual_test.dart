@@ -77,18 +77,33 @@ void main() {
   });
 
   test('the manual says plainly that remove leaves the file on disk', () {
-    final top = text.indexOf('## Commands');
-    expect(text.indexOf(neverDeletes), inInclusiveRange(0, top));
-    expect(quickStart('x', os: 'linux'), contains(filesRule));
+    final top = text.substring(0, text.indexOf('## Commands'));
+    expect(top, contains(neverDeletes));
+    expect(top, contains(filesRule));
+    expect(top, contains('"Remove" only takes a video off the list'));
     expect(text, contains(quickStart('vidctrl-client', os: 'linux')));
     expect(commandHelp('remove'), contains('stay on disk'));
   });
 
-  test('the quick start names the program, the manual and wait', () {
+  test('the manual\'s quick start says what the prompt leaves to it', () {
+    final start = text.substring(
+      text.indexOf('## Quick start'),
+      text.indexOf('## What VidCtrl is'),
+    );
+    expect(start, contains('Finding the videos is your job'));
+    expect(start, contains('`vidctrl-client wait`'));
+    expect(start, contains('`vidctrl-client events`'));
+    expect(start, contains(filesRule));
+  });
+
+  test('the quick start is what the program is and its manual', () {
     final start = quickStart('/opt/Vid Ctrl/vidctrl-client', os: 'linux');
+    expect(start, contains("`'/opt/Vid Ctrl/vidctrl-client'` controls it"));
     expect(start, contains("`'/opt/Vid Ctrl/vidctrl-client' manual`"));
-    expect(start, contains("`'/opt/Vid Ctrl/vidctrl-client' wait`"));
-    expect(start, contains('--json'));
+    expect(start, contains('`--json`'));
+    expect(start, isNot(contains('wait')));
+    expect(start, isNot(contains(filesRule)));
+    expect('\n- '.allMatches(start), hasLength(1));
     expect(
       quickStart('vidctrl-client', os: 'windows'),
       contains('`vidctrl-client manual`'),
@@ -115,7 +130,6 @@ void main() {
       expect(shellWord(client, os: 'windows'), '"$client"');
       final start = quickStart(client, os: 'windows');
       expect(start, contains('`"$client" manual`'));
-      expect(start, contains('`"$client" wait`'));
       expect(
         start,
         contains(

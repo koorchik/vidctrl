@@ -393,6 +393,15 @@ void main() {
         await save(tester, '6b_agent_smallest_uk');
       });
 
+      testWidgets('use with an AI agent, in a build without the program', (
+        tester,
+      ) async {
+        await pumpApp(tester, environment()..clientPath = null, look: look);
+        await tester.tap(find.byTooltip('Use with an AI agent'));
+        await tester.pumpAndSettle();
+        await save(tester, '6c_agent_missing');
+      });
+
       testWidgets('the about menu', (tester) async {
         await pumpApp(tester, environment(), look: look);
         await tester.tap(find.byTooltip('About VidCtrl'));

@@ -363,39 +363,38 @@ must find it in the window and get an agent working in one paste.
 - **It opens a small window** (like "More options…"), plain words first:
   one or two sentences on what it is for ("Let an AI agent such as Claude
   add videos and start conversions for you. You keep watching here."), then
-  the prompt in a box with **Copy** beside it, then the program's location
-  with its own Copy and "Show in folder", then a line for each kind of
-  agent (below). Nothing here changes a setting; it only copies text.
+  the prompt in a box with **Copy** beside it, and Close; nothing else (the
+  owner had the program's location and the lines on kinds of agent taken
+  out: the path is in the prompt). Nothing here changes a setting; it only
+  copies text.
 - **The prompt** is filled in at run time with the real, absolute path of
   `vidctrl-client` beside the running app (from `Platform.resolvedExecutable`;
-  this lands in the person's clipboard only, never in a file). It says, in
-  short:
+  this lands in the person's clipboard only, never in a file). In the
+  owner's words it says only what the tool is and to read the manual:
   - VidCtrl is open on this computer and the person watches its window;
     this program controls it (the path, quoted).
   - Run `"<path>" manual` first; it explains every command, the goals and
     what the results mean. Read output with `--json`.
-  - Finding videos is the agent's job (its own `find`, `du`); give paths to
-    `add` and `queue add --goal …`.
-  - Conversions run in the window one at a time and can take hours. To know
-    when they end, run `"<path>" wait` in the background (or follow
-    `events`) and tell the person when it returns, with each result and any
-    marked "worth a look by eye".
-  - Never delete, move or rename any file. "Remove" only takes a video off
-    the list or a job out of the queue.
-  The full guide stays in `manual`, so the prompt stays a dozen lines and
-  cannot go out of date: what changes with a release is in the manual, which
-  the agent reads from the same program.
-- **Language:** the window's words follow the app's language; the prompt
-  is in English (command names, fields and the manual are), with one line
-  asking the agent to answer the person in their language: Ukrainian when
-  the app is in Ukrainian.
-- **Kinds of agent**, one short line each:
-  - agents that run commands (Claude Code, Codex, Claude Desktop's Code
-    tab, any terminal harness): paste the prompt;
-  - an agent that cannot run commands (a plain chat): use one that can;
-  - a sandboxed agent: let it run this program outside the sandbox.
+  - On Windows, with a quoted path: PowerShell needs `&` before it.
+  Everything else is in the manual's quick start, before its commands:
+  finding videos is the agent's job; conversions run one at a time and can
+  take hours, so run `wait` in the background (or follow `events`) and tell
+  the person what came of each; never delete, move or rename any file, and
+  "remove" only takes a video off the list or a job out of the queue. So
+  the prompt cannot go out of date: what changes with a release is in the
+  manual, which the agent reads from the same program.
+- **Language:** the window's words and the prompt follow the app's
+  language (the prompt's texts are in the ARB files, with the path as a
+  placeholder; the English one is the client's quick start). Command
+  names, `manual` and `--json` stay as they are; the manual and the
+  program's answers are in English.
+- **The program is looked for each time the window opens**, so one built
+  while the app runs is found without a restart.
 - **When the program is missing** (a development build without it): the
-  window says so and shows how to build it, and Copy is disabled.
+  window says so and gives the exact command that builds it beside the
+  running app, `tool/build_client.sh <the app's folder>` (on macOS
+  `Contents/MacOS`), in a fixed-width box with its own Copy, then says to
+  open the window again; Copy for the prompt is disabled.
 - **Discoverability elsewhere:** the README's features and a short section
   "Use with an AI agent" showing the same prompt; `vidctrl-client` with no
   arguments prints the same quick start as the prompt and points to
@@ -405,8 +404,9 @@ must find it in the window and get an agent working in one paste.
   screen; the header still ends where the panel does at the smallest window
   (`no_scrolling_test.dart`, the header test); both looks; a screenshot of
   the new window per look. A test checks that the prompt contains the path,
-  `manual`, `wait` and the rule about files, and nothing about deleting
-  (the same word list as the manual's).
+  `manual` and `--json`, in both languages, and nothing about deleting
+  (the same word list as the manual's); another that the manual's top
+  holds `wait` and the rule about files.
 
 ## Shipping
 
@@ -493,8 +493,7 @@ Not discussed with the owner; each can be changed without changing the rest.
 - **A separate console program**, not a mode of the window's: a Windows GUI
   program cannot print to a terminal or be waited for there.
 - **"Use with an AI agent" in the header and the About menu**, a small
-  window with the prompt; English prompt, with a line to answer in the
-  app's language.
+  window with the prompt, in the app's language.
 - **TCP on loopback with a token**, not Unix sockets and named pipes: one
   transport on three systems.
 - **`queue add` without `--goal` uses the panel's goal**, like the button;

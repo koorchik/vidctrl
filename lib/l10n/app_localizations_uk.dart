@@ -292,23 +292,26 @@ class AppLocalizationsUk extends AppLocalizations {
   String get agentPromptLabel => 'Вставте це у свого агента';
 
   @override
-  String get agentProgramLabel => 'Програма, якою користується агент';
+  String agentPromptIntro(String client) {
+    return 'VidCtrl відкритий на цьому комп\'ютері, і людина стежить за його вікном. Програма `$client` керує ним: додає відео до списку у вікні й ставить конвертації в чергу.';
+  }
 
   @override
-  String get agentKindCommands =>
-      'Агенти, що запускають команди (Claude Code, Codex, термінал): вставте текст вище.';
+  String agentPromptManual(String client) {
+    return '- Спершу запусти `$client manual`: там пояснено кожну команду, цілі й що означають результати. Додай `--json` до команди, щоб прочитати відповідь як JSON.';
+  }
 
   @override
-  String get agentKindChat =>
-      'Чат, який не запускає команд, не зможе працювати з VidCtrl; візьміть агента, що вміє.';
-
-  @override
-  String get agentKindSandbox =>
-      'Якщо агент працює в пісочниці, дозвольте йому запускати цю програму поза нею.';
+  String agentPromptPowerShell(String client) {
+    return '- У PowerShell пиши & перед шляхом у лапках: `& $client manual`.';
+  }
 
   @override
   String get agentMissing =>
-      'Поруч із цією збіркою немає vidctrl-client. Зберіть його через tool/build_client.sh.';
+      'Поруч із цією збіркою немає vidctrl-client. У теці проєкту виконайте:';
+
+  @override
+  String get agentMissingAfter => 'Потім відкрийте це вікно ще раз.';
 
   @override
   String get camctrlQuestion => 'Знімаєте на Blackmagic?';

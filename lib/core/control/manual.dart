@@ -44,23 +44,36 @@ String shellWord(String client, {required String os}) {
   return "'${client.replaceAll("'", r"'\''")}'";
 }
 
+/// Whether [client] typed on [os] needs PowerShell's `&` before it: a
+/// quoted path on Windows.
+bool needsCallOperator(String client, {required String os}) =>
+    os == 'windows' && shellWord(client, os: os) != client;
+
 /// What an agent needs before anything else, with [client] as the command
-/// that runs this program on [os]: the manual's first section, what the
-/// client prints with no arguments, and the prompt the window gives to copy.
+/// that runs this program on [os]: what the program is and to read its
+/// manual. It is what the client prints with no arguments, the start of the
+/// manual's quick start, and the prompt the window gives to copy in English
+/// (the window's own copy in each language is in its texts).
 String quickStart(String client, {required String os}) {
   final c = shellWord(client, os: os);
-  final powerShell = os == 'windows' && c != client
+  final powerShell = needsCallOperator(client, os: os)
       ? '- In PowerShell, put & before a quoted path: `& $c manual`.\n'
       : '';
   return '''
 VidCtrl is open on this computer, and the person watches its window. The program `$c` controls it: it adds videos to the window's list and queues conversions there.
 
 - Run `$c manual` first: it explains every command, the goals and what the results mean. Add `--json` to a command to read its answer as JSON.
-$powerShell- Finding the videos is your job (with `find`, `du` or the like). Give their paths to `$c add`, or straight to `$c queue add --goal <goal>`.
+$powerShell''';
+}
+
+/// The rest of the manual's quick start: what an agent most needs once it
+/// reads on, which the prompt leaves to the manual.
+String _firstSteps(String c) =>
+    '''
+- Finding the videos is your job (with `find`, `du` or the like). Give their paths to `$c add`, or straight to `$c queue add --goal <goal>`.
 - The window converts one video at a time, and that can take hours. To know when it ends, run `$c wait` in the background (or follow `$c events`), and tell the person when it returns: each result, and any marked "worth a look by eye".
 - $filesRule "Remove" only takes a video off the list or a job out of the queue.
 ''';
-}
 
 /// The short list `--help` prints. Its examples are typed for [os]'s
 /// terminal (this system's by default), as are [commandHelp]'s and
@@ -129,7 +142,7 @@ String manual({
     '',
     '## Quick start',
     '',
-    quickStart(client, os: os),
+    quickStart(client, os: os) + _firstSteps(c),
     _about(c),
     _never(c),
     _commandsPart(c, words),

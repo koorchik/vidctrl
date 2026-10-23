@@ -188,30 +188,28 @@ in the window, and it deletes, moves or renames no file. Commands that need
 the window open it.
 
 The **Use with an AI agent** button in the window's header (the robot,
-beside the "i"; the About menu has it too) opens a small window with:
-
-- the text to paste into your agent, with **Copy** beside it. It has the
-  program's full path in it, quoted the way the system's terminal needs it
-  (on Windows `"C:\…\vidctrl-client.exe"`, with a line saying that
-  PowerShell wants `&` before it);
-- where the program is, with its own **Copy** and **Show in folder**;
-- which agents can use it: one that runs commands can; a chat that cannot
-  run commands cannot; one in a sandbox must be allowed to run the program
-  outside it.
+beside the "i"; the About menu has it too) opens a small window with the
+text to paste into your agent and **Copy** beside it. The text is in the
+app's language and has the program's full path in it, quoted the way the
+system's terminal needs it (on Windows `"C:\…\vidctrl-client.exe"`, with a
+line saying that PowerShell wants `&` before it). It only says what the
+program is and to read its manual: the manual tells the agent the rest,
+from waiting for conversions to leaving every file as it is.
 
 With the Linux download unpacked in `/home/alice/Apps/vidctrl`, the text it
-copies is this. With the app in Ukrainian, a last line asks the agent to
-answer in Ukrainian. `vidctrl-client` run on its own prints the same, with
-its plain name for the path.
+copies in English is this. `vidctrl-client` run on its own prints the same,
+with its plain name for the path.
 
 ```text
 VidCtrl is open on this computer, and the person watches its window. The program `'/home/alice/Apps/vidctrl/vidctrl-client'` controls it: it adds videos to the window's list and queues conversions there.
 
 - Run `'/home/alice/Apps/vidctrl/vidctrl-client' manual` first: it explains every command, the goals and what the results mean. Add `--json` to a command to read its answer as JSON.
-- Finding the videos is your job (with `find`, `du` or the like). Give their paths to `'/home/alice/Apps/vidctrl/vidctrl-client' add`, or straight to `'/home/alice/Apps/vidctrl/vidctrl-client' queue add --goal <goal>`.
-- The window converts one video at a time, and that can take hours. To know when it ends, run `'/home/alice/Apps/vidctrl/vidctrl-client' wait` in the background (or follow `'/home/alice/Apps/vidctrl/vidctrl-client' events`), and tell the person when it returns: each result, and any marked "worth a look by eye".
-- Never delete, move or rename any file. "Remove" only takes a video off the list or a job out of the queue.
 ```
+
+In a development build there is no `vidctrl-client` beside the app, so the
+window shows the command that builds it there
+(`tool/build_client.sh build/linux/x64/debug/bundle` under `flutter run` on
+Linux); it finds the program the next time it opens.
 
 The whole guide is `vidctrl-client manual`, also in
 [docs/CLIENT.md](docs/CLIENT.md).

@@ -160,11 +160,23 @@
   "agentTitle": "Use with an AI agent",
   "agentIntro": "Let an AI agent such as Claude add videos and start conversions for you. You keep watching here.",
   "agentPromptLabel": "Paste this into your agent",
-  "agentProgramLabel": "The program the agent uses",
-  "agentKindCommands": "Agents that run commands (Claude Code, Codex, a terminal): paste the text above.",
-  "agentKindChat": "A chat that cannot run commands cannot use VidCtrl; use an agent that can.",
-  "agentKindSandbox": "If your agent runs in a sandbox, let it run this program outside it.",
-  "agentMissing": "This build has no vidctrl-client beside it. Build it with tool/build_client.sh.",
+  "agentPromptIntro": "VidCtrl is open on this computer, and the person watches its window. The program `{client}` controls it: it adds videos to the window's list and queues conversions there.",
+  "@agentPromptIntro": {
+    "description": "The prompt's first paragraph. {client} is the program's path, quoted; keep the backticks.",
+    "placeholders": {"client": {"type": "String"}}
+  },
+  "agentPromptManual": "- Run `{client} manual` first: it explains every command, the goals and what the results mean. Add `--json` to a command to read its answer as JSON.",
+  "@agentPromptManual": {
+    "description": "The prompt's first point. Keep the command, manual and --json as they are.",
+    "placeholders": {"client": {"type": "String"}}
+  },
+  "agentPromptPowerShell": "- In PowerShell, put & before a quoted path: `& {client} manual`.",
+  "@agentPromptPowerShell": {
+    "description": "The prompt's point on Windows, when the path is quoted.",
+    "placeholders": {"client": {"type": "String"}}
+  },
+  "agentMissing": "This build has no vidctrl-client beside it. In the project folder, run:",
+  "agentMissingAfter": "Then open this window again.",
   "camctrlQuestion": "Shooting on Blackmagic?",
   "camctrlLink": "Control the camera with CamCtrl",
   "developmentBuild": "VidCtrl, development build",
