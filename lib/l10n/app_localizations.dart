@@ -1967,14 +1967,26 @@ abstract class AppLocalizations {
   /// No description provided for @archiveQualityEachTitle.
   ///
   /// In en, this message translates to:
-  /// **'Each video is checked'**
+  /// **'The quality is chosen for each video'**
   String get archiveQualityEachTitle;
 
   /// No description provided for @archiveQualityEach.
   ///
   /// In en, this message translates to:
-  /// **'Before converting, a few short pieces of each video are encoded and compared with the original, and the poorest one decides. If it falls short, that video gets a better quality, up to a limit past which files grow a lot for little. A video still short of it is converted all the same, and marked to be checked by eye. One that would keep more than four fifths of its size is left as it is.'**
+  /// **'Before converting, a few short pieces of each video are encoded and compared with the original, and the poorest one decides. If it falls short, the archive picks a better quality for that video by itself, up to a limit past which files grow a lot for little; such a video is marked “Quality tuned”. A video still short of it is converted all the same, marked to be checked by eye, its file name ending in “-check”. One that would keep more than four fifths of its size is left as it is.'**
   String get archiveQualityEach;
+
+  /// No description provided for @qualityTuned.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality tuned'**
+  String get qualityTuned;
+
+  /// No description provided for @qualityTunedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The archive chose a better quality for this video than its usual one'**
+  String get qualityTunedHint;
 }
 
 class _AppLocalizationsDelegate

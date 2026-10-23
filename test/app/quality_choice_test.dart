@@ -140,6 +140,55 @@ void main() {
     });
   });
 
+  group('the tag of a tuned quality', () {
+    for (final (outcome, shown) in [
+      (QualityOutcome.standard, false),
+      (QualityOutcome.raised, true),
+      (QualityOutcome.belowTarget, true),
+      (QualityOutcome.notWorthIt, false),
+    ]) {
+      testWidgets('${shown ? 'marks' : 'does not mark'} '
+          'a video ${outcome.name}', (tester) async {
+        env.estimator.choices['/videos/holiday.mp4'] = fakeChoice(outcome);
+        await addHoliday(tester);
+
+        expect(
+          find.text('Quality tuned'),
+          shown ? findsOneWidget : findsNothing,
+        );
+      });
+    }
+
+    testWidgets('stays with the job in the queue, and after', (tester) async {
+      env.estimator.choices['/videos/holiday.mp4'] = fakeChoice(
+        QualityOutcome.raised,
+      );
+      await addHoliday(tester);
+      await addToQueue(tester);
+
+      // In the video list and on the job.
+      expect(find.text('Quality tuned'), findsNWidgets(2));
+
+      env.executor.last.finish();
+      await tester.pump();
+
+      expect(find.text('Quality tuned'), findsNWidgets(2));
+    });
+
+    testWidgets('opens the story of the quality chosen', (tester) async {
+      env.estimator.choices['/videos/holiday.mp4'] = fakeChoice(
+        QualityOutcome.raised,
+      );
+      await addHoliday(tester);
+
+      await tester.tap(find.text('Quality tuned'));
+      await tester.pump();
+      await wait(tester);
+
+      expect(find.text('Quality raised for this video'), findsOneWidget);
+    });
+  });
+
   group('the (i) window', () {
     testWidgets('shows the hardest frame of the original and the copy', (
       tester,

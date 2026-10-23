@@ -258,6 +258,20 @@ class _JobTile extends ConsumerWidget {
                       const SizedBox(width: 8),
                       _Chip(l10n.sampleChip),
                     ],
+                    if (job.quality ??
+                            (job.status == JobStatus.waiting
+                                ? whole?.choice
+                                : null)
+                        case final choice? when QualityBadge.shows(choice)) ...[
+                      const SizedBox(width: 8),
+                      QualityBadge(
+                        choice: choice,
+                        original: job.info,
+                        result: job.status == JobStatus.done && !job.isSample
+                            ? job.result?.outputPath
+                            : null,
+                      ),
+                    ],
                   ],
                 ),
                 _GoalLine(job: job),

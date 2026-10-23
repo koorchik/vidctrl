@@ -112,6 +112,83 @@ class QualityChoiceLine extends StatelessWidget {
   }
 }
 
+/// A tag beside a video's name when the archive tuned its quality: it chose
+/// a better one than usual for it. In the accent where that was enough, in
+/// the colour of things worth noticing where the video still needs a look.
+/// Opens [QualityReportDialog].
+class QualityBadge extends StatelessWidget {
+  const QualityBadge({
+    super.key,
+    required this.choice,
+    required this.original,
+    this.result,
+  });
+
+  final QualityChoice choice;
+  final MediaInfo original;
+  final String? result;
+
+  /// Whether [choice] changed the quality the video is converted at.
+  static bool shows(QualityChoice? choice) =>
+      choice != null &&
+      choice.converts &&
+      choice.value != null &&
+      choice.value != choice.standardValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final look = AppLook.of(context);
+    final needsALook = choice.outcome == QualityOutcome.belowTarget;
+    final (background, foreground) = needsALook
+        ? (scheme.tertiaryContainer, scheme.onTertiaryContainer)
+        : (
+            look.hues?.violet.soft ?? scheme.primaryContainer,
+            look.hues?.violet.deep ?? scheme.onPrimaryContainer,
+          );
+    final radius = BorderRadius.circular(look.tagRadius);
+    return Tooltip(
+      message: l10n.qualityTunedHint,
+      child: Material(
+        color: background,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: foreground.withValues(alpha: 0.35)),
+        ),
+        child: InkWell(
+          borderRadius: radius,
+          onTap: () => showDialog<void>(
+            context: context,
+            builder: (_) => QualityReportDialog(
+              choice: choice,
+              original: original,
+              result: result,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.auto_awesome_rounded, size: 12, color: foreground),
+                const SizedBox(width: 4),
+                Text(
+                  l10n.qualityTuned,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: foreground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The share of the original's size a result keeps, in whole percent.
 int sharePercent(QualityChoice choice) => (choice.share * 100).round();
 

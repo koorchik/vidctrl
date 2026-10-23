@@ -311,6 +311,13 @@ class _VideoTile extends ConsumerWidget {
                             const SizedBox(width: 8),
                             TechnicalText(sourceFormat(info!.video!)),
                           ],
+                          if (preview?.estimate?.choice case final choice?
+                              when selected &&
+                                  info != null &&
+                                  QualityBadge.shows(choice)) ...[
+                            const SizedBox(width: 8),
+                            QualityBadge(choice: choice, original: info),
+                          ],
                         ],
                       ),
                       Text(

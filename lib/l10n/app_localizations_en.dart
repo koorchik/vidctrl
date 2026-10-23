@@ -1094,9 +1094,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'The frames could not be read: the file may have been moved or deleted.';
 
   @override
-  String get archiveQualityEachTitle => 'Each video is checked';
+  String get archiveQualityEachTitle => 'The quality is chosen for each video';
 
   @override
   String get archiveQualityEach =>
-      'Before converting, a few short pieces of each video are encoded and compared with the original, and the poorest one decides. If it falls short, that video gets a better quality, up to a limit past which files grow a lot for little. A video still short of it is converted all the same, and marked to be checked by eye. One that would keep more than four fifths of its size is left as it is.';
+      'Before converting, a few short pieces of each video are encoded and compared with the original, and the poorest one decides. If it falls short, the archive picks a better quality for that video by itself, up to a limit past which files grow a lot for little; such a video is marked “Quality tuned”. A video still short of it is converted all the same, marked to be checked by eye, its file name ending in “-check”. One that would keep more than four fifths of its size is left as it is.';
+
+  @override
+  String get qualityTuned => 'Quality tuned';
+
+  @override
+  String get qualityTunedHint =>
+      'The archive chose a better quality for this video than its usual one';
 }
