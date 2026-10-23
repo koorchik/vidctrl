@@ -414,6 +414,35 @@ void main() {
         expect(find.text('Fast'), findsNothing);
       });
 
+      testWidgets('explains itself in the smallest window when the computer '
+          'offers no graphics card', (tester) async {
+        const help = 'How the archive keeps the quality';
+        await pumpApp(tester, env, size: minimumWindowSize);
+        expect(find.textContaining('far less space'), findsOneWidget);
+        expect(find.byTooltip(help), findsOneWidget);
+        expect(find.textContaining('iPhone 15 Pro'), findsOneWidget);
+
+        // With a card, its row takes the room: the format and speed say
+        // what they trade away, and the explanation waits for a window a
+        // little taller, still with the compact spacing (a MacBook's).
+        await tester.pumpWidget(const SizedBox());
+        await pumpApp(
+          tester,
+          FakeEnvironment(capabilities: withGpu({'av1_nvenc'})),
+          size: minimumWindowSize,
+        );
+        expect(find.byTooltip(help), findsNothing);
+
+        await tester.pumpWidget(const SizedBox());
+        await pumpApp(
+          tester,
+          FakeEnvironment(capabilities: withGpu({'av1_nvenc'})),
+          size: const Size(960, 705),
+        );
+        expect(find.byTooltip(help), findsOneWidget);
+        expect(find.text('Fast'), findsOneWidget);
+      });
+
       testWidgets('without AV1 in this FFmpeg, there is nothing to choose', (
         tester,
       ) async {

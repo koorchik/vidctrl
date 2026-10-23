@@ -284,8 +284,11 @@ videos and gets small files that look the same, with no help.
   AV1 (HEVC where FFmpeg has no AV1). Drop videos, press Add to queue, done.
   Its format and speed rows each say under them what the chosen variant trades
   away (`choiceHint` in `scenario_texts.dart`; each variant's is also its
-  tooltip). With such rows, the goal's own explanation shows only in the
-  roomier window, so the smallest one still fits.
+  tooltip). With both rows, the goal's own explanation waits for a 705 px
+  window (`explainedFrom` in `recipe_pane.dart`), so the smallest one still
+  fits; where the computer offers one of them only (no graphics card, as on
+  an M1 Mac), it takes the other's room. `no_scrolling_test.dart` checks
+  the three kinds of computer at that height too.
 - More is available on request only: "More options…", and "Show the command"
   and "Video details" in the ⋯ menus.
 

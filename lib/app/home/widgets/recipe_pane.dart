@@ -156,13 +156,15 @@ class RecipePane extends ConsumerWidget {
                           ),
                         ],
                         // One explanation: of the variant where there are
-                        // several, otherwise of the goal. Where the options
-                        // explain themselves, the goal's explanation needs
-                        // the roomier window; it is also the goal's tooltip.
+                        // several, otherwise of the goal. Where two options
+                        // explain themselves, the goal's explanation waits
+                        // until it fits; it is also the goal's tooltip.
+                        // Where the computer offers only one of them (no
+                        // graphics card), it takes the other's room.
                         if (presets.length > 1)
                           _Hint(presetHint(l10n, selected.id))
-                        else if (explainedOptions.isEmpty ||
-                            constraints.maxHeight >= _Spacing.roomyFrom)
+                        else if (explainedOptions.length < 2 ||
+                            constraints.maxHeight >= _Spacing.explainedFrom)
                           _Hint(
                             scenarioHint(l10n, scenario.id),
                             // The archive's settings were measured, not
@@ -314,6 +316,11 @@ class _Spacing extends InheritedWidget {
 
   /// Panel height from which the roomier spacing is used.
   static const roomyFrom = 700.0;
+
+  /// Panel height from which the goal's explanation fits beside two options
+  /// that explain themselves (the archive's format and speed), in the
+  /// compact spacing too: a 705 px window.
+  static const explainedFrom = 615.0;
 
   final bool roomy;
 

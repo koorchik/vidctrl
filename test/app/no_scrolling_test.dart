@@ -8,6 +8,7 @@ import 'package:vidctrl/app/recipe/recipe.dart';
 import 'package:vidctrl/app/recipe/recipe_controller.dart';
 import 'package:vidctrl/app/theme.dart';
 import 'package:vidctrl/app/window.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
 import 'package:vidctrl/core/scenarios/registry.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
 import 'package:vidctrl/l10n/app_localizations.dart';
@@ -77,12 +78,26 @@ void main() {
   // Whether text fits depends on the font, so the app's real ones are used.
   setUpAll(loadRealFonts);
 
-  // The smallest window, the height where the roomier spacing starts, and
+  // The smallest window, the height where the archive's explanation joins
+  // its format and speed, the height where the roomier spacing starts, and
   // the size the window opens at.
   const sizes = {
     'smallest window': minimumWindowSize,
+    'where the archive explains itself': Size(960, 705),
     'where the spacing gets roomier': Size(960, 790),
     'default window': defaultWindowSize,
+  };
+
+  // What the computer offers decides the archive's rows: format and speed,
+  // the format alone, or the speed alone.
+  final computers = {
+    'graphics card': withGpu({'av1_nvenc'}),
+    'processor only': softwareOnly,
+    'no AV1': const Capabilities(
+      ffmpegVersion: 'test',
+      encoders: {'libx265', 'libx264', 'prores_ks', 'dnxhd', 'aac'},
+      hardwareEncoders: {'hevc_nvenc'},
+    ),
   };
 
   // The looks letter their labels differently, so each is checked.
@@ -90,15 +105,25 @@ void main() {
     for (final look in Look.values)
       for (final locale in const [Locale('en'), Locale('uk')])
         for (final MapEntry(key: name, value: size) in sizes.entries)
-          (look: look, locale: locale, name: name, size: size),
+          for (final MapEntry(key: computer, value: capabilities)
+              in computers.entries)
+            (
+              look: look,
+              locale: locale,
+              name: name,
+              size: size,
+              computer: computer,
+              capabilities: capabilities,
+            ),
   ];
 
-  for (final (:look, :locale, :name, :size) in cases) {
+  for (final (:look, :locale, :name, :size, :computer, :capabilities)
+      in cases) {
     testWidgets(
       'the settings panel shows everything, uncut, without scrolling: '
-      '$name, ${locale.languageCode}, ${look.name}',
+      '$name, $computer, ${locale.languageCode}, ${look.name}',
       (tester) async {
-        final env = FakeEnvironment(capabilities: withGpu({'av1_nvenc'}));
+        final env = FakeEnvironment(capabilities: capabilities);
         env.ffprobe.add('/videos/a.mp4');
         env.ffprobe.add('/videos/b.mp4');
         final sources = await pumpApp(
