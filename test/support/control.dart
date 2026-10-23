@@ -12,6 +12,7 @@ import 'package:vidctrl/core/control/endpoint.dart';
 import 'package:vidctrl/core/control/protocol.dart';
 
 import 'fakes.dart';
+import 'machine_json.dart';
 
 /// A window over [env] that serves clients through the endpoint file in
 /// [dir] (a new temporary folder when not given). [environment] stands in for
@@ -62,10 +63,13 @@ Future<(ProviderContainer, ControlConnection)> startControlled(
   return (container, client);
 }
 
-/// Everything the window has told a client unasked, in order.
+/// Everything the window has told a client unasked, in order; each must be
+/// fit for a program ([expectMachineJson]).
 class Heard {
   Heard(ControlConnection client) {
     client.notifications.listen((notification) {
+      // Each event as `events --json` prints it.
+      expectMachineJson({'event': notification.method, ...notification.params});
       all.add(notification);
       for (final (matches, found) in [..._awaited]) {
         if (!matches(notification)) continue;

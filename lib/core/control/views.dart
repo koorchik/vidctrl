@@ -1,9 +1,9 @@
-import 'words.dart';
+import 'codes.dart';
 
 // The shapes the window sends and the client prints. In JSON the keys are
-// the field names and an absent value is left out, never null. The `...Text`
-// keys beside some ids carry the English words; reading them back ignores
-// them.
+// the field names and an absent value is left out, never null. A value that
+// is one of a few is a code of codes.dart, never words: the client's words
+// for people are in words.dart.
 
 T? _opt<T>(Map<String, Object?> json, String key) => json[key] as T?;
 
@@ -51,7 +51,7 @@ class VideoView {
   final int id;
   final String path;
 
-  /// probing, ready or unreadable.
+  /// A [VideoStatusCodes] code.
   final String status;
   final int? sizeBytes;
   final double? durationSeconds;
@@ -66,7 +66,6 @@ class VideoView {
     'id': id,
     'path': path,
     'status': status,
-    'statusText': statusWords(status),
     'sizeBytes': ?sizeBytes,
     'durationSeconds': ?durationSeconds,
     'width': ?width,
@@ -100,24 +99,22 @@ class GoalPreview {
   /// The preset id.
   final String goal;
 
-  /// skip, remux, audioOnly, encode, unsupported or keptAsIs.
+  /// A [PlanCodes] code.
   final String plan;
   final int? expectedBytes;
   final bool measured;
   final bool measuring;
 
-  /// same, veryClose or differs.
+  /// A [ClosenessCodes] code.
   final String? closeness;
 
   Map<String, Object?> toJson() => {
     'goal': goal,
     'plan': plan,
-    'planText': planWords(plan),
     'expectedBytes': ?expectedBytes,
     'measured': measured,
     'measuring': measuring,
     'closeness': ?closeness,
-    'closenessText': ?(closeness == null ? null : closenessWords(closeness!)),
   };
 }
 
@@ -168,10 +165,10 @@ class JobView {
   final String goal;
   final Map<String, String> options;
 
-  /// start or middle, for a sample.
+  /// A [SampleCodes] code, for a sample.
   final String? sample;
 
-  /// A `JobStatus` name.
+  /// A [JobStatusCodes] code.
   final String status;
   final double? fraction;
   final double? remainingSeconds;
@@ -190,7 +187,6 @@ class JobView {
     'options': options,
     'sample': ?sample,
     'status': status,
-    'statusText': statusWords(status),
     'fraction': ?fraction,
     'remainingSeconds': ?remainingSeconds,
     'attempt': ?attempt,
@@ -221,7 +217,7 @@ class QualityView {
     share: _double(json, 'share') ?? 0,
   );
 
-  /// A `QualityOutcome` name.
+  /// An [OutcomeCodes] code.
   final String outcome;
   final int? value;
   final int? standardValue;
@@ -231,7 +227,6 @@ class QualityView {
 
   Map<String, Object?> toJson() => {
     'outcome': outcome,
-    'outcomeText': outcomeWords(outcome),
     'value': ?value,
     'standardValue': ?standardValue,
     'vmaf': ?vmaf,
@@ -257,13 +252,13 @@ class StatusView {
     jobs: {for (final e in _map(json['jobs']).entries) e.key: e.value as int},
   );
 
-  /// starting, ready or ffmpegMissing.
+  /// A [StateCodes] code.
   final String state;
   final String version;
   final bool busy;
   final bool paused;
 
-  /// How many jobs there are in each status.
+  /// How many jobs there are in each status, by [JobStatusCodes] code.
   final Map<String, int> jobs;
 
   Map<String, Object?> toJson() => {
@@ -382,7 +377,7 @@ class JobOutcome {
   final int jobId;
   final String path;
 
-  /// done, skipped, failed, cancelled or removed.
+  /// A [JobStatusCodes] code: done, skipped, failed, cancelled or removed.
   final String status;
   final String? outputPath;
   final bool needsALook;
@@ -391,7 +386,6 @@ class JobOutcome {
     'jobId': jobId,
     'path': path,
     'status': status,
-    'statusText': statusWords(status),
     'outputPath': ?outputPath,
     'needsALook': needsALook,
   };

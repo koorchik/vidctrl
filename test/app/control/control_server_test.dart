@@ -14,6 +14,7 @@ import 'package:vidctrl/app/recipe/recipe.dart';
 import 'package:vidctrl/app/recipe/recipe_controller.dart';
 import 'package:vidctrl/app/sources/sources_controller.dart';
 import 'package:vidctrl/core/control/client_text.dart';
+import 'package:vidctrl/core/control/codes.dart';
 import 'package:vidctrl/core/control/connection.dart';
 import 'package:vidctrl/core/control/endpoint.dart';
 import 'package:vidctrl/core/control/listener.dart';
@@ -29,6 +30,7 @@ import 'package:vidctrl/core/scenarios/registry.dart';
 import '../../support/control.dart';
 import '../../support/fake_media.dart';
 import '../../support/fakes.dart';
+import '../../support/machine_json.dart';
 
 /// A client as the window sees it, that keeps what it is told.
 class _Peer implements ControlPeer {
@@ -70,7 +72,7 @@ void main() {
       final (_, client) = await startControlled(env);
 
       final status = await client.call(Methods.status) as Map;
-      expect(status['state'], 'ready');
+      expect(status['state'], 'READY');
       expect(status['busy'], isFalse);
       expect(status['paused'], isFalse);
       expect(status['jobs'], isEmpty);
@@ -85,7 +87,7 @@ void main() {
       );
 
       final status = await client.call(Methods.status) as Map;
-      expect(status['state'], 'starting');
+      expect(status['state'], 'STARTING');
 
       var answered = false;
       final list = client.call(Methods.queueList).then((answer) {
@@ -110,7 +112,7 @@ void main() {
         _failsWith(ControlErrorKind.ffmpegMissing, contains('FFmpeg')),
       );
       final status = await client.call(Methods.status) as Map;
-      expect(status['state'], 'ffmpegMissing');
+      expect(status['state'], 'FFMPEG_MISSING');
     });
 
     test('an unknown method is refused', () async {
@@ -186,7 +188,7 @@ void main() {
 
         final added = container.read(sourcesProvider).videos.single;
         expect(answer['videos'], [
-          {'path': a, 'id': added.id, 'result': 'added'},
+          {'path': a, 'id': added.id, 'result': 'ADDED'},
         ]);
         expect(added.status, SourceStatus.ready);
         expect(container.read(sourcesProvider).selectedIds, {added.id});
@@ -203,8 +205,8 @@ void main() {
       }) as Map;
 
       expect(answer['videos'], [
-        {'path': a, 'id': isA<int>(), 'result': 'added'},
-        {'path': missing, 'result': 'notFound'},
+        {'path': a, 'id': isA<int>(), 'result': 'ADDED'},
+        {'path': missing, 'result': 'NOT_FOUND'},
       ]);
       expect(container.read(sourcesProvider).videos, hasLength(1));
     });
@@ -225,8 +227,8 @@ void main() {
         }) as Map;
 
         expect((answer['videos'] as List).map((v) => (v as Map)['result']), [
-          'known',
-          'unreadable',
+          'KNOWN',
+          'UNREADABLE',
         ]);
       },
     );
@@ -278,7 +280,7 @@ void main() {
                   .single
               as Map;
       expect(plain['path'], a);
-      expect(plain['status'], 'ready');
+      expect(plain['status'], 'READY');
       expect(plain['width'], 3840);
       expect(plain.containsKey('preview'), isFalse);
 
@@ -290,7 +292,7 @@ void main() {
               as Map;
       final preview = listed['preview'] as Map;
       expect(preview['goal'], 'remux.container');
-      expect(preview['plan'], isIn(['remux', 'skip']));
+      expect(preview['plan'], isIn(['REMUX', 'SKIP']));
     });
 
     test('removing takes a video off the list by id or path', () async {
@@ -393,7 +395,7 @@ void main() {
 
       await client.call(Methods.queueAdd, {
         'videos': [id],
-        'sample': 'middle',
+        'sample': 'MIDDLE',
       });
 
       expect(
@@ -619,7 +621,7 @@ void main() {
       }) as Map;
 
       expect(answer['skipped'], [
-        {'video': unreadable, 'reason': 'unreadable'},
+        {'video': unreadable, 'reason': 'UNREADABLE'},
       ]);
       expect(container.read(queueProvider).jobs.single.sourceId, a);
     });
@@ -711,7 +713,7 @@ void main() {
       final job = (answer['jobs'] as List).single as Map;
       expect(job['videoId'], id);
       expect(job['goal'], 'space.small');
-      expect(job['status'], JobStatus.running.name);
+      expect(job['status'], codeOf(JobStatus.running));
       expect(
         job['outputPath'],
         container.read(queueProvider).jobs.single.outputPath,
@@ -831,7 +833,7 @@ void main() {
 
       final answer = await cancelling as Map;
       expect(answer['cancelled'], isNull);
-      expect(answer['job'], containsPair('status', 'done'));
+      expect(answer['job'], containsPair('status', 'DONE'));
       expect(jobs(container).single.status, JobStatus.done);
     });
 
@@ -1003,7 +1005,7 @@ void main() {
 
     test('convert whole queues the whole video after a sample', () async {
       final (container, client) = await startControlled(env);
-      final ids = await queue(client, ['a.mp4'], sample: 'start');
+      final ids = await queue(client, ['a.mp4'], sample: 'START');
       await started(1);
       env.executor.started.single.finish();
       await pumpEventQueue();
@@ -1034,7 +1036,7 @@ void main() {
     test('convert whole waits, as the window\'s button, until the sample '
         'is done', () async {
       final (container, client) = await startControlled(env);
-      final ids = await queue(client, ['a.mp4', 'b.mp4'], sample: 'start');
+      final ids = await queue(client, ['a.mp4', 'b.mp4'], sample: 'START');
       await started(1);
 
       for (final id in ids) {
@@ -1139,6 +1141,59 @@ void main() {
     QueueJob jobOf(ProviderContainer container, int id) =>
         container.read(queueProvider).jobs.firstWhere((j) => j.id == id);
 
+    test('every answer and event carries codes, never words', () async {
+      final a = video('a.mp4');
+      env.estimator.choices[a] = fakeChoice(QualityOutcome.belowTarget);
+      final notes = p.join(folder.path, 'notes.txt');
+      File(notes).writeAsStringSync('');
+      final (_, client) = await startControlled(env);
+      final heard = Heard(client);
+      final answers = <Object?>[
+        await client.call(Methods.subscribe),
+        await client.call(Methods.videosAdd, {
+          'paths': [a, notes, p.join(folder.path, 'nope.mp4')],
+        }),
+      ];
+      final hd = await converted(client, 'hd.mp4');
+      final sample = await client.call(Methods.queueAdd, {
+        'videos': [a, notes],
+        'goal': 'archive',
+        'sample': 'MIDDLE',
+      });
+      await started(2);
+      env.executor.started.last.finish();
+      await pumpEventQueue();
+      final compared = client.call(Methods.jobCompare, {'job': hd});
+      await until(() => env.qualityMeter.started.isNotEmpty);
+      env.qualityMeter.last.finish(43, vmaf: 96);
+      answers.addAll([
+        sample,
+        await compared,
+        await client.call(Methods.status),
+        await client.call(Methods.goals),
+        await client.call(Methods.videosList, {'goal': 'archive'}),
+        await client.call(Methods.videosDetails, {'video': a}),
+        await client.call(Methods.queueList),
+        await client.call(Methods.jobGet, {'job': hd, 'command': true}),
+        await client.call(Methods.wait),
+      ]);
+
+      for (final answer in answers) {
+        expectMachineJson(answer);
+      }
+      expect(heard.names, contains(Events.compareFinished));
+      final jobs = (answers[8] as Map)['jobs'] as List;
+      expect(
+        [for (final job in jobs) (job as Map)['status']],
+        ['DONE', 'DONE'],
+      );
+      expect((jobs.last as Map)['sample'], 'MIDDLE');
+      expect(
+        ((answers[2] as Map)['skipped'] as List).single,
+        containsPair('reason', 'UNREADABLE'),
+      );
+    });
+
     test('job says a result worth a look by eye, with its quality', () async {
       final a = video('a.mp4');
       env.estimator.choices[a] = fakeChoice(QualityOutcome.belowTarget);
@@ -1151,9 +1206,9 @@ void main() {
       final answer = await client.call(Methods.jobGet, {'job': id}) as Map;
 
       final job = answer['job'] as Map;
-      expect(job['status'], 'done');
+      expect(job['status'], 'DONE');
       expect(job['needsALook'], isTrue);
-      expect(job['quality'], containsPair('outcome', 'belowTarget'));
+      expect(job['quality'], containsPair('outcome', 'BELOW_TARGET'));
       expect(job['outputPath'], endsWith('-check.mp4'));
       expect(answer, isNot(contains('command')));
       final text = jobDetailsText(
@@ -1196,7 +1251,7 @@ void main() {
         'command': true,
       }) as Map;
 
-      expect(answer['job'], containsPair('status', 'skipped'));
+      expect(answer['job'], containsPair('status', 'SKIPPED'));
       expect(answer, isNot(contains('command')));
       await expectLater(
         client.call(Methods.jobGet, {'job': 9}),
@@ -1215,9 +1270,8 @@ void main() {
 
       expect(await answer, {
         'job': id,
-        'status': 'measured',
-        'closeness': 'same',
-        'closenessText': 'Looks the same as the original',
+        'status': 'MEASURED',
+        'closeness': 'SAME',
         'xpsnr': 43.0,
       });
       expect(container.read(qualityProvider)[id], isA<QualityMeasured>());
@@ -1238,7 +1292,7 @@ void main() {
 
       final compared = await heard.first(Events.compareFinished);
       expect(compared.params['job'], id);
-      expect(compared.params['closeness'], 'veryClose');
+      expect(compared.params['closeness'], 'VERY_CLOSE');
       expect(compared.params['vmaf'], 94);
     });
 
@@ -1290,7 +1344,7 @@ void main() {
       );
       env.qualityMeter.last.finish(43);
 
-      expect(await first, containsPair('closeness', 'same'));
+      expect(await first, containsPair('closeness', 'SAME'));
       expect(await again, await first);
       expect(env.qualityMeter.started, hasLength(1));
     });
@@ -1604,7 +1658,7 @@ void main() {
         env.executor.started.first.finish();
 
         final finished = await heard.first(Events.jobFinished, job: ids.first);
-        expect(finished.params['status'], 'done');
+        expect(finished.params['status'], 'DONE');
         expect(finished.params['outputPath'], isA<String>());
         expect(DateTime.tryParse(finished.params['time'] as String), isNotNull);
         await heard.first(Events.jobStarted, job: ids.last);
@@ -1703,7 +1757,7 @@ void main() {
 
       final compared = await heard.first(Events.compareFinished);
       expect(compared.params['job'], job.params['id']);
-      expect(compared.params['closeness'], 'same');
+      expect(compared.params['closeness'], 'SAME');
     });
 
     test('wait returns when the queue is done, with each outcome', () async {
@@ -1724,8 +1778,8 @@ void main() {
 
       final outcomes = (await waiting)['outcomes'] as List;
       expect(outcomes.map((o) => ((o as Map)['jobId'], o['status'])), [
-        (ids.first, 'done'),
-        (ids.last, 'failed'),
+        (ids.first, 'DONE'),
+        (ids.last, 'FAILED'),
       ]);
       expect((outcomes.first as Map)['outputPath'], isA<String>());
     });

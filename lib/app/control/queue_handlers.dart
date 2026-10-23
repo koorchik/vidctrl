@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/control/codes.dart';
 import '../../core/control/words.dart';
 import '../providers.dart';
 import '../queue/queue_controller.dart';
@@ -71,7 +72,7 @@ Future<Object?> queueRetry(
   final job = jobFrom(ref, params);
   if (!job.canRetry) {
     throw badArgument(
-      'Job ${job.id} is ${statusWords(job.status.name).toLowerCase()}; only '
+      'Job ${job.id} is ${statusWords(codeOf(job.status)).toLowerCase()}; only '
       'a job that failed or was cancelled can be tried again.',
     );
   }
@@ -177,7 +178,7 @@ Future<Object?> queueConvertAnyway(
   if (job.status != JobStatus.skipped || !job.keptAsIs) {
     throw badArgument(
       'Job ${job.id} was not kept as it is; only a job that ended skipped '
-      'with the outcome notWorthIt can be converted anyway.',
+      'with the outcome NOT_WORTH_IT can be converted anyway.',
     );
   }
   return _addedBy(env, ref.read(queueProvider.notifier).convertAnyway(job.id));

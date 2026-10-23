@@ -23,7 +23,7 @@ void main() {
 
       expect(names(events), [Events.jobAdded]);
       expect(events.single.data, containsPair('id', 1));
-      expect(events.single.data, containsPair('status', 'waiting'));
+      expect(events.single.data, containsPair('status', 'WAITING'));
     });
 
     test('a job going from waiting to done gives started then finished', () {
@@ -36,7 +36,7 @@ void main() {
       ]);
       final finished = queueEvents(running, done, softwareOnly);
       expect(names(finished), [Events.jobFinished]);
-      expect(finished.single.data, containsPair('status', 'done'));
+      expect(finished.single.data, containsPair('status', 'DONE'));
       expect(
         finished.single.data,
         containsPair('outputPath', '/videos/1_new.mp4'),
@@ -61,7 +61,7 @@ void main() {
       );
 
       expect(names(events), [Events.jobFinished, Events.jobFinished]);
-      expect(events.map((e) => e.data['status']), ['failed', 'cancelled']);
+      expect(events.map((e) => e.data['status']), ['FAILED', 'CANCELLED']);
     });
 
     test('a measuring attempt gives job-checking with its number', () {
@@ -160,7 +160,7 @@ void main() {
       );
 
       expect(names(added), [Events.videoAdded]);
-      expect(added.single.data, containsPair('status', 'probing'));
+      expect(added.single.data, containsPair('status', 'PROBING'));
       expect(names(read), [Events.videoReady]);
       expect(read.single.data, containsPair('width', 3840));
     });
@@ -216,15 +216,14 @@ void main() {
       expect(names(measured), [Events.compareFinished]);
       expect(measured.single.data, {
         'job': 1,
-        'status': 'measured',
-        'closeness': 'same',
-        'closenessText': 'Looks the same as the original',
+        'status': 'MEASURED',
+        'closeness': 'SAME',
         'xpsnr': 43.0,
         'vmaf': 96.0,
       });
       expect(failed.single.data, {
         'job': 2,
-        'status': 'failed',
+        'status': 'FAILED',
         'errorLines': ['broken'],
       });
     });

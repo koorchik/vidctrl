@@ -16,7 +16,7 @@ void main() {
     t.update(QueueState(jobs: [failedJob(1), doneJob(2)]));
 
     expect(t.finished, isTrue);
-    expect(outcomes(t), [(2, 'done')]);
+    expect(outcomes(t), [(2, 'DONE')]);
   });
 
   test('a job added during the wait is waited for', () {
@@ -27,7 +27,7 @@ void main() {
 
     t.update(QueueState(jobs: [doneJob(1), doneJob(2)]));
     expect(t.finished, isTrue);
-    expect(outcomes(t), [(1, 'done'), (2, 'done')]);
+    expect(outcomes(t), [(1, 'DONE'), (2, 'DONE')]);
   });
 
   test('a removed job is reported as removed, not failed', () {
@@ -36,7 +36,7 @@ void main() {
     t.update(QueueState(jobs: [doneJob(2)]));
 
     expect(t.finished, isTrue);
-    expect(outcomes(t), [(1, 'removed'), (2, 'done')]);
+    expect(outcomes(t), [(1, 'REMOVED'), (2, 'DONE')]);
     expect(t.outcomes.first.path, '/videos/1.mp4');
   });
 
@@ -46,7 +46,7 @@ void main() {
     t.update(QueueState(jobs: [cancelledJob(1)]));
 
     expect(t.finished, isTrue);
-    expect(outcomes(t), [(1, 'cancelled')]);
+    expect(outcomes(t), [(1, 'CANCELLED')]);
   });
 
   test('with nothing pending the wait is over at once', () {
@@ -64,14 +64,14 @@ void main() {
     t.update(QueueState(jobs: [runningJob(1), doneJob(2), waitingJob(3)]));
 
     expect(t.finished, isTrue);
-    expect(outcomes(t), [(2, 'done')]);
+    expect(outcomes(t), [(2, 'DONE')]);
   });
 
   test('a given job finished already is reported at once', () {
     final t = WaitTracker(QueueState(jobs: [failedJob(1)]), jobs: {1});
 
     expect(t.finished, isTrue);
-    expect(outcomes(t), [(1, 'failed')]);
+    expect(outcomes(t), [(1, 'FAILED')]);
   });
 
   test('a job retried during the wait is waited for again', () {
@@ -82,7 +82,7 @@ void main() {
     expect(t.finished, isFalse);
 
     t.update(QueueState(jobs: [doneJob(1), doneJob(2)]));
-    expect(outcomes(t), [(1, 'done'), (2, 'done')]);
+    expect(outcomes(t), [(1, 'DONE'), (2, 'DONE')]);
   });
 
   test('a done job carries its result and whether it needs a look', () {

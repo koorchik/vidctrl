@@ -1,5 +1,5 @@
+import '../../core/control/codes.dart';
 import '../../core/control/protocol.dart';
-import '../../core/control/words.dart';
 import '../../core/ffmpeg/capabilities.dart';
 import '../quality/quality_controller.dart';
 import '../queue/queue_state.dart';
@@ -153,7 +153,7 @@ List<ControlEvent> qualityEvents(
         events.add(
           ControlEvent(Events.compareFinished, {
             'job': job,
-            'status': 'failed',
+            'status': ComparisonCodes.failed,
             'errorLines': check.errorLines,
           }),
         );
@@ -165,12 +165,11 @@ List<ControlEvent> qualityEvents(
 }
 
 /// How close job [job]'s result is to its original, as `job.compare`
-/// answers and `compare-finished` tells it.
+/// answers and [Events.compareFinished] tells it.
 Map<String, Object?> comparisonJson(int job, QualityMeasured check) => {
   'job': job,
-  'status': 'measured',
-  'closeness': check.closeness.name,
-  'closenessText': closenessWords(check.closeness.name),
+  'status': ComparisonCodes.measured,
+  'closeness': codeOf(check.closeness),
   'xpsnr': check.lumaDb,
   'vmaf': ?check.vmaf,
 };

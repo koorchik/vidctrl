@@ -1,3 +1,4 @@
+import '../../core/control/codes.dart';
 import '../../core/control/views.dart';
 import '../queue/queue_state.dart';
 
@@ -55,14 +56,14 @@ class WaitTracker {
           JobOutcome(
             jobId: id,
             path: job.path,
-            status: 'removed',
+            status: JobStatusCodes.removed,
             needsALook: false,
           )
         else if (!job.isPending)
           JobOutcome(
             jobId: id,
             path: job.path,
-            status: job.status.name,
+            status: codeOf(job.status),
             outputPath:
                 job.status == JobStatus.done && job.outputPath.isNotEmpty
                 ? job.outputPath

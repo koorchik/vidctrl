@@ -39,23 +39,23 @@ VidCtrl deletes no file: "remove" takes a video off the list or a job out of the
 How every command works:
 
 - `vidctrl-client <command> [arguments] [options]`; options may come before or after the arguments.
-- `--json` prints the answer as one JSON document on stdout (`events`: one per line). Without it, lines for people. The JSON has ids and numbers, and English words beside the ids in fields ending in `Text`. A value that is not known is left out, never `null`; only `cancel` answers `null`, when nothing was cancelled.
+- `--json` prints the answer as one JSON document on stdout (`events`: one per line). Without it, lines for people. The JSON is for programs: ids, numbers, paths, and a code in capitals for every value that is one of a few (`DONE`, `KEPT_AS_IS`), never words; "What the results mean" says what each code means. Goal, option and choice ids stay as `--goal` and `--opt` take them (`archive`, `speed=fast`). A value that is not known is left out, never `null`; only `cancel` answers `null`, when nothing was cancelled.
 - `--no-start`: do not open the window when it is not open; exit 2 instead.
 - `--help` prints the command's part of this guide.
 - Videos are given by id or by path, jobs by id. A reference made only of digits is an id: a file named `3` in the current folder is given as `./3`.
 - Paths may be relative or start with `~`: the client makes them absolute from the current folder before sending them.
 - A goal is given by its id (`--goal archive`), its options with `--opt option=choice`, once for each (`--opt codec=hevc --opt speed=gpu`). An unknown goal, option or choice is refused with the valid ones named. So is an option this computer does not offer (`vidctrl-client goals` lists those it does), unless its choice is the one the goal makes here anyway: `--opt speed=cpu` where the graphics card cannot encode. A script may name the defaults on every computer.
-- Errors go to stderr, as a line for people, or with `--json` as `{"error": {"kind": "...", "message": "..."}}`; the exit code tells what kind (see "Exit codes"). The kinds:
-  - `badArgument`: a command, goal, option, choice or value that is not valid (exit 5).
-  - `notFound`: no such video or job (exit 5).
-  - `busy`: the window cannot do that right now (exit 5).
-  - `unknownMethod`: the open window is of another version and does not know the request (exit 5).
-  - `ffmpegMissing`: the window could not find FFmpeg and shows what to do (exit 6).
-  - `unauthorized`: the window is open but refused the connection or did not answer; no other window is started (exit 2).
-  - `notRunning`: the window is not open and could not be opened (exit 2).
-  - `appClosed`: the window closed meanwhile (exit 4).
-  - `timeout`: `--timeout` passed; the jobs go on in the window (exit 3).
-  - `unexpected`: the client itself went wrong; the message says how (exit 5).
+- Errors go to stderr, as a line for people, or with `--json` as `{"error": {"code": "...", "message": "..."}}`: a program reads `code`, the `message` is for people. The exit code tells what kind (see "Exit codes"). The codes:
+  - `BAD_ARGUMENT`: a command, goal, option, choice or value that is not valid (exit 5).
+  - `NOT_FOUND`: no such video or job (exit 5).
+  - `BUSY`: the window cannot do that right now (exit 5).
+  - `UNKNOWN_METHOD`: the open window is of another version and does not know the request (exit 5).
+  - `FFMPEG_MISSING`: the window could not find FFmpeg and shows what to do (exit 6).
+  - `UNAUTHORIZED`: the window is open but refused the connection or did not answer; no other window is started (exit 2).
+  - `NOT_RUNNING`: the window is not open and could not be opened (exit 2).
+  - `APP_CLOSED`: the window closed meanwhile (exit 4).
+  - `TIMEOUT`: `--timeout` passed; the jobs go on in the window (exit 3).
+  - `UNEXPECTED`: the client itself went wrong; the message says how (exit 5).
 - Start the window before running commands side by side: two commands started at the same moment with no window open can each open one. Any command but `status`, `manual` and `help` opens it, for example `vidctrl-client queue`; then run `vidctrl-client events` in the background beside the others.
 
 ### `vidctrl-client add <paths…>`
@@ -84,10 +84,10 @@ Video 3: Cannot be read: not a video FFmpeg can open. /home/alice/Videos/notes.m
 Nothing found at /home/alice/Videos/missing.mov: no file, nor a folder with videos.
 ```
 
-With `--json`: `videos` (list): for each video found, and each path where nothing was, `path` (string), `id` (int, optional: absent when nothing was found) and `result` (string): `added`, `known` (in the list already), `unreadable` (in the list, but not a video FFmpeg can open) or `notFound`.
+With `--json`: `videos` (list): for each video found, and each path where nothing was, `path` (string), `id` (int, optional: absent when nothing was found) and `result` (string): `ADDED`, `KNOWN` (in the list already), `UNREADABLE` (in the list, but not a video FFmpeg can open) or `NOT_FOUND`; see "Adding".
 
 ```json
-{"videos":[{"path":"/home/alice/Videos/beach.mov","id":0,"result":"added"},{"path":"/home/alice/Videos/party.mov","id":1,"result":"known"},{"path":"/home/alice/Videos/notes.mov","id":3,"result":"unreadable"},{"path":"/home/alice/Videos/missing.mov","result":"notFound"}]}
+{"videos":[{"path":"/home/alice/Videos/beach.mov","id":0,"result":"ADDED"},{"path":"/home/alice/Videos/party.mov","id":1,"result":"KNOWN"},{"path":"/home/alice/Videos/notes.mov","id":3,"result":"UNREADABLE"},{"path":"/home/alice/Videos/missing.mov","result":"NOT_FOUND"}]}
 ```
 
 Errors:
@@ -123,7 +123,7 @@ Video 0: Ready. /home/alice/Videos/beach.mov
 With `--json`: `videos` (list of Video), in the order of the list; with `--goal`, each readable one has a `preview` (Preview).
 
 ```json
-{"videos":[{"id":0,"path":"/home/alice/Videos/beach.mov","status":"ready","statusText":"Ready","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false,"preview":{"goal":"archive.master","plan":"encode","planText":"Converted","expectedBytes":610000000,"measured":true,"measuring":false,"closeness":"same","closenessText":"Looks the same as the original"}}]}
+{"videos":[{"id":0,"path":"/home/alice/Videos/beach.mov","status":"READY","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false,"preview":{"goal":"archive.master","plan":"ENCODE","expectedBytes":610000000,"measured":true,"measuring":false,"closeness":"SAME"}}]}
 ```
 
 Errors:
@@ -171,12 +171,12 @@ File:
 With `--json`: `info` (Video): the video; for a job, its result, with the `id` of the video it was made from. `details` (list): for each track and the file, `title` (string) and `rows` (list of [label, value], both strings). With `--raw`, `raw` (object) instead of `details`: ffprobe's report as it gave it.
 
 ```json
-{"info":{"id":0,"path":"/home/alice/Videos/beach.mov","status":"ready","statusText":"Ready","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false},"details":[{"title":"Video track 1","rows":[["Codec","H.265 / HEVC (High Efficiency Video Coding) · Main 10 · level 5.1"],["Resolution","3840×2160"],["Frame rate","25 fps (25/1)"],["Bit depth","10-bit"],["Chroma subsampling","4:2:0"]]},{"title":"Audio track 1","rows":[["Codec","AAC (Advanced Audio Coding) · LC"],["Channels","2 (stereo)"],["Sample rate","48 kHz"]]},{"title":"File","rows":[["Container","QuickTime / MOV"],["Size","4.20 GB"]]}]}
+{"info":{"id":0,"path":"/home/alice/Videos/beach.mov","status":"READY","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false},"details":[{"title":"Video track 1","rows":[["Codec","H.265 / HEVC (High Efficiency Video Coding) · Main 10 · level 5.1"],["Resolution","3840×2160"],["Frame rate","25 fps (25/1)"],["Bit depth","10-bit"],["Chroma subsampling","4:2:0"]]},{"title":"Audio track 1","rows":[["Codec","AAC (Advanced Audio Coding) · LC"],["Channels","2 (stereo)"],["Sample rate","48 kHz"]]},{"title":"File","rows":[["Container","QuickTime / MOV"],["Size","4.20 GB"]]}]}
 ```
 
 Errors:
 
-- A video that is not in the list, a job that is not done, or a result that cannot be read where it was written: exit 5 (`notFound`). A video FFmpeg cannot open: exit 5.
+- A video that is not in the list, a job that is not done, or a result that cannot be read where it was written: exit 5 (`NOT_FOUND`). A video FFmpeg cannot open: exit 5.
 
 ### `vidctrl-client estimate <videos…>`
 
@@ -208,12 +208,12 @@ Video 0: Ready. /home/alice/Videos/beach.mov
 With `--json`: `videos` (list of Video), as given, each that could be read with its `preview` (Preview) for the goal.
 
 ```json
-{"videos":[{"id":0,"path":"/home/alice/Videos/beach.mov","status":"ready","statusText":"Ready","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false,"preview":{"goal":"archive.master","plan":"encode","planText":"Converted","expectedBytes":610000000,"measured":true,"measuring":false,"closeness":"same","closenessText":"Looks the same as the original"}}]}
+{"videos":[{"id":0,"path":"/home/alice/Videos/beach.mov","status":"READY","sizeBytes":4200000000,"durationSeconds":754.2,"width":3840,"height":2160,"videoCodec":"hevc","audioCodecs":["aac"],"hdr":false,"preview":{"goal":"archive.master","plan":"ENCODE","expectedBytes":610000000,"measured":true,"measuring":false,"closeness":"SAME"}}]}
 ```
 
 Errors:
 
-- While the queue converts, or when converting starts before it has measured them all: `busy`, exit 5 ("Videos are being converted; the window measures when the queue is idle."). Measure before queuing, or after `vidctrl-client wait`.
+- While the queue converts, or when converting starts before it has measured them all: `BUSY`, exit 5 ("Videos are being converted; the window measures when the queue is idle."). Measure before queuing, or after `vidctrl-client wait`.
 - A video that is not in the list (`vidctrl-client add` it first), one FFmpeg cannot open, or an unknown goal, option or choice: exit 5.
 
 ### `vidctrl-client remove <videos…>`
@@ -309,10 +309,10 @@ Video 0: In the queue already, with this goal and folder.
 Not queued, video 3: it cannot be read.
 ```
 
-With `--json`: `goal` (string): the goal's id; `options` (object): every option of the goal and the choice made on this computer, as in Job; `added` (list of Job): the new jobs; `alreadyQueued` (list of int): the videos that were queued already; `skipped` (list): `video` (int or string, as given) and `reason` (string: `unreadable` or `notFound`).
+With `--json`: `goal` (string): the goal's id; `options` (object): every option of the goal and the choice made on this computer, as in Job; `added` (list of Job): the new jobs; `alreadyQueued` (list of int): the videos that were queued already; `skipped` (list): `video` (int or string, as given) and `reason` (string: `UNREADABLE` or `NOT_FOUND`).
 
 ```json
-{"goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"added":[{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"waiting","statusText":"Waiting","needsALook":false,"errorLines":[]}],"alreadyQueued":[0],"skipped":[{"video":3,"reason":"unreadable"}]}
+{"goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"added":[{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","needsALook":false,"errorLines":[]}],"alreadyQueued":[0],"skipped":[{"video":3,"reason":"UNREADABLE"}]}
 ```
 
 Errors:
@@ -399,7 +399,7 @@ Job 2: Queued again. /home/alice/Videos/dog.mp4
 With `--json`: `job` (Job): the job, waiting again.
 
 ```json
-{"job":{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"waiting","statusText":"Waiting","needsALook":false,"errorLines":[]}}
+{"job":{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","needsALook":false,"errorLines":[]}}
 ```
 
 Errors:
@@ -434,7 +434,7 @@ With `--json`: `removed` (list of int): the jobs taken out; empty when none had 
 
 Converts a video kept as it is, as "Convert anyway" does.
 
-For a job that ended `skipped` with the outcome `notWorthIt`: Archive found that converting would hardly make the file smaller. A new job converts it all the same, at the quality found for it, with the same goal, options and folder. Ask the person first: the result is nearly as large as the original.
+For a job that ended `SKIPPED` with the outcome `NOT_WORTH_IT`: Archive found that converting would hardly make the file smaller. A new job converts it all the same, at the quality found for it, with the same goal, options and folder. Ask the person first: the result is nearly as large as the original.
 
 Example:
 
@@ -451,7 +451,7 @@ Job 4: Queued. /home/alice/Videos/trip.mov
 With `--json`: `added` (list of Job): the new job, or none when a job just like it is waiting or under way already; `alreadyQueued` (bool): that is so.
 
 ```json
-{"added":[{"id":4,"videoId":3,"path":"/home/alice/Videos/trip.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"waiting","statusText":"Waiting","needsALook":false,"errorLines":[]}],"alreadyQueued":false}
+{"added":[{"id":4,"videoId":3,"path":"/home/alice/Videos/trip.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","needsALook":false,"errorLines":[]}],"alreadyQueued":false}
 ```
 
 Errors:
@@ -534,7 +534,7 @@ With `--json`: `paused` (bool): false.
 
 Cancels the job under way, as its cancel button does.
 
-It answers once the job has stopped; the queue goes on with the next one. The job stays in the queue as `cancelled`; no result is written for it, and the original stays as it is. `vidctrl-client queue retry <job>` tries it again.
+It answers once the job has stopped; the queue goes on with the next one. The job stays in the queue as `CANCELLED`; no result is written for it, and the original stays as it is. `vidctrl-client queue retry <job>` tries it again.
 
 With a job id, only if that job is the one converting, so that another is not cancelled by mistake. A waiting job is taken out of the queue with `vidctrl-client queue remove <job>` instead.
 
@@ -571,7 +571,7 @@ Errors:
 
 One job, as its row and (i) window show it.
 
-Its status, goal and options, its result and size once done, and how its quality was chosen: the outcome and the scores of the poorest piece. A job worth a look by eye (`needsALook`, the outcome `belowTarget`) has a name ending in `-check`: tell the person to look at it beside the original.
+Its status, goal and options, its result and size once done, and how its quality was chosen: the outcome and the scores of the poorest piece. A job worth a look by eye (`needsALook`, the outcome `BELOW_TARGET`) has a name ending in `-check`: tell the person to look at it beside the original.
 
 With `--command`, what "Show the command" in its ⋯ menu shows: the FFmpeg command VidCtrl runs for it, for this system's terminal (PowerShell on Windows). It is for the person to read: do not run it, the window converts. For an Archive job whose quality is not chosen yet, its quality number may still change.
 
@@ -601,7 +601,7 @@ The command, as "Show the command" in the window gives it:
 With `--json`: `job` (Job); `command` (string, optional): with `--command`, left out for a job that runs nothing (one that ended skipped or is kept as it is).
 
 ```json
-{"job":{"id":1,"videoId":1,"path":"/home/alice/Videos/party.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"done","statusText":"Done","outputPath":"/home/alice/Videos/Converted/party_av1-crf20-check.mp4","outputBytes":2100000000,"quality":{"outcome":"belowTarget","outcomeText":"Worth a look by eye: even the best quality falls a little short somewhere","value":20,"standardValue":35,"vmaf":93.8,"xpsnr":40.2,"share":0.52},"needsALook":true,"errorLines":[]},"command":"ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -svtav1-params tune=0:enable-variance-boost=1:enable-qm=1:qm-min=0:keyint=10s:scd=1 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -metadata major_brand= -metadata minor_version= -metadata compatible_brands= -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4"}
+{"job":{"id":1,"videoId":1,"path":"/home/alice/Videos/party.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"DONE","outputPath":"/home/alice/Videos/Converted/party_av1-crf20-check.mp4","outputBytes":2100000000,"quality":{"outcome":"BELOW_TARGET","value":20,"standardValue":35,"vmaf":93.8,"xpsnr":40.2,"share":0.52},"needsALook":true,"errorLines":[]},"command":"ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -svtav1-params tune=0:enable-variance-boost=1:enable-qm=1:qm-min=0:keyint=10s:scd=1 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -metadata major_brand= -metadata minor_version= -metadata compatible_brands= -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4"}
 ```
 
 Errors:
@@ -618,7 +618,7 @@ Offered only where each frame of the result stands for one of the original: not 
 
 Options:
 
-- `--no-wait`: answer at once; the `compare-finished` event (`vidctrl-client events`) tells the result.
+- `--no-wait`: answer at once; the `COMPARE_FINISHED` event (`vidctrl-client events`) tells the result.
 
 Examples:
 
@@ -636,23 +636,23 @@ Job 1: Compared with the original. Very close to the original (VMAF 94.1; XPSNR 
 Job 1: Comparing with the original; `vidctrl-client compare 1` waits for the result.
 ```
 
-With `--json`: `job` (int); `status` (string): `measured`; `closeness` (string, see "Closeness") and `closenessText` (string) in words; `xpsnr` (number, in dB); `vmaf` (number, optional: where this FFmpeg measures it). With `--no-wait`, `{"started": true}`.
+With `--json`: `job` (int); `status` (string): `MEASURED`; `closeness` (string, see "Closeness"); `xpsnr` (number, in dB); `vmaf` (number, optional: where this FFmpeg measures it). With `--no-wait`, `{"started": true}`.
 
 ```json
-{"job":1,"status":"measured","closeness":"veryClose","closenessText":"Very close to the original","xpsnr":40.6,"vmaf":94.1}
+{"job":1,"status":"MEASURED","closeness":"VERY_CLOSE","xpsnr":40.6,"vmaf":94.1}
 ```
 
 Errors:
 
 - A job that is not done, or whose frames do not pair with the original's, or an FFmpeg without the `xpsnr` filter: exit 5, saying why.
-- Another job being compared: `busy`, exit 5; ask again once it has ended.
+- Another job being compared: `BUSY`, exit 5; ask again once it has ended.
 - The comparison failed (exit 5, with FFmpeg's words), or was stopped in the window (exit 5).
 
 ### `vidctrl-client status`
 
 Whether VidCtrl is open, and how its queue stands.
 
-It never opens the window. A window that has just opened is `starting` while it looks for FFmpeg, then `ready`, or `ffmpegMissing` when it found none.
+It never opens the window. A window that has just opened is `STARTING` while it looks for FFmpeg, then `READY`, or `FFMPEG_MISSING` when it found none.
 
 Examples:
 
@@ -674,7 +674,7 @@ VidCtrl is not running.
 With `--json`: `{"running": false}` when the window is not open; otherwise `running` (bool, true) and a Status.
 
 ```json
-{"running":true,"state":"ready","version":"1.2.0","busy":true,"paused":false,"jobs":{"done":1,"running":1,"waiting":1}}
+{"running":true,"state":"READY","version":"1.2.0","busy":true,"paused":false,"jobs":{"DONE":1,"RUNNING":1,"WAITING":1}}
 ```
 
 ### `vidctrl-client wait [jobs…]`
@@ -711,7 +711,7 @@ All done.
 With `--json`: `outcomes` (list of Outcome), once all have ended; nothing is printed before.
 
 ```json
-{"outcomes":[{"jobId":0,"path":"/home/alice/Videos/beach.mov","status":"done","statusText":"Done","outputPath":"/home/alice/Videos/Converted/beach_av1-crf35.mp4","needsALook":false},{"jobId":1,"path":"/home/alice/Videos/party.mov","status":"done","statusText":"Done","outputPath":"/home/alice/Videos/Converted/party_av1-crf20-check.mp4","needsALook":true}]}
+{"outcomes":[{"jobId":0,"path":"/home/alice/Videos/beach.mov","status":"DONE","outputPath":"/home/alice/Videos/Converted/beach_av1-crf35.mp4","needsALook":false},{"jobId":1,"path":"/home/alice/Videos/party.mov","status":"DONE","outputPath":"/home/alice/Videos/Converted/party_av1-crf20-check.mp4","needsALook":true}]}
 ```
 
 Errors:
@@ -722,11 +722,11 @@ Errors:
 
 Tells what happens in the window, as it happens.
 
-It goes on until the window closes, then exits 4: stop it yourself when you no longer need it. First it tells how everything stands (`snapshot`), so nothing is missed by starting late. The events are listed under "Waiting and events".
+It goes on until the window closes, then exits 4: stop it yourself when you no longer need it. First it tells how everything stands (`SNAPSHOT`), so nothing is missed by starting late. The events are listed under "Waiting and events".
 
 Options:
 
-- `--since-now`: leave out the `snapshot`; only what happens from now on.
+- `--since-now`: leave out the `SNAPSHOT`; only what happens from now on.
 
 Example:
 
@@ -745,10 +745,10 @@ Job 0: Done. /home/alice/Videos/beach.mov
 The queue has nothing more to do.
 ```
 
-With `--json`: one JSON object per line: `event` (string), `time` (string, UTC, ISO 8601; not on `app-closing`) and the event's fields.
+With `--json`: one JSON object per line: `event` (string, the event's code), `time` (string, UTC, ISO 8601; not on `APP_CLOSING`) and the event's fields.
 
 ```json
-{"event":"job-progress","time":"2026-10-23T14:05:09.120Z","job":1,"fraction":0.42,"remainingSeconds":1260.0}
+{"event":"JOB_PROGRESS","time":"2026-10-23T14:05:09.120Z","job":1,"fraction":0.42,"remainingSeconds":1260.0}
 ```
 
 ### `vidctrl-client goals`
@@ -798,7 +798,7 @@ It prints, for example:
 …
 ```
 
-With `--json`: the same as data: `commands` (list: `name`, `arguments`, `description`, `options`), `goals` (list: like Goal, with `goal`, the name `--goal` takes, and a `hint` for each goal and option), `exitCodes` (object: code to meaning) and `events` (list: `name`, `fields`, `description`).
+With `--json`: the same as data: `commands` (list: `name`, `arguments`, `description`, `options`), `goals` (list: like Goal, with `goal`, the name `--goal` takes, and a `hint` for each goal and option), `exitCodes` (object: code to meaning), `events` (list: `name`, `fields`, `description`) and `codes` (object: for each kind of code, as "What the results mean" lists them, a list of `code` and `description`).
 
 ### `vidctrl-client help [command]`
 
@@ -829,11 +829,11 @@ The shapes the answers and events are made of. Each field is named with its JSON
 
 How the window stands.
 
-- `state` (string): `starting`, `ready` or `ffmpegMissing`.
+- `state` (string): `STARTING`, `READY` or `FFMPEG_MISSING`, see "Window states".
 - `version` (string): VidCtrl's version; empty in a development build.
 - `busy` (bool): the queue is working through jobs.
 - `paused` (bool): the queue is paused in the window.
-- `jobs` (object): how many jobs there are in each status, as `{"waiting": 2, "done": 1}`.
+- `jobs` (object): how many jobs there are in each status, by its code, as `{"WAITING": 2, "DONE": 1}`.
 
 #### Goal
 
@@ -869,7 +869,7 @@ A video in the window's list.
 
 - `id` (int).
 - `path` (string): the file, absolute.
-- `status` (string): `probing` (being read), `ready` or `unreadable`; `statusText` (string) in words.
+- `status` (string): `PROBING`, `READY` or `UNREADABLE`, see "Video statuses".
 - `sizeBytes` (int, optional).
 - `durationSeconds` (number, optional).
 - `width` (int, optional), `height` (int, optional): the picture.
@@ -883,11 +883,11 @@ A video in the window's list.
 What a goal would do to a video, as the list shows it.
 
 - `goal` (string): the goal's full id.
-- `plan` (string): what it would do, see "Plans"; `planText` (string) in words.
+- `plan` (string): what it would do, see "Plans".
 - `expectedBytes` (int, optional): the result's expected size.
 - `measured` (bool): the size was measured by encoding pieces, not calculated.
 - `measuring` (bool): the window is measuring it now.
-- `closeness` (string, optional): how close the result would look, see "Closeness"; `closenessText` (string) in words.
+- `closeness` (string, optional): how close the result would look, see "Closeness".
 
 #### Job
 
@@ -898,22 +898,22 @@ A job in the queue.
 - `path` (string): that video's file.
 - `goal` (string): the goal's full id.
 - `options` (object): every option of the goal and the choice it really makes on this computer: `speed` is `cpu` where the graphics card cannot encode that format. Tell the person these, not what was asked.
-- `sample` (string, optional): `start` or `middle` for a sample.
-- `status` (string): see "Job statuses"; `statusText` (string) in words.
+- `sample` (string, optional): `START` or `MIDDLE` for a sample, see "Samples".
+- `status` (string): see "Job statuses".
 - `fraction` (number, optional): how far it is, 0 to 1, while converting.
 - `remainingSeconds` (number, optional): the time left, while converting.
 - `attempt` (int, optional): while choosing the quality, which try this is.
-- `outputPath` (string, optional): where the result goes, once known; the result is there once the job is `done`.
+- `outputPath` (string, optional): where the result goes, once known; the result is there once the job is `DONE`.
 - `outputBytes` (int, optional): the result's size, once done.
 - `quality` (Quality, optional): how its quality was chosen.
-- `needsALook` (bool): worth a look by eye, see `belowTarget`.
+- `needsALook` (bool): worth a look by eye, see `BELOW_TARGET`.
 - `errorLines` (list of string): why it failed, in FFmpeg's last words.
 
 #### Quality
 
 How a job's quality was chosen: Archive measures each video before converting it and compares pieces of the result with the original.
 
-- `outcome` (string): see "Quality outcomes"; `outcomeText` (string) in words.
+- `outcome` (string): see "Quality outcomes".
 - `value` (int, optional): the quality number chosen (lower is better).
 - `standardValue` (int, optional): the goal's usual number.
 - `vmaf` (number, optional): VMAF of the poorest piece; 95 and more looks the same.
@@ -926,13 +926,13 @@ How a job ended, as `wait` tells it.
 
 - `jobId` (int).
 - `path` (string): the video's file.
-- `status` (string): `done`, `skipped`, `failed`, `cancelled` or `removed`; `statusText` (string) in words.
+- `status` (string): `DONE`, `SKIPPED`, `FAILED`, `CANCELLED` or `REMOVED`, see "Job statuses".
 - `outputPath` (string, optional): the result, when done.
-- `needsALook` (bool): worth a look by eye, see `belowTarget`.
+- `needsALook` (bool): worth a look by eye, see `BELOW_TARGET`.
 
 ## Goals
 
-Each goal, by the name `--goal` takes, with its options and their choices. The full id (as `archive.master`) is taken too. An option is offered only where it makes a difference on this computer: `vidctrl-client goals` shows which are here; another is taken only with the choice the goal makes here anyway. A file with no picture is `unsupported` by every goal but "Get the sound" and "Remove personal data".
+Each goal, by the name `--goal` takes, with its options and their choices. The full id (as `archive.master`) is taken too. An option is offered only where it makes a difference on this computer: `vidctrl-client goals` shows which are here; another is taken only with the choice the goal makes here anyway. A file with no picture is `UNSUPPORTED` by every goal but "Get the sound" and "Remove personal data".
 
 ### Archive, no quality loss: `--goal archive`
 
@@ -940,7 +940,7 @@ Full id: `archive.master`.
 
 Camera videos take far less space and look the same as the originals. Dates, camera details, sound and colours are kept.
 
-Every video is converted, its quality chosen by measuring (see "Quality outcomes"). One whose result would keep over 80% of the original's size is kept as it is: its job ends `skipped` with the outcome `notWorthIt`. A sample is made all the same.
+Every video is converted, its quality chosen by measuring (see "Quality outcomes"). One whose result would keep over 80% of the original's size is kept as it is: its job ends `SKIPPED` with the outcome `NOT_WORTH_IT`. A sample is made all the same.
 
 - `--opt codec=…`: Format.
   - `av1`: Smallest file (the default). Plays on computers (Macs from M1) and newer devices: iPhone 15 Pro and later, TVs from about 2020.
@@ -964,7 +964,7 @@ It has no options.
 
 Makes videos open with picture and sound in Resolve on Linux. Usually only the sound needs fixing, which takes seconds.
 
-A video Resolve already opens is left as it is (plan `skip`); often only the sound needs converting (`audioOnly`).
+A video Resolve already opens is left as it is (plan `SKIP`); often only the sound needs converting (`AUDIO_ONLY`).
 
 - `--opt convertVideo=…`: Also convert the picture. Turn on if videos play choppily, as they can without an NVIDIA graphics card.
   - `no` (the default).
@@ -984,7 +984,7 @@ A video Resolve already opens is left as it is (plan `skip`); often only the sou
 
 Makes videos open with picture and sound in Resolve on Linux. The picture is converted too. Files become much larger.
 
-A video Resolve already opens is left as it is (plan `skip`); often only the sound needs converting (`audioOnly`).
+A video Resolve already opens is left as it is (plan `SKIP`); often only the sound needs converting (`AUDIO_ONLY`).
 
 - `--opt quality=…`: File size.
   - `smallest`.
@@ -1002,7 +1002,7 @@ Full id: `audio.extract`.
 
 Saves the sound of a video as a separate file.
 
-Takes the first sound track; a video without sound is `unsupported`. Sound that fits the file type is copied as it is.
+Takes the first sound track; a video without sound is `UNSUPPORTED`. Sound that fits the file type is copied as it is.
 
 - `--opt format=…`: File type.
   - `original`: As it is (the default).
@@ -1017,7 +1017,7 @@ Full id: `privacy.clean`.
 
 Removes the hidden notes about place, date, camera and author before you share a video. What is seen and heard stays the same.
 
-Each result is a new copy without the hidden notes; the original stays as it is. `quick` copies picture and sound as they are (`remux`), `thorough` converts them again (`encode`). Sound files are taken too.
+Each result is a new copy without the hidden notes; the original stays as it is. `quick` copies picture and sound as they are (`REMUX`), `thorough` converts them again (`ENCODE`). Sound files are taken too.
 
 - `--opt mode=…`: How thoroughly. Thorough rebuilds the picture and sound from scratch. It takes much longer and is the safest.
   - `quick` (the default).
@@ -1029,7 +1029,7 @@ Full id: `remux.container`.
 
 Puts the video into another kind of file in seconds, without touching the picture quality.
 
-A video already of that file type is left as it is (`skip`); sound the new type cannot hold is converted (`audioOnly`); the picture never is.
+A video already of that file type is left as it is (`SKIP`); sound the new type cannot hold is converted (`AUDIO_ONLY`); the picture never is.
 
 - `--opt format=…`: File type.
   - `mp4` (the default).
@@ -1038,52 +1038,87 @@ A video already of that file type is left as it is (`skip`); sound the new type 
 
 ## What the results mean
 
-Each id and its words (the `...Text` fields in JSON), then what to make of it.
+Every code the JSON carries, by where it is found, with what it means and the words the client prints for people. The errors and events are explained under "Commands" and "Events".
 
 ### Job statuses
 
-- `waiting`: Waiting. In the queue, its turn not come yet.
-- `running`: Converting. Being converted now, or its quality being chosen (`attempt`).
-- `paused`: Paused. Under way, held because the queue is paused in the window.
-- `done`: Done. The result is at `outputPath`. Tell the person, and say so when `needsALook` is true. `compare <job>` says how close it looks to the original.
-- `skipped`: Nothing to do. Nothing was written: the video already met the goal, the goal can do nothing with it (plan `unsupported`), or converting would hardly make it smaller (outcome `notWorthIt`). Counts as finished, not as a failure.
-- `failed`: Failed. It could not be converted; `errorLines` says why. The person can try it again in the window, as `queue retry <job>` does.
-- `cancelled`: Cancelled. Stopped before it was done, in the window or by `cancel`. `wait` counts it as a failure; `queue retry <job>` tries it again.
-- `removed`: Taken out of the queue (the file stays on disk). Only in `wait`, for a job taken out of the queue while it waited. Not a failure.
+A job's state (Job and Outcome `status`, the keys of Status `jobs`):
+
+- `WAITING`: Waiting. In the queue, its turn not come yet.
+- `RUNNING`: Converting. Being converted now, or its quality being chosen (`attempt`).
+- `PAUSED`: Paused. Under way, held because the queue is paused in the window.
+- `DONE`: Done. The result is at `outputPath`. Tell the person, and say so when `needsALook` is true. `compare <job>` says how close it looks to the original.
+- `SKIPPED`: Nothing to do. Nothing was written: the video already met the goal, the goal can do nothing with it (plan `UNSUPPORTED`), or converting would hardly make it smaller (outcome `NOT_WORTH_IT`). Counts as finished, not as a failure.
+- `FAILED`: Failed. It could not be converted; `errorLines` says why. The person can try it again in the window, as `queue retry <job>` does.
+- `CANCELLED`: Cancelled. Stopped before it was done, in the window or by `cancel`. `wait` counts it as a failure; `queue retry <job>` tries it again.
+- `REMOVED`: Taken out of the queue (the file stays on disk). Only in `wait`, for a job taken out of the queue while it waited. Not a failure.
 
 ### Video statuses
 
-- `probing`: Being read.
-- `ready`: Read; it can be queued.
-- `unreadable`: Not a video FFmpeg can open; it cannot be queued.
+A video in the list (Video `status`):
+
+- `PROBING`: Being read. VidCtrl is learning its size, length, picture and sound.
+- `READY`: Ready. It can be queued.
+- `UNREADABLE`: Cannot be read: not a video FFmpeg can open. It cannot be queued.
 
 ### Plans
 
 What a goal would do to a video (Preview `plan`):
 
-- `skip`: Already fine: nothing to do. Queued, the job ends `skipped` and writes no file.
-- `remux`: Copied into a new file type, untouched. Quick: the picture and sound are copied.
-- `audioOnly`: Only the sound is converted. Quick: the picture is copied.
-- `encode`: Converted. The picture is converted: this takes time.
-- `unsupported`: This goal cannot do anything with it. For example, a goal for pictures given a sound file. Queued, the job ends `skipped`.
-- `keptAsIs`: Kept as it is: converting would hardly make it smaller. Archive only; the job ends `skipped`.
+- `SKIP`: Already fine: nothing to do. Queued, the job ends `SKIPPED` and writes no file.
+- `REMUX`: Copied into a new file type, untouched. Quick: the picture and sound are copied.
+- `AUDIO_ONLY`: Only the sound is converted. Quick: the picture is copied.
+- `ENCODE`: Converted. The picture is converted: this takes time.
+- `UNSUPPORTED`: This goal cannot do anything with it. For example, a goal for pictures given a sound file. Queued, the job ends `SKIPPED`.
+- `KEPT_AS_IS`: Kept as it is: converting would hardly make it smaller. Archive only; the job ends `SKIPPED`.
 
 ### Closeness
 
-How close a result looks to its original (Preview `closeness`):
+How close a result looks to its original (Preview `closeness`, and `compare`):
 
-- `same`: Looks the same as the original. VMAF 95 or more on the poorest piece.
-- `veryClose`: Very close to the original. VMAF 93 or more.
-- `differs`: Differences may be visible. Below that: worth a look.
+- `SAME`: Looks the same as the original. VMAF 95 or more on the poorest piece.
+- `VERY_CLOSE`: Very close to the original. VMAF 93 or more.
+- `DIFFERS`: Differences may be visible. Below that: worth a look.
 
 ### Quality outcomes
 
 How a job's quality was chosen (Quality `outcome`):
 
-- `standard`: Usual quality. The goal's usual quality was enough to look the same.
-- `raised`: Raised quality: needed to look the same. A better quality than usual was needed, and the file is larger for it.
-- `belowTarget`: Worth a look by eye: even the best quality falls a little short somewhere. Converted anyway, and the result's name ends in `-check`. Tell the person to look at it by eye beside the original. The job is `done` and `needsALook` is true; `wait` still exits 0.
-- `notWorthIt`: Kept as it is: converting would hardly make it smaller. The job ends `skipped` and nothing is written. In the window, "Convert anyway" in the job's ⋯ menu converts it all the same, as `queue convert-anyway <job>` does.
+- `STANDARD`: Usual quality. The goal's usual quality was enough to look the same.
+- `RAISED`: Raised quality: needed to look the same. A better quality than usual was needed, and the file is larger for it.
+- `BELOW_TARGET`: Worth a look by eye: even the best quality falls a little short somewhere. Converted anyway, and the result's name ends in `-check`. Tell the person to look at it by eye beside the original. The job is `DONE` and `needsALook` is true; `wait` still exits 0.
+- `NOT_WORTH_IT`: Kept as it is: converting would hardly make it smaller. The job ends `SKIPPED` and nothing is written. In the window, "Convert anyway" in the job's ⋯ menu converts it all the same, as `queue convert-anyway <job>` does.
+
+### Window states
+
+How the window stands (Status `state`):
+
+- `STARTING`: The window has just opened and looks for FFmpeg.
+- `READY`: Open and ready.
+- `FFMPEG_MISSING`: Open, but it found no FFmpeg; the window says what to do. Every command but `status` fails with `FFMPEG_MISSING`.
+
+### Adding
+
+What adding a path gave (`add`'s `result`), and why `queue add` skipped a video (`skipped[].reason`: `NOT_FOUND` or `UNREADABLE`):
+
+- `ADDED`: Added to the list now.
+- `KNOWN`: In the list already; not added twice.
+- `NOT_FOUND`: No file there, nor a folder with videos. As a `skipped` reason of `queue add`: nothing found there, or the video was taken off the list meanwhile.
+- `UNREADABLE`: In the list, but not a video FFmpeg can open; it cannot be queued.
+
+### Samples
+
+Where a sample is taken from (Job `sample`):
+
+- `START`: Ten seconds from the start (`--sample start`).
+- `MIDDLE`: Ten seconds from the middle (`--sample middle`).
+
+### Comparisons
+
+How a comparison ended (`compare`'s and `COMPARE_FINISHED`'s `status`):
+
+- `MEASURED`: Compared: `closeness`, `xpsnr` and, where measured, `vmaf` say how close.
+- `FAILED`: Only in `COMPARE_FINISHED`: it could not be compared; `errorLines` says why. `compare` exits 5 instead.
 
 ## Waiting and events
 
@@ -1092,7 +1127,7 @@ How a job's quality was chosen (Quality `outcome`):
 - `vidctrl-client wait` without ids waits until no job is waiting, converting or paused; with ids, until those have ended.
 - The jobs it counts are those not yet ended when it starts, and any added or tried again while it waits, by this program or the person. Jobs that ended before it started do not count, so an old failure does not make every later `wait` exit 1.
 - With nothing waiting when it starts, it exits 0 at once.
-- A job taken out of the queue while it waits is told as `removed`, not as a failure; one cancelled is a failure.
+- A job taken out of the queue while it waits is told as `REMOVED`, not as a failure; one cancelled is a failure.
 - A paused queue keeps it waiting, as the person may continue it; it says so once on stderr.
 - It may run for hours: run it in the background and tell the person when it returns.
 
@@ -1112,26 +1147,26 @@ The same for every command:
 
 ### Events
 
-`vidctrl-client events` tells these, each with `event` and, but on `app-closing`, `time`:
+`vidctrl-client events` tells these, each with `event`, its code, and, but on `APP_CLOSING`, `time`:
 
 | Event | Fields | Meaning |
 |---|---|---|
-| `snapshot` | `videos` (list of Video), `jobs` (list of Job), `paused` (bool), `busy` (bool) | How everything stands; first, unless `--since-now`. |
-| `video-added` | a Video | A video came into the list. |
-| `video-ready` | a Video | It has been read. |
-| `video-unreadable` | a Video | It is not a video FFmpeg can open. |
-| `video-removed` | `video` (int) | It was taken off the list; its file stays on disk. |
-| `job-added` | a Job | A job came into the queue. |
-| `job-checking` | `job` (int), `attempt` (int) | Choosing its quality: this try. |
-| `job-started` | a Job | Converting it begins. |
-| `job-progress` | `job` (int), `fraction` (number, 0 to 1), `remainingSeconds` (number, optional) | How far it is; at most once a second for each job. |
-| `job-finished` | a Job | It ended: `done`, `skipped`, `failed` or `cancelled`. |
-| `job-removed` | `job` (int) | It was taken out of the queue; any result stays on disk. |
-| `queue-paused` | none | The queue was paused, in the window or by `pause`. |
-| `queue-resumed` | none | It goes on again. |
-| `queue-idle` | none | The queue has nothing more to do. |
-| `compare-finished` | `job` (int), `status` (`measured` or `failed`), `closeness`, `closenessText`, `vmaf` (optional), `xpsnr`; or `errorLines` | "Compare with the original" ended, in the window or by `compare`. |
-| `app-closing` | none | The window is closing; `events` and `wait` exit 4. |
+| `SNAPSHOT` | `videos` (list of Video), `jobs` (list of Job), `paused` (bool), `busy` (bool) | How everything stands; first, unless `--since-now`. |
+| `VIDEO_ADDED` | a Video | A video came into the list. |
+| `VIDEO_READY` | a Video | It has been read. |
+| `VIDEO_UNREADABLE` | a Video | It is not a video FFmpeg can open. |
+| `VIDEO_REMOVED` | `video` (int) | It was taken off the list; its file stays on disk. |
+| `JOB_ADDED` | a Job | A job came into the queue. |
+| `JOB_CHECKING` | `job` (int), `attempt` (int) | Choosing its quality: this try. |
+| `JOB_STARTED` | a Job | Converting it begins. |
+| `JOB_PROGRESS` | `job` (int), `fraction` (number, 0 to 1), `remainingSeconds` (number, optional) | How far it is; at most once a second for each job. |
+| `JOB_FINISHED` | a Job | It ended: `DONE`, `SKIPPED`, `FAILED` or `CANCELLED`. |
+| `JOB_REMOVED` | `job` (int) | It was taken out of the queue; any result stays on disk. |
+| `QUEUE_PAUSED` | none | The queue was paused, in the window or by `pause`. |
+| `QUEUE_RESUMED` | none | It goes on again. |
+| `QUEUE_IDLE` | none | The queue has nothing more to do. |
+| `COMPARE_FINISHED` | `job` (int), `status` (`MEASURED` or `FAILED`), `closeness`, `vmaf` (optional), `xpsnr`; or `errorLines` | "Compare with the original" ended, in the window or by `compare`. |
+| `APP_CLOSING` | none | The window is closing; `events` and `wait` exit 4. |
 
 ## Recipes
 
@@ -1176,7 +1211,7 @@ vidctrl-client queue                          # opens the window first, if it is
 vidctrl-client events --since-now --json      # in the background
 ```
 
-Read its lines as they come. On each `job-finished`, tell the person about that job: its `status`, `outputPath`, `outputBytes`, `quality.outcome` and `needsALook`. On `queue-idle` the queue has nothing more to do: stop following. On `app-closing` the window closed.
+Read its lines as they come. On each `JOB_FINISHED`, tell the person about that job: its `status`, `outputPath`, `outputBytes`, `quality.outcome` and `needsALook`. On `QUEUE_IDLE` the queue has nothing more to do: stop following. On `APP_CLOSING` the window closed.
 
 ### Make samples first, compare, then convert the whole
 
@@ -1187,7 +1222,7 @@ vidctrl-client compare 0 --json               # each sample job's id from `added
 vidctrl-client compare 1 --json
 ```
 
-Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`. `compare` compares it with the same piece of its original and says how close it looks: `closeness` (`closenessText` in words), with `vmaf` and `xpsnr`. Each comparison takes about as long as the piece lasts, or longer. `vidctrl-client job <job> --json` gives the sample's `quality` too: the quality chosen for the whole video and `share`, its expected size as a share of the original's. Tell the person where the samples are and how close each looks, so they can look at them. Once they agree, convert each whole video with its sample's settings, by the sample jobs' ids:
+Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`. `compare` compares it with the same piece of its original and says how close it looks: `closeness` (see "Closeness"), with `vmaf` and `xpsnr`. Each comparison takes about as long as the piece lasts, or longer. `vidctrl-client job <job> --json` gives the sample's `quality` too: the quality chosen for the whole video and `share`, its expected size as a share of the original's. Tell the person where the samples are and how close each looks, so they can look at them. Once they agree, convert each whole video with its sample's settings, by the sample jobs' ids:
 
 ```sh
 vidctrl-client queue convert-whole 0 --json
@@ -1215,7 +1250,7 @@ vidctrl-client add ~/Videos/trip --json
 vidctrl-client estimate 0 1 2 --goal archive --json      # the ids from `add`
 ```
 
-`estimate` measures each video in turn and answers once all are measured; that takes seconds to a minute or so for each. Each video's `preview` gives the `plan` (`planText` in words), the `expectedBytes` (`measured` when measured by encoding pieces) and the `closeness`; beside its `sizeBytes`, that is how much smaller it would come out. A preview with no `expectedBytes` could not be measured. While the queue converts, `estimate` is refused (`busy`): measure before queuing, or once `vidctrl-client wait` has returned. Later, `vidctrl-client videos --goal archive --json` gives the same again.
+`estimate` measures each video in turn and answers once all are measured; that takes seconds to a minute or so for each. Each video's `preview` gives the `plan` (see "Plans"), the `expectedBytes` (`measured` when measured by encoding pieces) and the `closeness`; beside its `sizeBytes`, that is how much smaller it would come out. A preview with no `expectedBytes` could not be measured. While the queue converts, `estimate` is refused (`BUSY`): measure before queuing, or once `vidctrl-client wait` has returned. Later, `vidctrl-client videos --goal archive --json` gives the same again.
 
 ## Limits
 

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../core/control/codes.dart';
 import '../../core/control/protocol.dart';
 import '../../core/ffmpeg/capabilities.dart';
 import '../../core/output/output_namer.dart';
@@ -187,12 +188,15 @@ bool optionOffered(
   return false;
 }
 
-SampleChoice _sample(Object? sample) => switch (sample) {
-  null => SampleChoice.none,
-  'start' => SampleChoice.start,
-  'middle' => SampleChoice.middle,
-  _ => throw badArgument('"sample" is start or middle, not "$sample".'),
-};
+/// The sample [sample] names by its code; none when it names none.
+SampleChoice _sample(Object? sample) => sample == null
+    ? SampleChoice.none
+    : switch (fromCode(SampleChoice.values, sample)) {
+        final choice? when choice != SampleChoice.none => choice,
+        _ => throw badArgument(
+          '"sample" is ${SampleCodes.all.join(' or ')}, not "$sample".',
+        ),
+      };
 
 /// Where results go: the panel's setting when nothing is asked; `next` for
 /// a folder beside each video (`subfolder` names it, and alone implies

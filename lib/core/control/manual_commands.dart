@@ -9,11 +9,11 @@ import '../scenarios/archive.dart';
 import '../scenarios/registry.dart';
 import '../scenarios/scenario.dart';
 import 'client_text.dart';
+import 'codes.dart';
 import 'manual.dart';
 import 'manual_words.g.dart';
 import 'protocol.dart';
 import 'views.dart';
-import 'words.dart';
 
 // Each command's part of vidctrl-client's manual, with samples of what it
 // prints, made by the client's own words. Nothing here speaks of deleting a
@@ -99,17 +99,17 @@ const _folder = '/home/alice/Videos';
 
 const _preview = GoalPreview(
   goal: 'archive.master',
-  plan: 'encode',
+  plan: PlanCodes.encode,
   expectedBytes: 610000000,
   measured: true,
   measuring: false,
-  closeness: 'same',
+  closeness: ClosenessCodes.same,
 );
 
 const _video = VideoView(
   id: 0,
   path: '$_folder/beach.mov',
-  status: 'ready',
+  status: VideoStatusCodes.ready,
   sizeBytes: 4200000000,
   durationSeconds: 754.2,
   width: 3840,
@@ -127,11 +127,11 @@ const _doneJob = JobView(
   path: '$_folder/beach.mov',
   goal: 'archive.master',
   options: _options,
-  status: 'done',
+  status: JobStatusCodes.done,
   outputPath: '$_folder/Converted/beach_av1-crf35.mp4',
   outputBytes: 598000000,
   quality: QualityView(
-    outcome: 'standard',
+    outcome: OutcomeCodes.standard,
     value: 35,
     standardValue: 35,
     vmaf: 96.4,
@@ -148,12 +148,12 @@ const _runningJob = JobView(
   path: '$_folder/party.mov',
   goal: 'archive.master',
   options: _options,
-  status: 'running',
+  status: JobStatusCodes.running,
   fraction: .42,
   remainingSeconds: 1260,
   outputPath: '$_folder/Converted/party_av1-crf20-check.mp4',
   quality: QualityView(
-    outcome: 'belowTarget',
+    outcome: OutcomeCodes.belowTarget,
     value: 20,
     standardValue: 35,
     vmaf: 93.8,
@@ -170,11 +170,11 @@ const _checkedJob = JobView(
   path: '$_folder/party.mov',
   goal: 'archive.master',
   options: _options,
-  status: 'done',
+  status: JobStatusCodes.done,
   outputPath: '$_folder/Converted/party_av1-crf20-check.mp4',
   outputBytes: 2100000000,
   quality: QualityView(
-    outcome: 'belowTarget',
+    outcome: OutcomeCodes.belowTarget,
     value: 20,
     standardValue: 35,
     vmaf: 93.8,
@@ -191,25 +191,33 @@ const _waitingJob = JobView(
   path: '$_folder/dog.mp4',
   goal: 'archive.master',
   options: _options,
-  status: 'waiting',
+  status: JobStatusCodes.waiting,
   needsALook: false,
   errorLines: [],
 );
 
 const _status = StatusView(
-  state: 'ready',
+  state: StateCodes.ready,
   version: '1.2.0',
   busy: true,
   paused: false,
-  jobs: {'done': 1, 'running': 1, 'waiting': 1},
+  jobs: {
+    JobStatusCodes.done: 1,
+    JobStatusCodes.running: 1,
+    JobStatusCodes.waiting: 1,
+  },
 );
 
 final _addAnswer = {
   'videos': [
-    {'path': '$_folder/beach.mov', 'id': 0, 'result': 'added'},
-    {'path': '$_folder/party.mov', 'id': 1, 'result': 'known'},
-    {'path': '$_folder/notes.mov', 'id': 3, 'result': 'unreadable'},
-    {'path': '$_folder/missing.mov', 'result': 'notFound'},
+    {'path': '$_folder/beach.mov', 'id': 0, 'result': AddResultCodes.added},
+    {'path': '$_folder/party.mov', 'id': 1, 'result': AddResultCodes.known},
+    {
+      'path': '$_folder/notes.mov',
+      'id': 3,
+      'result': AddResultCodes.unreadable,
+    },
+    {'path': '$_folder/missing.mov', 'result': AddResultCodes.notFound},
   ],
 };
 
@@ -219,7 +227,7 @@ final _queueAddAnswer = {
   'added': [_waitingJob.toJson()],
   'alreadyQueued': [0],
   'skipped': [
-    {'video': 3, 'reason': 'unreadable'},
+    {'video': 3, 'reason': AddResultCodes.unreadable},
   ],
 };
 
@@ -230,7 +238,7 @@ const _anotherJob = JobView(
   path: '$_folder/trip.mov',
   goal: 'archive.master',
   options: _options,
-  status: 'waiting',
+  status: JobStatusCodes.waiting,
   needsALook: false,
   errorLines: [],
 );
@@ -245,14 +253,14 @@ final _waitAnswer = {
     const JobOutcome(
       jobId: 0,
       path: '$_folder/beach.mov',
-      status: 'done',
+      status: JobStatusCodes.done,
       outputPath: '$_folder/Converted/beach_av1-crf35.mp4',
       needsALook: false,
     ).toJson(),
     const JobOutcome(
       jobId: 1,
       path: '$_folder/party.mov',
-      status: 'done',
+      status: JobStatusCodes.done,
       outputPath: '$_folder/Converted/party_av1-crf20-check.mp4',
       needsALook: true,
     ).toJson(),
@@ -305,9 +313,8 @@ final _jobAnswer = {'job': _checkedJob.toJson(), 'command': _command};
 
 final _compareAnswer = {
   'job': 1,
-  'status': 'measured',
-  'closeness': 'veryClose',
-  'closenessText': closenessWords('veryClose'),
+  'status': ComparisonCodes.measured,
+  'closeness': ClosenessCodes.veryClose,
   'xpsnr': 40.6,
   'vmaf': 94.1,
 };
@@ -382,9 +389,9 @@ List<CommandDoc> commandDocs(
     json: [
       '`videos` (list): for each video found, and each path where nothing '
           'was, `path` (string), `id` (int, optional: absent when nothing was '
-          'found) and `result` (string): `added`, `known` (in the list '
-          'already), `unreadable` (in the list, but not a video FFmpeg can '
-          'open) or `notFound`.',
+          'found) and `result` (string): `ADDED`, `KNOWN` (in the list '
+          'already), `UNREADABLE` (in the list, but not a video FFmpeg can '
+          'open) or `NOT_FOUND`; see "Adding".',
       ..._jsonBlock(_addAnswer),
     ],
     errors: ['Nothing at all found at the paths given: exit 5.'],
@@ -461,7 +468,7 @@ List<CommandDoc> commandDocs(
     shapes: ['Video'],
     errors: [
       'A video that is not in the list, a job that is not done, or a result '
-          'that cannot be read where it was written: exit 5 (`notFound`). A '
+          'that cannot be read where it was written: exit 5 (`NOT_FOUND`). A '
           'video FFmpeg cannot open: exit 5.',
     ],
   ),
@@ -503,7 +510,7 @@ List<CommandDoc> commandDocs(
     shapes: ['Video', 'Preview'],
     errors: [
       'While the queue converts, or when converting starts before it has '
-          'measured them all: `busy`, exit 5 ("Videos are being converted; '
+          'measured them all: `BUSY`, exit 5 ("Videos are being converted; '
           'the window measures when the queue is idle."). Measure before '
           'queuing, or after `$c wait`.',
       'A video that is not in the list (`$c add` it first), one FFmpeg '
@@ -598,7 +605,7 @@ List<CommandDoc> commandDocs(
           '`added` (list of Job): the new jobs; '
           '`alreadyQueued` (list of int): the videos that were queued '
           'already; `skipped` (list): `video` (int or string, as given) and '
-          '`reason` (string: `unreadable` or `notFound`).',
+          '`reason` (string: `UNREADABLE` or `NOT_FOUND`).',
       ..._jsonBlock(_queueAddAnswer),
     ],
     shapes: ['Job', 'Quality'],
@@ -703,7 +710,7 @@ List<CommandDoc> commandDocs(
     arguments: '<job>',
     summary: 'converts a video kept as it is, as "Convert anyway" does',
     about: [
-      'For a job that ended `skipped` with the outcome `notWorthIt`: Archive '
+      'For a job that ended `SKIPPED` with the outcome `NOT_WORTH_IT`: Archive '
           'found that converting would hardly make the file smaller. A new '
           'job converts it all the same, at the quality found for it, with '
           'the same goal, options and folder. Ask the person first: the '
@@ -789,7 +796,7 @@ List<CommandDoc> commandDocs(
     summary: 'cancels the job under way, as its cancel button does',
     about: [
       'It answers once the job has stopped; the queue goes on with the next '
-          'one. The job stays in the queue as `cancelled`; no result is '
+          'one. The job stays in the queue as `CANCELLED`; no result is '
           'written for it, and the original stays as it is. `$c queue retry '
           '<job>` tries it again.',
       'With a job id, only if that job is the one converting, so that '
@@ -827,7 +834,7 @@ List<CommandDoc> commandDocs(
       'Its status, goal and options, its result and size once done, and how '
           'its quality was chosen: the outcome and the scores of the poorest '
           'piece. A job worth a look by eye (`needsALook`, the outcome '
-          '`belowTarget`) has a name ending in `-check`: tell the person to '
+          '`BELOW_TARGET`) has a name ending in `-check`: tell the person to '
           'look at it beside the original.',
       'With `--command`, what "Show the command" in its ⋯ menu shows: the '
           'FFmpeg command VidCtrl runs for it, for this system\'s terminal '
@@ -869,7 +876,7 @@ List<CommandDoc> commandDocs(
     options: [
       (
         '--no-wait',
-        'answer at once; the `compare-finished` event (`$c events`) tells '
+        'answer at once; the `COMPARE_FINISHED` event (`$c events`) tells '
             'the result.',
       ),
     ],
@@ -881,8 +888,8 @@ List<CommandDoc> commandDocs(
       comparingText(1),
     ],
     json: [
-      '`job` (int); `status` (string): `measured`; `closeness` (string, see '
-          '"Closeness") and `closenessText` (string) in words; `xpsnr` '
+      '`job` (int); `status` (string): `MEASURED`; `closeness` (string, see '
+          '"Closeness"); `xpsnr` '
           '(number, in dB); `vmaf` (number, optional: where this FFmpeg '
           'measures it). With `--no-wait`, `{"started": true}`.',
       ..._jsonBlock(_compareAnswer),
@@ -891,7 +898,7 @@ List<CommandDoc> commandDocs(
       'A job that is not done, or whose frames do not pair with the '
           'original\'s, or an FFmpeg without the `xpsnr` filter: exit 5, '
           'saying why.',
-      'Another job being compared: `busy`, exit 5; ask again once it has '
+      'Another job being compared: `BUSY`, exit 5; ask again once it has '
           'ended.',
       'The comparison failed (exit 5, with FFmpeg\'s words), or was '
           'stopped in the window (exit 5).',
@@ -903,8 +910,8 @@ List<CommandDoc> commandDocs(
     summary: 'whether VidCtrl is open, and how its queue stands',
     about: [
       'It never opens the window. A window that has just opened is '
-          '`starting` while it looks for FFmpeg, then `ready`, or '
-          '`ffmpegMissing` when it found none.',
+          '`STARTING` while it looks for FFmpeg, then `READY`, or '
+          '`FFMPEG_MISSING` when it found none.',
     ],
     examples: ['$c status', '$c status --json'],
     text: [
@@ -962,13 +969,13 @@ List<CommandDoc> commandDocs(
     about: [
       'It goes on until the window closes, then exits 4: stop it yourself '
           'when you no longer need it. First it tells how everything stands '
-          '(`snapshot`), so nothing is missed by starting late. The events '
+          '(`SNAPSHOT`), so nothing is missed by starting late. The events '
           'are listed under "Waiting and events".',
     ],
     options: [
       (
         '--since-now',
-        'leave out the `snapshot`; only what happens from now '
+        'leave out the `SNAPSHOT`; only what happens from now '
             'on.',
       ),
     ],
@@ -984,8 +991,9 @@ List<CommandDoc> commandDocs(
       ...eventText(Events.queueIdle, const {}),
     ],
     json: [
-      'one JSON object per line: `event` (string), `time` (string, UTC, ISO '
-          '8601; not on `app-closing`) and the event\'s fields.',
+      'one JSON object per line: `event` (string, the event\'s code), '
+          '`time` (string, UTC, ISO 8601; not on `APP_CLOSING`) and the '
+          'event\'s fields.',
       '```json',
       jsonEncode({
         'event': Events.jobProgress,
@@ -1024,8 +1032,10 @@ List<CommandDoc> commandDocs(
       'the same as data: `commands` (list: `name`, `arguments`, '
           '`description`, `options`), `goals` (list: like Goal, with `goal`, '
           'the name `--goal` takes, and a `hint` for each goal and option), '
-          '`exitCodes` (object: code to meaning) and `events` (list: `name`, '
-          '`fields`, `description`).',
+          '`exitCodes` (object: code to meaning), `events` (list: `name`, '
+          '`fields`, `description`) and `codes` (object: for each kind of '
+          'code, as "What the results mean" lists them, a list of `code` and '
+          '`description`).',
     ],
   ),
   CommandDoc(

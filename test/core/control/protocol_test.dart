@@ -83,6 +83,53 @@ void main() {
     expect(Methods.videosAdd, 'videos.add');
     expect(Methods.queueClearFinished, 'queue.clearFinished');
     expect(Methods.jobGet, 'job.get');
-    expect(Events.appClosing, 'app-closing');
+  });
+
+  test('an error goes on the wire with its code', () {
+    expect(
+      const ControlError(ControlErrorKind.badArgument, 'no').toRpc().data,
+      {'kind': 'BAD_ARGUMENT'},
+    );
+  });
+
+  test('every event is named by its code', () {
+    expect(
+      [
+        Events.videoAdded,
+        Events.videoReady,
+        Events.videoUnreadable,
+        Events.videoRemoved,
+        Events.jobAdded,
+        Events.jobChecking,
+        Events.jobStarted,
+        Events.jobProgress,
+        Events.jobFinished,
+        Events.jobRemoved,
+        Events.queuePaused,
+        Events.queueResumed,
+        Events.queueIdle,
+        Events.compareFinished,
+        Events.appClosing,
+        Events.snapshot,
+      ],
+      [
+        'VIDEO_ADDED',
+        'VIDEO_READY',
+        'VIDEO_UNREADABLE',
+        'VIDEO_REMOVED',
+        'JOB_ADDED',
+        'JOB_CHECKING',
+        'JOB_STARTED',
+        'JOB_PROGRESS',
+        'JOB_FINISHED',
+        'JOB_REMOVED',
+        'QUEUE_PAUSED',
+        'QUEUE_RESUMED',
+        'QUEUE_IDLE',
+        'COMPARE_FINISHED',
+        'APP_CLOSING',
+        'SNAPSHOT',
+      ],
+    );
   });
 }

@@ -1,9 +1,8 @@
 import 'dart:io' show Platform;
 
-import '../quality/quality_meter.dart' show Closeness;
-import '../quality/quality_search.dart' show QualityOutcome;
 import '../scenarios/registry.dart';
 import '../scenarios/scenario.dart';
+import 'codes.dart';
 import 'manual_commands.dart';
 import 'manual_words.g.dart';
 import 'protocol.dart';
@@ -167,6 +166,13 @@ Map<String, Object?> manualJson({
     for (final (name, fields, meaning) in _events)
       {'name': name, 'fields': fields, 'description': meaning},
   ],
+  'codes': {
+    for (final kind in codeKinds)
+      kind.name: [
+        for (final (code, meaning) in kind.codes)
+          {'code': code, 'description': meaning},
+      ],
+  },
 };
 
 /// A goal as `manual --json` gives it.
@@ -248,10 +254,13 @@ String _commandsPart(String c, Map<String, GoalWords> words) => [
   '- `$c <command> [arguments] [options]`; options may come before or '
       'after the arguments.',
   '- `--json` prints the answer as one JSON document on stdout (`events`: '
-      'one per line). Without it, lines for people. The JSON has ids and '
-      'numbers, and English words beside the ids in fields ending in '
-      '`Text`. A value that is not known is left out, never `null`; only '
-      '`cancel` answers `null`, when nothing was cancelled.',
+      'one per line). Without it, lines for people. The JSON is for '
+      'programs: ids, numbers, paths, and a code in capitals for every '
+      'value that is one of a few (`DONE`, `KEPT_AS_IS`), never words; '
+      '"What the results mean" says what each code means. Goal, option and '
+      'choice ids stay as `--goal` and `--opt` take them (`archive`, '
+      '`speed=fast`). A value that is not known is left out, never `null`; '
+      'only `cancel` answers `null`, when nothing was cancelled.',
   '- `--no-start`: do not open the window when it is not open; exit 2 '
       'instead.',
   '- `--help` prints the command\'s part of this guide.',
@@ -268,9 +277,10 @@ String _commandsPart(String c, Map<String, GoalWords> words) => [
       'goal makes here anyway: `--opt speed=cpu` where the graphics card '
       'cannot encode. A script may name the defaults on every computer.',
   '- Errors go to stderr, as a line for people, or with `--json` as '
-      '`{"error": {"kind": "...", "message": "..."}}`; the exit code tells '
-      'what kind (see "Exit codes"). The kinds:',
-  for (final (kind, meaning) in _errorKinds) '  - `$kind`: $meaning',
+      '`{"error": {"code": "...", "message": "..."}}`: a program reads '
+      '`code`, the `message` is for people. The exit code tells what kind '
+      '(see "Exit codes"). The codes:',
+  for (final (code, meaning) in _errorCodes) '  - `$code`: $meaning',
   '- Start the window before running commands side by side: two commands '
       'started at the same moment with no window open can each open one. '
       'Any command but `status`, `manual` and `help` opens it, for example '
@@ -322,34 +332,40 @@ String _commandSection(String c, CommandDoc doc) => [
   ],
 ].join('\n');
 
-const _errorKinds = [
+final _errorCodes = [
   (
-    'badArgument',
+    ControlErrorKind.badArgument.code,
     'a command, goal, option, choice or value that is not '
         'valid (exit 5).',
   ),
-  ('notFound', 'no such video or job (exit 5).'),
-  ('busy', 'the window cannot do that right now (exit 5).'),
+  (ControlErrorKind.notFound.code, 'no such video or job (exit 5).'),
+  (ControlErrorKind.busy.code, 'the window cannot do that right now (exit 5).'),
   (
-    'unknownMethod',
+    ControlErrorKind.unknownMethod.code,
     'the open window is of another version and does not '
         'know the request (exit 5).',
   ),
   (
-    'ffmpegMissing',
+    ControlErrorKind.ffmpegMissing.code,
     'the window could not find FFmpeg and shows what to do '
         '(exit 6).',
   ),
   (
-    'unauthorized',
+    ControlErrorKind.unauthorized.code,
     'the window is open but refused the connection or did not answer; '
         'no other window is started (exit 2).',
   ),
-  ('notRunning', 'the window is not open and could not be opened (exit 2).'),
-  ('appClosed', 'the window closed meanwhile (exit 4).'),
-  ('timeout', '`--timeout` passed; the jobs go on in the window (exit 3).'),
   (
-    'unexpected',
+    ControlErrorKind.notRunning.code,
+    'the window is not open and could not be opened (exit 2).',
+  ),
+  (ControlErrorKind.appClosed.code, 'the window closed meanwhile (exit 4).'),
+  (
+    ClientErrorCodes.timeout,
+    '`--timeout` passed; the jobs go on in the window (exit 3).',
+  ),
+  (
+    ClientErrorCodes.unexpected,
     'the client itself went wrong; the message says how '
         '(exit 5).',
   ),
@@ -365,11 +381,11 @@ const _shapes = {
   'Status': '''
 How the window stands.
 
-- `state` (string): `starting`, `ready` or `ffmpegMissing`.
+- `state` (string): `STARTING`, `READY` or `FFMPEG_MISSING`, see "Window states".
 - `version` (string): VidCtrl's version; empty in a development build.
 - `busy` (bool): the queue is working through jobs.
 - `paused` (bool): the queue is paused in the window.
-- `jobs` (object): how many jobs there are in each status, as `{"waiting": 2, "done": 1}`.
+- `jobs` (object): how many jobs there are in each status, by its code, as `{"WAITING": 2, "DONE": 1}`.
 ''',
   'Goal': '''
 A goal, with the options this computer offers.
@@ -401,7 +417,7 @@ A video in the window's list.
 
 - `id` (int).
 - `path` (string): the file, absolute.
-- `status` (string): `probing` (being read), `ready` or `unreadable`; `statusText` (string) in words.
+- `status` (string): `PROBING`, `READY` or `UNREADABLE`, see "Video statuses".
 - `sizeBytes` (int, optional).
 - `durationSeconds` (number, optional).
 - `width` (int, optional), `height` (int, optional): the picture.
@@ -414,11 +430,11 @@ A video in the window's list.
 What a goal would do to a video, as the list shows it.
 
 - `goal` (string): the goal's full id.
-- `plan` (string): what it would do, see "Plans"; `planText` (string) in words.
+- `plan` (string): what it would do, see "Plans".
 - `expectedBytes` (int, optional): the result's expected size.
 - `measured` (bool): the size was measured by encoding pieces, not calculated.
 - `measuring` (bool): the window is measuring it now.
-- `closeness` (string, optional): how close the result would look, see "Closeness"; `closenessText` (string) in words.
+- `closeness` (string, optional): how close the result would look, see "Closeness".
 ''',
   'Job': '''
 A job in the queue.
@@ -428,21 +444,21 @@ A job in the queue.
 - `path` (string): that video's file.
 - `goal` (string): the goal's full id.
 - `options` (object): every option of the goal and the choice it really makes on this computer: `speed` is `cpu` where the graphics card cannot encode that format. Tell the person these, not what was asked.
-- `sample` (string, optional): `start` or `middle` for a sample.
-- `status` (string): see "Job statuses"; `statusText` (string) in words.
+- `sample` (string, optional): `START` or `MIDDLE` for a sample, see "Samples".
+- `status` (string): see "Job statuses".
 - `fraction` (number, optional): how far it is, 0 to 1, while converting.
 - `remainingSeconds` (number, optional): the time left, while converting.
 - `attempt` (int, optional): while choosing the quality, which try this is.
-- `outputPath` (string, optional): where the result goes, once known; the result is there once the job is `done`.
+- `outputPath` (string, optional): where the result goes, once known; the result is there once the job is `DONE`.
 - `outputBytes` (int, optional): the result's size, once done.
 - `quality` (Quality, optional): how its quality was chosen.
-- `needsALook` (bool): worth a look by eye, see `belowTarget`.
+- `needsALook` (bool): worth a look by eye, see `BELOW_TARGET`.
 - `errorLines` (list of string): why it failed, in FFmpeg's last words.
 ''',
   'Quality': '''
 How a job's quality was chosen: Archive measures each video before converting it and compares pieces of the result with the original.
 
-- `outcome` (string): see "Quality outcomes"; `outcomeText` (string) in words.
+- `outcome` (string): see "Quality outcomes".
 - `value` (int, optional): the quality number chosen (lower is better).
 - `standardValue` (int, optional): the goal's usual number.
 - `vmaf` (number, optional): VMAF of the poorest piece; 95 and more looks the same.
@@ -454,9 +470,9 @@ How a job ended, as `wait` tells it.
 
 - `jobId` (int).
 - `path` (string): the video's file.
-- `status` (string): `done`, `skipped`, `failed`, `cancelled` or `removed`; `statusText` (string) in words.
+- `status` (string): `DONE`, `SKIPPED`, `FAILED`, `CANCELLED` or `REMOVED`, see "Job statuses".
 - `outputPath` (string, optional): the result, when done.
-- `needsALook` (bool): worth a look by eye, see `belowTarget`.
+- `needsALook` (bool): worth a look by eye, see `BELOW_TARGET`.
 ''',
 };
 
@@ -467,23 +483,23 @@ const _leaves = {
   'archive':
       'Every video is converted, its quality chosen by measuring (see '
       '"Quality outcomes"). One whose result would keep over 80% of the '
-      'original\'s size is kept as it is: its job ends `skipped` with the '
-      'outcome `notWorthIt`. A sample is made all the same.',
+      'original\'s size is kept as it is: its job ends `SKIPPED` with the '
+      'outcome `NOT_WORTH_IT`. A sample is made all the same.',
   'space': 'Every video with a picture is converted.',
   'resolve':
-      'A video Resolve already opens is left as it is (plan `skip`); often '
-      'only the sound needs converting (`audioOnly`).',
+      'A video Resolve already opens is left as it is (plan `SKIP`); often '
+      'only the sound needs converting (`AUDIO_ONLY`).',
   'audio':
-      'Takes the first sound track; a video without sound is `unsupported`. '
+      'Takes the first sound track; a video without sound is `UNSUPPORTED`. '
       'Sound that fits the file type is copied as it is.',
   'privacy':
       'Each result is a new copy without the hidden notes; the original '
       'stays as it is. `quick` copies picture and sound as they are '
-      '(`remux`), `thorough` converts them again (`encode`). Sound files are '
+      '(`REMUX`), `thorough` converts them again (`ENCODE`). Sound files are '
       'taken too.',
   'remux':
-      'A video already of that file type is left as it is (`skip`); sound '
-      'the new type cannot hold is converted (`audioOnly`); the picture '
+      'A video already of that file type is left as it is (`SKIP`); sound '
+      'the new type cannot hold is converted (`AUDIO_ONLY`); the picture '
       'never is.',
 };
 
@@ -496,7 +512,7 @@ String _goalsPart(Map<String, GoalWords> words) {
         'is offered only where it makes a difference on this computer: '
         '`vidctrl-client goals` shows which are here; another is taken only '
         'with the choice the goal makes here anyway. A file with no picture '
-        'is `unsupported` by every goal but "Get the sound" and "Remove '
+        'is `UNSUPPORTED` by every goal but "Get the sound" and "Remove '
         'personal data".',
     '',
   ];
@@ -547,112 +563,249 @@ String _choiceLine(PresetOption option, String choice, OptionWords? words) {
 
 /// Job statuses, and what to make of each.
 const _jobStatuses = [
-  ('waiting', 'In the queue, its turn not come yet.'),
-  ('running', 'Being converted now, or its quality being chosen (`attempt`).'),
-  ('paused', 'Under way, held because the queue is paused in the window.'),
+  (JobStatusCodes.waiting, 'In the queue, its turn not come yet.'),
   (
-    'done',
+    JobStatusCodes.running,
+    'Being converted now, or its quality being chosen (`attempt`).',
+  ),
+  (
+    JobStatusCodes.paused,
+    'Under way, held because the queue is paused in the window.',
+  ),
+  (
+    JobStatusCodes.done,
     'The result is at `outputPath`. Tell the person, and say so when '
         '`needsALook` is true. `compare <job>` says how close it looks to '
         'the original.',
   ),
   (
-    'skipped',
+    JobStatusCodes.skipped,
     'Nothing was written: the video already met the goal, the goal can do '
-        'nothing with it (plan `unsupported`), or converting would hardly '
-        'make it smaller (outcome `notWorthIt`). Counts as finished, not as '
-        'a failure.',
+        'nothing with it (plan `UNSUPPORTED`), or converting would hardly '
+        'make it smaller (outcome `NOT_WORTH_IT`). Counts as finished, not '
+        'as a failure.',
   ),
   (
-    'failed',
+    JobStatusCodes.failed,
     'It could not be converted; `errorLines` says why. The person '
         'can try it again in the window, as `queue retry <job>` does.',
   ),
   (
-    'cancelled',
+    JobStatusCodes.cancelled,
     'Stopped before it was done, in the window or by `cancel`. `wait` '
         'counts it as a failure; `queue retry <job>` tries it again.',
   ),
   (
-    'removed',
+    JobStatusCodes.removed,
     'Only in `wait`, for a job taken out of the queue while it waited. Not '
         'a failure.',
   ),
 ];
 
 const _videoStatuses = [
-  ('probing', 'Being read.'),
-  ('ready', 'Read; it can be queued.'),
-  ('unreadable', 'Not a video FFmpeg can open; it cannot be queued.'),
+  (
+    VideoStatusCodes.probing,
+    'VidCtrl is learning its size, length, picture and sound.',
+  ),
+  (VideoStatusCodes.ready, 'It can be queued.'),
+  (VideoStatusCodes.unreadable, 'It cannot be queued.'),
 ];
 
 const _planNotes = {
-  'skip': 'Queued, the job ends `skipped` and writes no file.',
-  'remux': 'Quick: the picture and sound are copied.',
-  'audioOnly': 'Quick: the picture is copied.',
-  'encode': 'The picture is converted: this takes time.',
-  'unsupported':
+  PlanCodes.skip: 'Queued, the job ends `SKIPPED` and writes no file.',
+  PlanCodes.remux: 'Quick: the picture and sound are copied.',
+  PlanCodes.audioOnly: 'Quick: the picture is copied.',
+  PlanCodes.encode: 'The picture is converted: this takes time.',
+  PlanCodes.unsupported:
       'For example, a goal for pictures given a sound file. Queued, the job '
-      'ends `skipped`.',
-  'keptAsIs': 'Archive only; the job ends `skipped`.',
+      'ends `SKIPPED`.',
+  PlanCodes.keptAsIs: 'Archive only; the job ends `SKIPPED`.',
 };
 
 const _closenessNotes = {
-  'same': 'VMAF 95 or more on the poorest piece.',
-  'veryClose': 'VMAF 93 or more.',
-  'differs': 'Below that: worth a look.',
+  ClosenessCodes.same: 'VMAF 95 or more on the poorest piece.',
+  ClosenessCodes.veryClose: 'VMAF 93 or more.',
+  ClosenessCodes.differs: 'Below that: worth a look.',
 };
 
 const _outcomeNotes = {
-  'standard': 'The goal\'s usual quality was enough to look the same.',
-  'raised':
+  OutcomeCodes.standard:
+      'The goal\'s usual quality was enough to look the same.',
+  OutcomeCodes.raised:
       'A better quality than usual was needed, and the file is larger '
       'for it.',
-  'belowTarget':
+  OutcomeCodes.belowTarget:
       'Converted anyway, and the result\'s name ends in `-check`. '
       'Tell the person to look at it by eye beside the original. The job is '
-      '`done` and `needsALook` is true; `wait` still exits 0.',
-  'notWorthIt':
-      'The job ends `skipped` and nothing is written. In the '
+      '`DONE` and `needsALook` is true; `wait` still exits 0.',
+  OutcomeCodes.notWorthIt:
+      'The job ends `SKIPPED` and nothing is written. In the '
       'window, "Convert anyway" in the job\'s ⋯ menu converts it all the '
       'same, as `queue convert-anyway <job>` does.',
 };
 
+const _stateNotes = [
+  (StateCodes.starting, 'The window has just opened and looks for FFmpeg.'),
+  (StateCodes.ready, 'Open and ready.'),
+  (
+    StateCodes.ffmpegMissing,
+    'Open, but it found no FFmpeg; the window says what to do. Every '
+        'command but `status` fails with `FFMPEG_MISSING`.',
+  ),
+];
+
+const _addNotes = [
+  (AddResultCodes.added, 'Added to the list now.'),
+  (AddResultCodes.known, 'In the list already; not added twice.'),
+  (
+    AddResultCodes.notFound,
+    'No file there, nor a folder with videos. As a `skipped` reason of '
+        '`queue add`: nothing found there, or the video was taken off the '
+        'list meanwhile.',
+  ),
+  (
+    AddResultCodes.unreadable,
+    'In the list, but not a video FFmpeg can open; it cannot be queued.',
+  ),
+];
+
+const _sampleNotes = [
+  (SampleCodes.start, 'Ten seconds from the start (`--sample start`).'),
+  (SampleCodes.middle, 'Ten seconds from the middle (`--sample middle`).'),
+];
+
+const _comparisonNotes = [
+  (
+    ComparisonCodes.measured,
+    'Compared: `closeness`, `xpsnr` and, where measured, `vmaf` say how '
+        'close.',
+  ),
+  (
+    ComparisonCodes.failed,
+    'Only in `COMPARE_FINISHED`: it could not be compared; `errorLines` '
+        'says why. `compare` exits 5 instead.',
+  ),
+];
+
+/// One kind of code: where it is found, and each code with its meaning.
+typedef CodeKind = ({
+  String name,
+  String title,
+  String where,
+  List<(String, String)> codes,
+});
+
+/// Every kind of code the JSON carries, each code with what it means, as
+/// "What the results mean" lists them.
+final List<CodeKind> codeKinds = [
+  (
+    name: 'jobStatus',
+    title: 'Job statuses',
+    where:
+        'A job\'s state (Job and Outcome `status`, the keys of Status '
+        '`jobs`)',
+    codes: [
+      for (final (code, note) in _jobStatuses)
+        (code, '${statusWords(code)}. $note'),
+    ],
+  ),
+  (
+    name: 'videoStatus',
+    title: 'Video statuses',
+    where: 'A video in the list (Video `status`)',
+    codes: [
+      for (final (code, note) in _videoStatuses)
+        (code, '${statusWords(code)}. $note'),
+    ],
+  ),
+  (
+    name: 'plan',
+    title: 'Plans',
+    where: 'What a goal would do to a video (Preview `plan`)',
+    codes: [
+      for (final code in PlanCodes.all)
+        (code, '${planWords(code)}.${_note(_planNotes[code])}'),
+    ],
+  ),
+  (
+    name: 'closeness',
+    title: 'Closeness',
+    where:
+        'How close a result looks to its original (Preview `closeness`, '
+        'and `compare`)',
+    codes: [
+      for (final code in ClosenessCodes.all)
+        (code, '${closenessWords(code)}.${_note(_closenessNotes[code])}'),
+    ],
+  ),
+  (
+    name: 'qualityOutcome',
+    title: 'Quality outcomes',
+    where: 'How a job\'s quality was chosen (Quality `outcome`)',
+    codes: [
+      for (final code in OutcomeCodes.all)
+        (code, '${outcomeWords(code)}.${_note(_outcomeNotes[code])}'),
+    ],
+  ),
+  (
+    name: 'state',
+    title: 'Window states',
+    where: 'How the window stands (Status `state`)',
+    codes: _stateNotes,
+  ),
+  (
+    name: 'addResult',
+    title: 'Adding',
+    where:
+        'What adding a path gave (`add`\'s `result`), and why `queue add` '
+        'skipped a video (`skipped[].reason`: `NOT_FOUND` or `UNREADABLE`)',
+    codes: _addNotes,
+  ),
+  (
+    name: 'sample',
+    title: 'Samples',
+    where: 'Where a sample is taken from (Job `sample`)',
+    codes: _sampleNotes,
+  ),
+  (
+    name: 'comparison',
+    title: 'Comparisons',
+    where:
+        'How a comparison ended (`compare`\'s and `COMPARE_FINISHED`\'s '
+        '`status`)',
+    codes: _comparisonNotes,
+  ),
+  (
+    name: 'error',
+    title: 'Errors',
+    where: 'Why a command failed (`error.code`, see "Commands")',
+    codes: _errorCodes,
+  ),
+  (
+    name: 'event',
+    title: 'Events',
+    where: 'What `events` tells (`event`, see "Events")',
+    codes: [for (final (name, _, meaning) in _events) (name, meaning)],
+  ),
+];
+
 String _resultsPart() => [
   '## What the results mean',
   '',
-  'Each id and its words (the `...Text` fields in JSON), then what to make '
-      'of it.',
+  'Every code the JSON carries, by where it is found, with what it means '
+      'and the words the client prints for people. The errors and events '
+      'are explained under "Commands" and "Events".',
   '',
-  '### Job statuses',
-  '',
-  for (final (id, note) in _jobStatuses) '- `$id`: ${statusWords(id)}. $note',
-  '',
-  '### Video statuses',
-  '',
-  for (final (id, note) in _videoStatuses) '- `$id`: $note',
-  '',
-  '### Plans',
-  '',
-  'What a goal would do to a video (Preview `plan`):',
-  '',
-  for (final id in [...PlanKind.values.map((k) => k.name), 'keptAsIs'])
-    '- `$id`: ${planWords(id)}.${_note(_planNotes[id])}',
-  '',
-  '### Closeness',
-  '',
-  'How close a result looks to its original (Preview `closeness`):',
-  '',
-  for (final id in Closeness.values.map((c) => c.name))
-    '- `$id`: ${closenessWords(id)}.${_note(_closenessNotes[id])}',
-  '',
-  '### Quality outcomes',
-  '',
-  'How a job\'s quality was chosen (Quality `outcome`):',
-  '',
-  for (final id in QualityOutcome.values.map((o) => o.name))
-    '- `$id`: ${outcomeWords(id)}.${_note(_outcomeNotes[id])}',
-  '',
+  for (final kind in codeKinds.where(
+    (k) => k.name != 'error' && k.name != 'event',
+  )) ...[
+    '### ${kind.title}',
+    '',
+    '${kind.where}:',
+    '',
+    for (final (code, meaning) in kind.codes) '- `$code`: $meaning',
+    '',
+  ],
 ].join('\n');
 
 String _note(String? note) => note == null ? '' : ' $note';
@@ -722,8 +875,8 @@ const _events = [
   (
     Events.jobFinished,
     'a Job',
-    'It ended: `done`, `skipped`, `failed` or '
-        '`cancelled`.',
+    'It ended: `DONE`, `SKIPPED`, `FAILED` or '
+        '`CANCELLED`.',
   ),
   (
     Events.jobRemoved,
@@ -741,9 +894,9 @@ const _events = [
   (Events.queueIdle, 'none', 'The queue has nothing more to do.'),
   (
     Events.compareFinished,
-    '`job` (int), `status` (`measured` or '
-        '`failed`), `closeness`, `closenessText`, `vmaf` (optional), `xpsnr`; '
-        'or `errorLines`',
+    '`job` (int), `status` (`MEASURED` or '
+        '`FAILED`), `closeness`, `vmaf` (optional), `xpsnr`; or '
+        '`errorLines`',
     '"Compare with the original" ended, in the window or by `compare`.',
   ),
   (
@@ -766,7 +919,7 @@ String _waitingPart(String c) => [
       'Jobs that ended before it started do not count, so an old failure '
       'does not make every later `wait` exit 1.',
   '- With nothing waiting when it starts, it exits 0 at once.',
-  '- A job taken out of the queue while it waits is told as `removed`, '
+  '- A job taken out of the queue while it waits is told as `REMOVED`, '
       'not as a failure; one cancelled is a failure.',
   '- A paused queue keeps it waiting, as the person may continue it; it '
       'says so once on stderr.',
@@ -783,8 +936,8 @@ String _waitingPart(String c) => [
   '',
   '### Events',
   '',
-  '`$c events` tells these, each with `event` and, but on `app-closing`, '
-      '`time`:',
+  '`$c events` tells these, each with `event`, its code, and, but on '
+      '`APP_CLOSING`, `time`:',
   '',
   '| Event | Fields | Meaning |',
   '|---|---|---|',
@@ -840,7 +993,7 @@ $c queue                          # opens the window first, if it is not open
 $c events --since-now --json      # in the background
 ```
 
-Read its lines as they come. On each `job-finished`, tell the person about that job: its `status`, `outputPath`, `outputBytes`, `quality.outcome` and `needsALook`. On `queue-idle` the queue has nothing more to do: stop following. On `app-closing` the window closed.
+Read its lines as they come. On each `JOB_FINISHED`, tell the person about that job: its `status`, `outputPath`, `outputBytes`, `quality.outcome` and `needsALook`. On `QUEUE_IDLE` the queue has nothing more to do: stop following. On `APP_CLOSING` the window closed.
 
 ### Make samples first, compare, then convert the whole
 
@@ -851,7 +1004,7 @@ $c compare 0 --json               # each sample job's id from `added`
 $c compare 1 --json
 ```
 
-Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`. `compare` compares it with the same piece of its original and says how close it looks: `closeness` (`closenessText` in words), with `vmaf` and `xpsnr`. Each comparison takes about as long as the piece lasts, or longer. `$c job <job> --json` gives the sample's `quality` too: the quality chosen for the whole video and `share`, its expected size as a share of the original's. Tell the person where the samples are and how close each looks, so they can look at them. Once they agree, convert each whole video with its sample's settings, by the sample jobs' ids:
+Each sample job's `outputPath` is a 10-second piece in `Converted/Samples/`. `compare` compares it with the same piece of its original and says how close it looks: `closeness` (see "Closeness"), with `vmaf` and `xpsnr`. Each comparison takes about as long as the piece lasts, or longer. `$c job <job> --json` gives the sample's `quality` too: the quality chosen for the whole video and `share`, its expected size as a share of the original's. Tell the person where the samples are and how close each looks, so they can look at them. Once they agree, convert each whole video with its sample's settings, by the sample jobs' ids:
 
 ```sh
 $c queue convert-whole 0 --json
@@ -879,7 +1032,7 @@ $c add ~/Videos/trip --json
 $c estimate 0 1 2 --goal archive --json      # the ids from `add`
 ```
 
-`estimate` measures each video in turn and answers once all are measured; that takes seconds to a minute or so for each. Each video's `preview` gives the `plan` (`planText` in words), the `expectedBytes` (`measured` when measured by encoding pieces) and the `closeness`; beside its `sizeBytes`, that is how much smaller it would come out. A preview with no `expectedBytes` could not be measured. While the queue converts, `estimate` is refused (`busy`): measure before queuing, or once `$c wait` has returned. Later, `$c videos --goal archive --json` gives the same again.
+`estimate` measures each video in turn and answers once all are measured; that takes seconds to a minute or so for each. Each video's `preview` gives the `plan` (see "Plans"), the `expectedBytes` (`measured` when measured by encoding pieces) and the `closeness`; beside its `sizeBytes`, that is how much smaller it would come out. A preview with no `expectedBytes` could not be measured. While the queue converts, `estimate` is refused (`BUSY`): measure before queuing, or once `$c wait` has returned. Later, `$c videos --goal archive --json` gives the same again.
 ''';
 
 String _limits(String c) =>

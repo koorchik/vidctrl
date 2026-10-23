@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/control/codes.dart';
 import '../../core/control/views.dart';
 import '../../core/estimate/size_estimator.dart';
 import '../../core/ffmpeg/capabilities.dart';
@@ -14,12 +15,13 @@ import '../queue/queue_state.dart';
 import '../recipe/recipe.dart';
 import '../sources/sources_controller.dart';
 
-// The window's state in the shapes a client reads.
+// The window's state in the shapes a client reads, each value that is one of
+// a few by its code.
 
 VideoView videoView(SourceVideo video, {GoalPreview? preview}) => _videoView(
   video.id,
   video.path,
-  video.status.name,
+  codeOf(video.status),
   video.info,
   preview: preview,
 );
@@ -27,7 +29,7 @@ VideoView videoView(SourceVideo video, {GoalPreview? preview}) => _videoView(
 /// The result of [job], read as [info], in the shape of a video: its id is
 /// that of the video the job was made from.
 VideoView resultView(QueueJob job, MediaInfo info) =>
-    _videoView(job.sourceId, info.path, 'ready', info);
+    _videoView(job.sourceId, info.path, VideoStatusCodes.ready, info);
 
 VideoView _videoView(
   int id,
@@ -64,8 +66,8 @@ JobView jobView(QueueJob job, Capabilities capabilities) {
     path: job.path,
     goal: job.recipe.presetId,
     options: appliedOptions(job.recipe, capabilities),
-    sample: job.recipe.isSample ? job.recipe.sample.name : null,
-    status: job.status.name,
+    sample: job.recipe.isSample ? codeOf(job.recipe.sample) : null,
+    status: codeOf(job.status),
     fraction: progress?.fraction,
     remainingSeconds: remaining == null ? null : _seconds(remaining),
     attempt: job.attempt,
@@ -81,7 +83,7 @@ JobView jobView(QueueJob job, Capabilities capabilities) {
 }
 
 QualityView _qualityView(QualityChoice choice) => QualityView(
-  outcome: choice.outcome.name,
+  outcome: codeOf(choice.outcome),
   value: choice.value,
   standardValue: choice.standardValue,
   vmaf: choice.chosen.score.vmaf,
@@ -104,11 +106,16 @@ GoalPreview goalPreview(
   final estimate = estimateWithoutEncoding(info, plan) ?? cache.estimates[key];
   return GoalPreview(
     goal: recipe.presetId,
-    plan: estimate?.choice?.converts == false ? 'keptAsIs' : plan.kind.name,
+    plan: estimate?.choice?.converts == false
+        ? PlanCodes.keptAsIs
+        : codeOf(plan.kind),
     expectedBytes: estimate?.bytes,
     measured: estimate?.measured ?? false,
     measuring: cache.measuring.contains(key),
-    closeness: estimate?.quality?.closeness.name,
+    closeness: switch (estimate?.quality?.closeness) {
+      final closeness? => codeOf(closeness),
+      null => null,
+    },
   );
 }
 

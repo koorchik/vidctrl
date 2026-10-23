@@ -1,6 +1,8 @@
 import 'dart:math';
 
 import '../media/media_details.dart' show formatBytes, fullReport;
+import 'codes.dart';
+import 'protocol.dart';
 import 'views.dart';
 import 'words.dart';
 
@@ -11,12 +13,12 @@ import 'words.dart';
 List<String> statusText(StatusView status) {
   final name = status.version.isEmpty ? 'VidCtrl' : 'VidCtrl ${status.version}';
   return switch (status.state) {
-    'ready' => [
+    StateCodes.ready => [
       '$name is open and ready.',
       _queueSummary(status.busy, status.paused, status.jobs),
     ],
-    'starting' => ['$name is starting: it is looking for FFmpeg.'],
-    'ffmpegMissing' => [
+    StateCodes.starting => ['$name is starting: it is looking for FFmpeg.'],
+    StateCodes.ffmpegMissing => [
       '$name is open, but it could not find FFmpeg; the window says what '
           'to do.',
     ],
@@ -73,9 +75,10 @@ String addedText(Map<String, Object?> entry) {
   final path = entry['path'];
   final id = entry['id'];
   return switch (entry['result']) {
-    'added' => 'Video $id: Added. $path',
-    'known' => 'Video $id: In the list already. $path',
-    'unreadable' => 'Video $id: ${statusWords('unreadable')}. $path',
+    AddResultCodes.added => 'Video $id: Added. $path',
+    AddResultCodes.known => 'Video $id: In the list already. $path',
+    AddResultCodes.unreadable =>
+      'Video $id: ${statusWords(VideoStatusCodes.unreadable)}. $path',
     _ => 'Nothing found at $path: no file, nor a folder with videos.',
   };
 }
@@ -146,11 +149,12 @@ String removedText(int id) =>
 /// A job as the queue pane shows it.
 List<String> jobText(JobView job) {
   final progress = [
-    if (job.fraction case final fraction? when job.status == 'running')
+    if (job.fraction case final fraction?
+        when job.status == JobStatusCodes.running)
       _percent(fraction),
     if (job.remainingSeconds case final seconds?) _timeLeft(seconds),
   ];
-  final state = job.attempt != null && job.status == 'running'
+  final state = job.attempt != null && job.status == JobStatusCodes.running
       ? 'Choosing the quality, try ${job.attempt}'
       : statusWords(job.status);
   return [
@@ -158,8 +162,8 @@ List<String> jobText(JobView job) {
         '${job.path}',
     '  ${_recipe(job.goal, job.options)}, video ${job.videoId}'
         '${switch (job.sample) {
-          'start' => ', a sample from the start',
-          'middle' => ', a sample from the middle',
+          SampleCodes.start => ', a sample from the start',
+          SampleCodes.middle => ', a sample from the middle',
           _ => '',
         }}',
     ..._resultText(
@@ -190,7 +194,7 @@ List<String> jobDetailsText(
   String? commandLine,
 }) => [
   ...jobText(job),
-  if (job.needsALook && job.quality?.outcome == 'belowTarget')
+  if (job.needsALook && job.quality?.outcome == OutcomeCodes.belowTarget)
     '  Its name ends in -check: look at it beside the original.',
   if (command)
     if (commandLine == null)
@@ -225,7 +229,7 @@ List<String> queueAddText(Map<String, Object?> answer) {
       'Video $video: In the queue already, with this goal and folder.',
     for (final skipped in answer['skipped'] as List)
       switch ((skipped as Map)['reason']) {
-        'unreadable' =>
+        AddResultCodes.unreadable =>
           'Not queued, ${_video(skipped['video'])}: it cannot be read.',
         _ => 'Not queued, ${_video(skipped['video'])}: nothing found there.',
       },
@@ -299,11 +303,11 @@ List<String> outcomeText(JobOutcome outcome) => [
   ),
 ];
 
-/// How a job ended, from its `job-finished` event.
+/// How a job ended, from its [Events.jobFinished] event.
 List<String> finishedText(JobView job) => [
   'Job ${job.id}: ${statusWords(job.status)}. ${job.path}',
   ..._resultText(
-    outputPath: job.status == 'done' ? job.outputPath : null,
+    outputPath: job.status == JobStatusCodes.done ? job.outputPath : null,
     outputBytes: job.outputBytes,
     quality: job.quality,
     needsALook: job.needsALook,
@@ -322,7 +326,7 @@ List<String> _resultText({
     '  Result: $outputPath'
         '${outputBytes == null ? '' : ', ${formatBytes(outputBytes)}'}',
   if (quality != null) '  ${_qualityText(quality)}',
-  if (needsALook && quality?.outcome != 'belowTarget')
+  if (needsALook && quality?.outcome != OutcomeCodes.belowTarget)
     '  Worth a look by eye: its name ends in -check.',
   // FFmpeg's last words say why it failed.
   for (final line in errorLines.skip(max(0, errorLines.length - 3)))
@@ -352,42 +356,44 @@ List<String> eventText(String event, Map<String, Object?> params) {
   VideoView video() => VideoView.fromJson(params);
   JobView job() => JobView.fromJson(params);
   return switch (event) {
-    'snapshot' => [
+    Events.snapshot => [
       'Now: ${(the('videos') as List).length} videos in the list, '
           '${(the('jobs') as List).length} jobs in the queue; the queue is '
           '${_queueState(the('busy') == true, the('paused') == true)}.',
     ],
-    'video-added' => ['Video ${the('id')}: Added. ${the('path')}'],
-    'video-ready' || 'video-unreadable' => [videoText(video()).first],
-    'video-removed' => [removedText(the('video') as int)],
-    'job-added' => [
+    Events.videoAdded => ['Video ${the('id')}: Added. ${the('path')}'],
+    Events.videoReady || Events.videoUnreadable => [videoText(video()).first],
+    Events.videoRemoved => [removedText(the('video') as int)],
+    Events.jobAdded => [
       'Job ${the('id')}: Queued. ${the('path')}',
       '  ${_recipe(job().goal, job().options)}',
     ],
-    'job-checking' => [
+    Events.jobChecking => [
       'Job ${the('job')}: Choosing the quality, try ${the('attempt')}.',
     ],
-    'job-started' => ['Job ${the('id')}: Converting. ${the('path')}'],
-    'job-progress' => [
+    Events.jobStarted => ['Job ${the('id')}: Converting. ${the('path')}'],
+    Events.jobProgress => [
       'Job ${the('job')}: ${_percent(the('fraction') as num)}'
           '${switch (the('remainingSeconds')) {
             final num seconds => ', ${_timeLeft(seconds.toDouble())}',
             _ => '',
           }}.',
     ],
-    'job-finished' => finishedText(job()),
-    'job-removed' => ['Job ${the('job')}: ${statusWords('removed')}.'],
-    'queue-paused' => ['The queue is paused in the window.'],
-    'queue-resumed' => ['The queue goes on.'],
-    'queue-idle' => ['The queue has nothing more to do.'],
-    'compare-finished' when the('status') == 'measured' => [
+    Events.jobFinished => finishedText(job()),
+    Events.jobRemoved => [
+      'Job ${the('job')}: ${statusWords(JobStatusCodes.removed)}.',
+    ],
+    Events.queuePaused => ['The queue is paused in the window.'],
+    Events.queueResumed => ['The queue goes on.'],
+    Events.queueIdle => ['The queue has nothing more to do.'],
+    Events.compareFinished when the('status') == ComparisonCodes.measured => [
       comparedText(the('job'), params),
     ],
-    'compare-finished' => [
+    Events.compareFinished => [
       'Job ${the('job')}: Could not be compared with the original.',
       for (final line in (the('errorLines') as List?) ?? const []) '  > $line',
     ],
-    'app-closing' => ['VidCtrl is closing.'],
+    Events.appClosing => ['VidCtrl is closing.'],
     _ => [event],
   };
 }

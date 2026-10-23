@@ -7,6 +7,7 @@ import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
 import 'client_text.dart';
+import 'codes.dart';
 import 'connection.dart';
 import 'endpoint.dart';
 import 'launcher.dart';
@@ -115,7 +116,7 @@ Future<int> runClient(List<String> args, ClientIo io) {
     final first = '$error'.split('\n').first;
     end(
       output.failWith(
-        'unexpected',
+        ClientErrorCodes.unexpected,
         'vidctrl-client stopped on an unexpected error: $first',
         ExitCode.badArguments,
       ),
@@ -198,7 +199,7 @@ Future<ControlConnection> _start(ClientIo io) async {
       final status = StatusView.fromJson(
         _object(await connection!.call(Methods.status)),
       );
-      if (status.state == 'ffmpegMissing') {
+      if (status.state == StateCodes.ffmpegMissing) {
         throw const ControlError(
           ControlErrorKind.ffmpegMissing,
           'VidCtrl could not find FFmpeg; the window says what to do.',
@@ -206,7 +207,7 @@ Future<ControlConnection> _start(ClientIo io) async {
       }
       // Still starting after all that: the window holds the request until
       // it is ready.
-      if (status.state != 'starting' || overdue()) return connection;
+      if (status.state != StateCodes.starting || overdue()) return connection;
       await Future<void>.delayed(_pollEvery);
     }
   } on Object {
@@ -240,13 +241,15 @@ class _Output {
   /// Something to know on the side, on stderr.
   void note(String text) => io.err.writeln(text);
 
-  int fail(ControlError e) => failWith(e.kind.name, e.message, e.kind.exitCode);
+  int fail(ControlError e) => failWith(e.kind.code, e.message, e.kind.exitCode);
 
-  int failWith(String kind, String message, int exitCode) {
+  /// [message] for people; with `--json`, beside the [code] a program
+  /// reads.
+  int failWith(String code, String message, int exitCode) {
     io.err.writeln(
       json
           ? jsonEncode({
-              'error': {'kind': kind, 'message': message},
+              'error': {'code': code, 'message': message},
             })
           : message,
     );
@@ -285,6 +288,9 @@ ArgParser _withGlobals(ArgParser parser) => parser
     help: 'Do not start VidCtrl when it is not running.',
   );
 
+/// `--sample`'s words, and the code the window takes for each.
+const _sampleCodes = {'start': SampleCodes.start, 'middle': SampleCodes.middle};
+
 ArgParser _withGoal(ArgParser parser) => parser
   ..addOption('goal', help: 'A goal id, as `goals` lists them.')
   ..addMultiOption(
@@ -298,7 +304,7 @@ ArgParser _parser() {
     ..addCommand(
       'add',
       _withGoal(_withGlobals(ArgParser()))
-        ..addOption('sample', allowed: ['start', 'middle'])
+        ..addOption('sample', allowed: _sampleCodes.keys)
         ..addOption('out')
         ..addOption('subfolder'),
     );
@@ -479,7 +485,7 @@ _Command? _command(ArgResults top, ClientIo io) {
       final params = {
         'videos': [for (final v in add.rest) _video(v, io)],
         ..._goalParams(add),
-        'sample': ?add.option('sample'),
+        'sample': ?_sampleCodes[add.option('sample')],
         'out': ?(out == null || out == 'next' ? out : _absolute(out, io)),
         'subfolder': ?add.option('subfolder'),
       };
@@ -791,9 +797,9 @@ Future<int> _wait(
       result = _object(await answer);
     } on TimeoutException {
       return output.failWith(
-        'timeout',
+        ClientErrorCodes.timeout,
         'Still waiting after ${timeout!.inMilliseconds / 1000} seconds; the '
-            'jobs go on in the window.',
+        'jobs go on in the window.',
         ExitCode.timeout,
       );
     }
@@ -803,7 +809,7 @@ Future<int> _wait(
     ];
     output.answer(result, () {
       final failed = outcomes
-          .where((o) => o.status == 'failed' || o.status == 'cancelled')
+          .where((o) => _failedOrCancelled.contains(o.status))
           .length;
       return [
         for (final outcome in outcomes)
@@ -816,7 +822,7 @@ Future<int> _wait(
           'All done.',
       ];
     });
-    return outcomes.any((o) => o.status == 'failed' || o.status == 'cancelled')
+    return outcomes.any((o) => _failedOrCancelled.contains(o.status))
         ? ExitCode.jobsFailed
         : ExitCode.ok;
   } finally {
@@ -826,6 +832,8 @@ Future<int> _wait(
     await events?.close();
   }
 }
+
+const _failedOrCancelled = {JobStatusCodes.failed, JobStatusCodes.cancelled};
 
 /// Prints every event until the window closes.
 Future<int> _events(

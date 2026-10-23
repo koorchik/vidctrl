@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../core/control/codes.dart';
 import '../../core/control/listener.dart';
 import '../../core/control/protocol.dart';
 import '../../core/control/views.dart';
@@ -117,7 +118,9 @@ Map<String, Object?> _status(Ref ref) {
   final version = ref.read(buildInfoProvider).version;
   if (!environment.hasValue) {
     return StatusView(
-      state: environment.hasError ? 'ffmpegMissing' : 'starting',
+      state: environment.hasError
+          ? StateCodes.ffmpegMissing
+          : StateCodes.starting,
       version: version,
       busy: false,
       paused: false,
@@ -127,10 +130,10 @@ Map<String, Object?> _status(Ref ref) {
   final queue = ref.read(queueProvider);
   final counts = <String, int>{};
   for (final job in queue.jobs) {
-    counts.update(job.status.name, (n) => n + 1, ifAbsent: () => 1);
+    counts.update(codeOf(job.status), (n) => n + 1, ifAbsent: () => 1);
   }
   return StatusView(
-    state: 'ready',
+    state: StateCodes.ready,
     version: version,
     busy: queue.busy,
     paused: queue.paused,
@@ -209,7 +212,7 @@ class _Added {
   final String given;
   final String path;
 
-  /// added, known (listed before), notFound or unreadable.
+  /// An [AddResultCodes] code.
   final String result;
   final int? id;
 
@@ -247,14 +250,14 @@ Future<List<_Added>> _addPaths(
       found = true;
       if (!reported.add(video.id)) continue;
       final result = video.status == SourceStatus.unreadable
-          ? 'unreadable'
+          ? AddResultCodes.unreadable
           : before.contains(video.id)
-          ? 'known'
-          : 'added';
+          ? AddResultCodes.known
+          : AddResultCodes.added;
       entries.add(_Added(given, video.path, result, video.id));
     }
     // A folder with no videos in it counts as nothing there.
-    if (!found) entries.add(_Added(given, given, 'notFound'));
+    if (!found) entries.add(_Added(given, given, AddResultCodes.notFound));
   }
   return entries;
 }
@@ -366,7 +369,7 @@ Future<Object?> _queueAdd(
         if (entry.id case final id?) {
           ids.add(id);
         } else {
-          skipped.add({'video': reference, 'reason': 'notFound'});
+          skipped.add({'video': reference, 'reason': AddResultCodes.notFound});
         }
       }
     } else {
@@ -384,9 +387,9 @@ Future<Object?> _queueAdd(
     final video = state.byId(id);
     if (video == null) {
       // Taken off the list meanwhile.
-      skipped.add({'video': id, 'reason': 'notFound'});
+      skipped.add({'video': id, 'reason': AddResultCodes.notFound});
     } else if (!video.isReady) {
-      skipped.add({'video': id, 'reason': 'unreadable'});
+      skipped.add({'video': id, 'reason': AddResultCodes.unreadable});
     } else {
       ready.add(video);
     }
@@ -395,7 +398,7 @@ Future<Object?> _queueAdd(
     // Every video was skipped, as `videos.add` with nothing to add.
     final reasons = [
       for (final s in skipped)
-        s['reason'] == 'unreadable'
+        s['reason'] == AddResultCodes.unreadable
             ? 'video ${s['video']} cannot be read'
             : 'nothing found at ${s['video']}',
     ];

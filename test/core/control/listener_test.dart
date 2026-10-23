@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:vidctrl/core/control/codes.dart';
 import 'package:vidctrl/core/control/connection.dart';
 import 'package:vidctrl/core/control/endpoint.dart';
 import 'package:vidctrl/core/control/listener.dart';
@@ -46,7 +47,7 @@ String _request(
 ControlErrorKind? _errorIn(String line) {
   final error = (jsonDecode(line) as Map)['error'];
   if (error is! Map) return null;
-  return ControlErrorKind.values.asNameMap()[(error['data'] as Map)['kind']];
+  return fromCode(ControlErrorKind.values, (error['data'] as Map)['kind']);
 }
 
 Future<bool> _alive(int pid) async => true;

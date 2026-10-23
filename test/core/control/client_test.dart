@@ -13,6 +13,8 @@ import 'package:vidctrl/core/control/process_alive.dart';
 import 'package:vidctrl/core/control/protocol.dart';
 import 'package:vidctrl/core/control/words.dart';
 
+import '../../support/machine_json.dart';
+
 typedef _Answer = FutureOr<Object?> Function(
   Map<String, Object?> params,
   ControlPeer peer,
@@ -46,7 +48,7 @@ class _FakeApp {
     final calls = <(String, Map<String, Object?>)>[];
     final subscribers = <ControlPeer>[];
     final all = <String, _Answer>{
-      Methods.status: (_, _) => _status('ready'),
+      Methods.status: (_, _) => _status('READY'),
       Methods.subscribe: (_, _) => const <String, Object?>{},
       ...answers,
     };
@@ -181,7 +183,7 @@ Map<String, Object?> _outcome(
 Map<String, Object?> _video(int id) => {
   'id': id,
   'path': '/videos/clip$id.mov',
-  'status': 'ready',
+  'status': 'READY',
   'sizeBytes': 1500000000,
   'width': 3840,
   'height': 2160,
@@ -201,7 +203,7 @@ final _resultAnswers = <String, _Answer>{
       ),
       'outputBytes': 1000000,
       'quality': {
-        'outcome': 'belowTarget',
+        'outcome': 'BELOW_TARGET',
         'value': 20,
         'standardValue': 35,
         'vmaf': 93.1,
@@ -219,8 +221,8 @@ final _resultAnswers = <String, _Answer>{
       ? {'started': true}
       : {
           'job': params['job'],
-          'status': 'measured',
-          'closeness': 'same',
+          'status': 'MEASURED',
+          'closeness': 'SAME',
           'closenessText': 'Looks the same as the original',
           'vmaf': 96.2,
           'xpsnr': 43.0,
@@ -254,11 +256,11 @@ final _resultAnswers = <String, _Answer>{
         ..._video(1),
         'preview': {
           'goal': 'archive.master',
-          'plan': 'encode',
+          'plan': 'ENCODE',
           'expectedBytes': 400000000,
           'measured': true,
           'measuring': false,
-          'closeness': 'same',
+          'closeness': 'SAME',
         },
       },
     ],
@@ -277,7 +279,7 @@ void main() {
       Methods.videosAdd: (params, _) => {
         'videos': [
           for (final (i, path) in (params['paths'] as List).indexed)
-            {'path': path, 'id': i + 1, 'result': 'added'},
+            {'path': path, 'id': i + 1, 'result': 'ADDED'},
         ],
       },
     });
@@ -305,7 +307,7 @@ void main() {
       Methods.videosAdd: (params, _) => {
         'videos': [
           for (final (i, path) in (params['paths'] as List).indexed)
-            {'path': path, 'id': i + 1, 'result': 'added'},
+            {'path': path, 'id': i + 1, 'result': 'ADDED'},
         ],
       },
       Methods.queueAdd: (params, _) => {
@@ -347,7 +349,7 @@ void main() {
       Methods.queueAdd: (params, _) => {
         'goal': 'archive.master',
         'options': {'speed': 'fast'},
-        'added': [_job(1, 'waiting')],
+        'added': [_job(1, 'WAITING')],
         'alreadyQueued': <int>[],
         'skipped': <Object?>[],
       },
@@ -370,7 +372,7 @@ void main() {
       'videos': [3],
       'goal': 'archive',
       'options': {'speed': 'fast'},
-      'sample': 'middle',
+      'sample': 'MIDDLE',
       'out': '/out',
     });
     expect(run.out, contains('archive.master'));
@@ -392,7 +394,7 @@ void main() {
       final app = await _FakeApp.start(_endpoint, {
         Methods.queueRemove: (params, _) => {'removed': params['jobs']},
         Methods.queueMove: (_, _) => {
-          'jobs': [_job(3, 'waiting'), _job(1, 'running')],
+          'jobs': [_job(3, 'WAITING'), _job(1, 'RUNNING')],
         },
         Methods.queueRetry: (params, _) => {
           'job': _job(params['job'] as int, 'waiting'),
@@ -401,10 +403,10 @@ void main() {
         Methods.queuePause: (_, _) => {'paused': true},
         Methods.queueResume: (_, _) => {'paused': false},
         Methods.queueCancel: (params, _) => params['job'] == 3
-            ? {'cancelled': null, 'job': _job(3, 'done')}
+            ? {'cancelled': null, 'job': _job(3, 'DONE')}
             : {'cancelled': params['job'] ?? 1},
         Methods.queueConvertAnyway: (_, _) => {
-          'added': [_job(5, 'waiting')],
+          'added': [_job(5, 'WAITING')],
           'alreadyQueued': false,
         },
         Methods.queueConvertWhole: (_, _) => {
@@ -582,8 +584,8 @@ void main() {
       'paused': false,
       'busy': true,
       'jobs': [
-        _job(1, 'running'),
-        _job(2, 'done', outputPath: '/videos/Converted/clip2.mp4'),
+        _job(1, 'RUNNING'),
+        _job(2, 'DONE', outputPath: '/videos/Converted/clip2.mp4'),
       ],
     };
     await _FakeApp.start(_endpoint, {Methods.queueList: (_, _) => answer});
@@ -594,6 +596,7 @@ void main() {
       final run = await _run(args);
       expect(run.exitCode, 0, reason: run.err);
       expect(jsonDecode(run.out), answer);
+      expectMachineJson(jsonDecode(run.out));
     }
   });
 
@@ -612,10 +615,11 @@ void main() {
     expect(json.exitCode, ExitCode.badArguments);
     expect(jsonDecode(json.err), {
       'error': {
-        'kind': 'badArgument',
+        'code': 'BAD_ARGUMENT',
         'message': 'There is no goal "x". Goals: archive, smaller.',
       },
     });
+    expectMachineJson(jsonDecode(json.err));
 
     // Refused before the window is asked anything.
     final asked = app.calls.length;
@@ -636,7 +640,7 @@ void main() {
   });
 
   test('wait exits 1 when a job failed and 0 when all are done', () async {
-    var outcomes = [_outcome(1, 'done'), _outcome(2, 'failed')];
+    var outcomes = [_outcome(1, 'DONE'), _outcome(2, 'FAILED')];
     final app = await _FakeApp.start(_endpoint, {
       Methods.wait: (_, _) => {'outcomes': outcomes},
     });
@@ -645,16 +649,16 @@ void main() {
     expect(failed.out, contains('Job 1: Done'));
     expect(failed.out, contains('Job 2: Failed'));
 
-    outcomes = [_outcome(1, 'done'), _outcome(2, 'skipped')];
+    outcomes = [_outcome(1, 'DONE'), _outcome(2, 'SKIPPED')];
     expect((await _run(['wait', '1', '2'])).exitCode, ExitCode.ok);
     expect(app.paramsOf(Methods.wait), {
       'jobs': [1, 2],
     });
 
-    outcomes = [_outcome(3, 'cancelled')];
+    outcomes = [_outcome(3, 'CANCELLED')];
     expect((await _run(['wait'])).exitCode, ExitCode.jobsFailed);
     // Taken out of the queue is not a failure.
-    outcomes = [_outcome(3, 'removed')];
+    outcomes = [_outcome(3, 'REMOVED')];
     expect((await _run(['wait'])).exitCode, ExitCode.ok);
   });
 
@@ -671,13 +675,13 @@ void main() {
         for (final subscriber in app.subscribers) {
           subscriber.notify(
             Events.jobFinished,
-            _job(1, 'done', outputPath: '/videos/Converted/clip1.mp4'),
+            _job(1, 'DONE', outputPath: '/videos/Converted/clip1.mp4'),
           );
           subscriber.notify(Events.queuePaused, const {});
         }
         await answer.future;
         return {
-          'outcomes': [_outcome(1, 'done'), _outcome(2, 'done')],
+          'outcomes': [_outcome(1, 'DONE'), _outcome(2, 'DONE')],
         };
       },
     });
@@ -719,6 +723,13 @@ void main() {
     expect(run.exitCode, ExitCode.timeout);
     expect(watch.elapsed, lessThan(const Duration(seconds: 3)));
     expect(run.err, isNotEmpty);
+
+    final json = await _run(['wait', '--timeout', '0.2', '--json']);
+    expect(json.exitCode, ExitCode.timeout);
+    expect(
+      (jsonDecode(json.err) as Map)['error'],
+      containsPair('code', 'TIMEOUT'),
+    );
   });
 
   test(
@@ -737,7 +748,7 @@ void main() {
             });
           }
           Timer(const Duration(milliseconds: 50), () {
-            peer.notify(Events.jobFinished, {'time': 't1', ..._job(1, 'done')});
+            peer.notify(Events.jobFinished, {'time': 't1', ..._job(1, 'DONE')});
             app.listener.close();
           });
           return const <String, Object?>{};
@@ -751,8 +762,11 @@ void main() {
       ];
       expect(
         [for (final line in lines) line['event']],
-        [Events.snapshot, Events.jobFinished, Events.appClosing],
+        ['SNAPSHOT', 'JOB_FINISHED', 'APP_CLOSING'],
       );
+      for (final line in lines) {
+        expectMachineJson(line);
+      }
       expect(lines[1]['id'], 1);
       expect(lines[1]['time'], 't1');
       expect(app.paramsOf(Methods.subscribe), {'snapshot': true});
@@ -784,7 +798,7 @@ void main() {
       await _FakeApp.start(_endpoint, {
         // Looking for FFmpeg at first.
         Methods.status: (_, _) =>
-            _status(++statuses < 3 ? 'starting' : 'ready'),
+            _status(++statuses < 3 ? 'STARTING' : 'READY'),
         Methods.queueList: (_, _) => {
           'paused': false,
           'busy': false,
@@ -904,7 +918,7 @@ void main() {
     () async {
       final launcher = _FakeLauncher(() async {
         await _FakeApp.start(_endpoint, {
-          Methods.status: (_, _) => _status('ffmpegMissing'),
+          Methods.status: (_, _) => _status('FFMPEG_MISSING'),
         });
       });
       final watch = Stopwatch()..start();
@@ -927,7 +941,7 @@ void main() {
 
     await _FakeApp.start(_endpoint);
     final running = await _run(['status', '--json']);
-    expect(jsonDecode(running.out), {'running': true, ..._status('ready')});
+    expect(jsonDecode(running.out), {'running': true, ..._status('READY')});
   });
 
   test('--help prints what the commands are', () async {
@@ -1000,7 +1014,7 @@ void main() {
       if (args.contains('--json')) {
         expect(
           (jsonDecode(run.err) as Map)['error'],
-          containsPair('kind', 'unexpected'),
+          containsPair('code', 'UNEXPECTED'),
         );
       } else {
         expect(run.err, contains('unexpected error'));
@@ -1015,9 +1029,9 @@ void main() {
     app = await _FakeApp.start(_endpoint, {
       ..._resultAnswers,
       Methods.status: (_, _) => {
-        ..._status('ready'),
+        ..._status('READY'),
         'busy': true,
-        'jobs': {'running': 1, 'waiting': 2, 'done': 3},
+        'jobs': {'RUNNING': 1, 'WAITING': 2, 'DONE': 3},
       },
       Methods.goals: (_, _) => {
         'goals': [
@@ -1043,10 +1057,10 @@ void main() {
       },
       Methods.videosAdd: (_, _) => {
         'videos': [
-          {'path': '/videos/a.mov', 'id': 1, 'result': 'added'},
-          {'path': '/videos/b.mov', 'id': 2, 'result': 'known'},
-          {'path': '/videos/c.txt', 'id': 3, 'result': 'unreadable'},
-          {'path': '/videos/none', 'result': 'notFound'},
+          {'path': '/videos/a.mov', 'id': 1, 'result': 'ADDED'},
+          {'path': '/videos/b.mov', 'id': 2, 'result': 'KNOWN'},
+          {'path': '/videos/c.txt', 'id': 3, 'result': 'UNREADABLE'},
+          {'path': '/videos/none', 'result': 'NOT_FOUND'},
         ],
       },
       Methods.videosList: (_, _) => {
@@ -1054,7 +1068,7 @@ void main() {
           {
             'id': 1,
             'path': '/videos/a.mov',
-            'status': 'ready',
+            'status': 'READY',
             'sizeBytes': 1500000000,
             'durationSeconds': 754.2,
             'width': 3840,
@@ -1064,17 +1078,17 @@ void main() {
             'hdr': true,
             'preview': {
               'goal': 'archive.master',
-              'plan': 'encode',
+              'plan': 'ENCODE',
               'expectedBytes': 400000000,
               'measured': true,
               'measuring': false,
-              'closeness': 'same',
+              'closeness': 'SAME',
             },
           },
           {
             'id': 3,
             'path': '/videos/c.txt',
-            'status': 'unreadable',
+            'status': 'UNREADABLE',
             'audioCodecs': <String>[],
             'hdr': false,
           },
@@ -1088,17 +1102,17 @@ void main() {
         'busy': true,
         'jobs': [
           {
-            ..._job(1, 'running'),
+            ..._job(1, 'RUNNING'),
             'fraction': .42,
             'remainingSeconds': 200.0,
             'attempt': 2,
           },
           {
-            ..._job(2, 'done', outputPath: '/videos/Converted/clip2.mp4'),
+            ..._job(2, 'DONE', outputPath: '/videos/Converted/clip2.mp4'),
             'outputBytes': 1000000,
-            'sample': 'middle',
+            'sample': 'MIDDLE',
             'quality': {
-              'outcome': 'belowTarget',
+              'outcome': 'BELOW_TARGET',
               'value': 20,
               'standardValue': 35,
               'vmaf': 93.1,
@@ -1107,7 +1121,7 @@ void main() {
             'needsALook': true,
           },
           {
-            ..._job(3, 'failed'),
+            ..._job(3, 'FAILED'),
             'errorLines': ['Conversion failed!'],
           },
         ],
@@ -1115,11 +1129,11 @@ void main() {
       Methods.queueAdd: (_, _) => {
         'goal': 'archive.master',
         'options': {'codec': 'av1'},
-        'added': [_job(4, 'waiting')],
+        'added': [_job(4, 'WAITING')],
         'alreadyQueued': [2],
         'skipped': [
-          {'video': '/videos/none', 'reason': 'notFound'},
-          {'video': 3, 'reason': 'unreadable'},
+          {'video': '/videos/none', 'reason': 'NOT_FOUND'},
+          {'video': 3, 'reason': 'UNREADABLE'},
         ],
       },
       Methods.queueRemove: (_, _) => {
@@ -1129,14 +1143,14 @@ void main() {
         'removed': [2],
       },
       Methods.queueMove: (_, _) => {
-        'jobs': [_job(1, 'waiting')],
+        'jobs': [_job(1, 'WAITING')],
       },
-      Methods.queueRetry: (_, _) => {'job': _job(3, 'waiting')},
+      Methods.queueRetry: (_, _) => {'job': _job(3, 'WAITING')},
       Methods.queuePause: (_, _) => {'paused': true},
       Methods.queueResume: (_, _) => {'paused': false},
       Methods.queueCancel: (_, _) => {'cancelled': null},
       Methods.queueConvertAnyway: (_, _) => {
-        'added': [_job(4, 'waiting')],
+        'added': [_job(4, 'WAITING')],
         'alreadyQueued': false,
       },
       Methods.queueConvertWhole: (_, _) => {
@@ -1145,9 +1159,9 @@ void main() {
       },
       Methods.wait: (_, _) => {
         'outcomes': [
-          _outcome(1, 'done', needsALook: true),
-          _outcome(2, 'removed'),
-          _outcome(3, 'cancelled'),
+          _outcome(1, 'DONE', needsALook: true),
+          _outcome(2, 'REMOVED'),
+          _outcome(3, 'CANCELLED'),
         ],
       },
       Methods.subscribe: (_, peer) {
@@ -1156,15 +1170,15 @@ void main() {
         for (final (event, params) in [
           (Events.videoAdded, {'id': 1, 'path': '/videos/a.mov'}),
           (Events.videoRemoved, {'video': 1}),
-          (Events.jobAdded, _job(1, 'waiting')),
+          (Events.jobAdded, _job(1, 'WAITING')),
           (Events.jobChecking, {'job': 1, 'attempt': 1}),
           (Events.jobProgress, {'job': 1, 'fraction': .5}),
-          (Events.jobFinished, _job(1, 'failed')),
+          (Events.jobFinished, _job(1, 'FAILED')),
           (Events.jobRemoved, {'job': 1}),
           (Events.queueIdle, const <String, Object?>{}),
           (
             Events.compareFinished,
-            {'job': 1, 'status': 'measured', 'closeness': 'same', 'xpsnr': 42},
+            {'job': 1, 'status': 'MEASURED', 'closeness': 'SAME', 'xpsnr': 42},
           ),
         ]) {
           peer.notify(event, {'time': 't', ...params});

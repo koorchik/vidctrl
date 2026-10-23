@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 
 import '../../core/control/protocol.dart';
+import '../../core/control/codes.dart';
 import '../../core/control/words.dart';
 import '../../core/estimate/size_estimator.dart';
 import '../../core/ffmpeg/command_text.dart';
@@ -98,7 +99,7 @@ Future<Object?> jobCompare(
 /// Why [job] cannot be compared, as the window then offers no comparison.
 String _notComparable(QueueJob job, AppEnvironment env) {
   if (job.status != JobStatus.done || job.result?.outputPath == null) {
-    return 'Job ${job.id} is ${statusWords(job.status.name).toLowerCase()}; '
+    return 'Job ${job.id} is ${statusWords(codeOf(job.status)).toLowerCase()}; '
         'only a job that is done can be compared with its original.';
   }
   if (!canComparePlan(job.plan)) {
@@ -135,7 +136,7 @@ Future<Object?> videosDetails(
       throw ControlError(
         ControlErrorKind.notFound,
         'Job ${job.id} has no result: it is '
-        '${statusWords(job.status.name).toLowerCase()}.',
+        '${statusWords(codeOf(job.status)).toLowerCase()}.',
       );
     }
     try {

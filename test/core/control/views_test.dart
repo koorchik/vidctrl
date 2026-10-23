@@ -1,8 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vidctrl/core/control/codes.dart';
 import 'package:vidctrl/core/control/views.dart';
 import 'package:vidctrl/core/control/words.dart';
+
+import '../../support/machine_json.dart';
 
 Map<String, Object?> _through(Map<String, Object?> json) =>
     jsonDecode(jsonEncode(json)) as Map<String, Object?>;
@@ -15,10 +18,14 @@ void main() {
       path: '/videos/a.mov',
       goal: 'archive.master',
       options: {'speed': 'fast'},
-      status: 'done',
+      status: JobStatusCodes.done,
       outputPath: '/videos/Converted/a_av1-crf35.mp4',
       outputBytes: 10,
-      quality: QualityView(outcome: 'belowTarget', value: 20, share: .4),
+      quality: QualityView(
+        outcome: OutcomeCodes.belowTarget,
+        value: 20,
+        share: .4,
+      ),
       needsALook: true,
       errorLines: const [],
     );
@@ -27,7 +34,7 @@ void main() {
     final video = VideoView(
       id: 1,
       path: '/videos/a.mov',
-      status: 'ready',
+      status: VideoStatusCodes.ready,
       sizeBytes: 1000,
       durationSeconds: 12.5,
       width: 3840,
@@ -37,11 +44,11 @@ void main() {
       hdr: true,
       preview: GoalPreview(
         goal: 'archive.master',
-        plan: 'encode',
+        plan: PlanCodes.encode,
         expectedBytes: 100,
         measured: true,
         measuring: false,
-        closeness: 'same',
+        closeness: ClosenessCodes.same,
       ),
     );
     expect(
@@ -50,11 +57,11 @@ void main() {
     );
 
     final status = StatusView(
-      state: 'ready',
+      state: StateCodes.ready,
       version: '1.0.0',
       busy: true,
       paused: false,
-      jobs: {'waiting': 2, 'done': 1},
+      jobs: {JobStatusCodes.waiting: 2, JobStatusCodes.done: 1},
     );
     expect(
       StatusView.fromJson(_through(status.toJson())).toJson(),
@@ -81,7 +88,7 @@ void main() {
     final outcome = JobOutcome(
       jobId: 3,
       path: '/videos/a.mov',
-      status: 'done',
+      status: JobStatusCodes.done,
       outputPath: '/videos/Converted/a.mp4',
       needsALook: false,
     );
@@ -95,7 +102,7 @@ void main() {
     final json = VideoView(
       id: 0,
       path: '/videos/a.mov',
-      status: 'probing',
+      status: VideoStatusCodes.probing,
       audioCodecs: const [],
       hdr: false,
     ).toJson();
@@ -103,60 +110,76 @@ void main() {
     expect(json.containsKey('preview'), isFalse);
   });
 
-  test('English text stands beside the ids', () {
+  test('the JSON carries codes, never words', () {
     final video = VideoView(
       id: 0,
       path: '/videos/a.mov',
-      status: 'unreadable',
+      status: VideoStatusCodes.ready,
       audioCodecs: const [],
       hdr: false,
       preview: GoalPreview(
         goal: 'archive.master',
-        plan: 'keptAsIs',
+        plan: PlanCodes.keptAsIs,
         measured: true,
         measuring: false,
-        closeness: 'veryClose',
+        closeness: ClosenessCodes.veryClose,
       ),
     ).toJson();
-    expect(video['statusText'], 'Cannot be read: not a video FFmpeg can open');
-    final preview = video['preview'] as Map<String, Object?>;
-    expect(preview['planText'], planWords('keptAsIs'));
-    expect(preview['closenessText'], 'Very close to the original');
-    final quality = QualityView(outcome: 'raised', share: 1).toJson();
-    expect(quality['outcomeText'], startsWith('Raised quality'));
+    final job = JobView(
+      id: 3,
+      videoId: 0,
+      path: '/videos/a.mov',
+      goal: 'archive.master',
+      options: {'speed': 'fast'},
+      sample: SampleCodes.middle,
+      status: JobStatusCodes.done,
+      quality: QualityView(outcome: OutcomeCodes.belowTarget, share: .4),
+      needsALook: true,
+      errorLines: const [],
+    ).toJson();
+    final status = StatusView(
+      state: StateCodes.ready,
+      version: '1.0.0',
+      busy: false,
+      paused: false,
+      jobs: {JobStatusCodes.waiting: 1},
+    ).toJson();
+    final outcome = JobOutcome(
+      jobId: 3,
+      path: '/videos/a.mov',
+      status: JobStatusCodes.removed,
+      needsALook: false,
+    ).toJson();
+    for (final json in [video, job, status, outcome]) {
+      expectMachineJson(json);
+    }
+    expect((video['preview'] as Map)['plan'], 'KEPT_AS_IS');
+    expect((job['quality'] as Map)['outcome'], 'BELOW_TARGET');
   });
 
   test('no word the client prints speaks of deleting', () {
     final all = [
-      for (final s in [
-        'waiting',
-        'running',
-        'paused',
-        'done',
-        'skipped',
-        'failed',
-        'cancelled',
-        'removed',
-        'probing',
-        'ready',
-        'unreadable',
-      ])
+      for (final s in [...JobStatusCodes.all, ...VideoStatusCodes.all])
         statusWords(s),
-      for (final s in [
-        'skip',
-        'remux',
-        'audioOnly',
-        'encode',
-        'unsupported',
-        'keptAsIs',
-      ])
-        planWords(s),
-      for (final s in ['same', 'veryClose', 'differs']) closenessWords(s),
-      for (final s in ['standard', 'raised', 'belowTarget', 'notWorthIt'])
-        outcomeWords(s),
+      for (final s in PlanCodes.all) planWords(s),
+      for (final s in ClosenessCodes.all) closenessWords(s),
+      for (final s in OutcomeCodes.all) outcomeWords(s),
     ];
     for (final text in all) {
       expect(speaksOfDeleting(text), isFalse, reason: text);
+    }
+  });
+
+  test('every code has its words', () {
+    for (final (words, codes) in [
+      (statusWords, [...JobStatusCodes.all, ...VideoStatusCodes.all]),
+      (planWords, PlanCodes.all),
+      (closenessWords, ClosenessCodes.all),
+      (outcomeWords, OutcomeCodes.all),
+    ]) {
+      for (final code in codes) {
+        expect(words(code), isNot(code), reason: code);
+      }
     }
   });
 

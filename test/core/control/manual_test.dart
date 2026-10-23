@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vidctrl/app/queue/queue_state.dart';
 import 'package:vidctrl/app/sources/sources_controller.dart';
 import 'package:vidctrl/core/control/client.dart';
+import 'package:vidctrl/core/control/codes.dart';
 import 'package:vidctrl/core/control/manual.dart';
 import 'package:vidctrl/core/control/protocol.dart';
 import 'package:vidctrl/core/control/views.dart';
@@ -259,17 +260,50 @@ void main() {
     }
   });
 
-  test('every status, plan, closeness and outcome is told in words', () {
-    for (final id in [
-      for (final status in JobStatus.values) status.name,
-      'removed',
-      for (final status in SourceStatus.values) status.name,
-      'keptAsIs',
-    ]) {
-      expect(text, contains('- `$id`: '), reason: id);
+  test('every code the JSON carries is explained, with its words', () {
+    final codes = [
+      ...JobStatusCodes.all,
+      ...VideoStatusCodes.all,
+      ...PlanCodes.all,
+      ...ClosenessCodes.all,
+      ...OutcomeCodes.all,
+      ...StateCodes.all,
+      ...AddResultCodes.all,
+      ...SampleCodes.all,
+      ...ComparisonCodes.all,
+      for (final kind in ControlErrorKind.values) kind.code,
+      ...ClientErrorCodes.all,
+    ];
+    for (final code in codes) {
+      expect(text, contains('- `$code`: '), reason: code);
     }
-    expect(text, contains('- `belowTarget`: ${outcomeWords('belowTarget')}'));
+    for (final status in [
+      ...JobStatus.values.map(codeOf),
+      ...SourceStatus.values.map(codeOf),
+    ]) {
+      expect(text, contains('- `$status`: ${statusWords(status)}'));
+    }
+    expect(
+      text,
+      contains('- `BELOW_TARGET`: ${outcomeWords(OutcomeCodes.belowTarget)}'),
+    );
     expect(text, contains('-check'));
+  });
+
+  test('the manual names no value as it was before codes', () {
+    for (final old in [
+      '`keptAsIs`',
+      '`notWorthIt`',
+      '`belowTarget`',
+      '`veryClose`',
+      '`ffmpegMissing`',
+      '`badArgument`',
+      '`job-finished`',
+      '`app-closing`',
+      'Text`',
+    ]) {
+      expect(text, isNot(contains(old)), reason: old);
+    }
   });
 
   test('every event and exit code is listed', () {
@@ -305,7 +339,7 @@ void main() {
       expect(text, contains('| $code |'), reason: '$code');
     }
     for (final kind in ControlErrorKind.values) {
-      expect(text, contains('`${kind.name}`'), reason: kind.name);
+      expect(text, contains('`${kind.code}`'), reason: kind.code);
     }
   });
 
@@ -323,9 +357,29 @@ void main() {
     expect(archive['title'], 'Archive');
     expect(archive['goal'], 'archive');
     expect((json['exitCodes'] as Map).keys, containsAll(['0', '1', '6']));
+    final events = [
+      for (final e in json['events'] as List) (e as Map)['name'] as String,
+    ];
+    expect(events, contains(Events.jobFinished));
+    for (final event in events) {
+      expect(event, matches(codePattern));
+    }
+    final codes = json['codes'] as Map;
     expect([
-      for (final e in json['events'] as List) (e as Map)['name'],
-    ], contains(Events.jobFinished));
+      for (final c in codes['jobStatus'] as List) (c as Map)['code'],
+    ], JobStatusCodes.all);
+    expect([
+      for (final c in codes['plan'] as List) (c as Map)['code'],
+    ], PlanCodes.all);
+    expect([
+      for (final c in codes['event'] as List) (c as Map)['code'],
+    ], events);
+    for (final kind in codes.values) {
+      for (final c in kind as List) {
+        expect((c as Map)['code'], matches(codePattern));
+        expect(c['description'], isNotEmpty);
+      }
+    }
   });
 
   test('docs/CLIENT.md is the manual as it is now', () {

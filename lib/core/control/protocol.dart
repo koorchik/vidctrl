@@ -4,6 +4,8 @@ import 'package:json_rpc_2/error_code.dart' as error_code;
 import 'package:json_rpc_2/json_rpc_2.dart';
 import 'package:stream_channel/stream_channel.dart';
 
+import 'codes.dart';
+
 /// The version of the conversation between a client and the window. It goes
 /// in the endpoint file and in the `hello` answer.
 const controlProtocol = 1;
@@ -18,6 +20,9 @@ enum ControlErrorKind {
   unauthorized,
   notRunning,
   appClosed;
+
+  /// How JSON names it: `BAD_ARGUMENT` and so on.
+  String get code => codeOf(this);
 
   /// The code the client exits with for this kind of failure.
   int get exitCode => switch (this) {
@@ -36,8 +41,10 @@ class ControlError implements Exception {
   /// ours is [ControlErrorKind.badArgument].
   factory ControlError.fromRpc(RpcException e) {
     final data = e.data;
-    final kind = ControlErrorKind.values
-        .asNameMap()[data is Map ? data['kind'] : null];
+    final kind = fromCode(
+      ControlErrorKind.values,
+      data is Map ? data['kind'] : null,
+    );
     return ControlError(
       kind ??
           (e.code == error_code.METHOD_NOT_FOUND
@@ -50,12 +57,12 @@ class ControlError implements Exception {
   final ControlErrorKind kind;
   final String message;
 
-  /// This error as JSON-RPC sends it: a code of the kind's position clear of
-  /// JSON-RPC's own, and the kind by name.
+  /// This error as JSON-RPC sends it: a number of the kind's position clear
+  /// of JSON-RPC's own, and the kind's code.
   RpcException toRpc() => RpcException(
     _errorCodeBase + kind.index,
     message,
-    data: {'kind': kind.name},
+    data: {'kind': kind.code},
   );
 
   @override
@@ -123,22 +130,22 @@ abstract final class Methods {
   static const subscribe = 'subscribe';
 }
 
-/// What the window tells a subscribed client.
+/// What the window tells a subscribed client, each by its code.
 abstract final class Events {
-  static const snapshot = 'snapshot';
-  static const videoAdded = 'video-added';
-  static const videoReady = 'video-ready';
-  static const videoUnreadable = 'video-unreadable';
-  static const videoRemoved = 'video-removed';
-  static const jobAdded = 'job-added';
-  static const jobChecking = 'job-checking';
-  static const jobStarted = 'job-started';
-  static const jobProgress = 'job-progress';
-  static const jobFinished = 'job-finished';
-  static const jobRemoved = 'job-removed';
-  static const queuePaused = 'queue-paused';
-  static const queueResumed = 'queue-resumed';
-  static const queueIdle = 'queue-idle';
-  static const compareFinished = 'compare-finished';
-  static const appClosing = 'app-closing';
+  static const snapshot = 'SNAPSHOT';
+  static const videoAdded = 'VIDEO_ADDED';
+  static const videoReady = 'VIDEO_READY';
+  static const videoUnreadable = 'VIDEO_UNREADABLE';
+  static const videoRemoved = 'VIDEO_REMOVED';
+  static const jobAdded = 'JOB_ADDED';
+  static const jobChecking = 'JOB_CHECKING';
+  static const jobStarted = 'JOB_STARTED';
+  static const jobProgress = 'JOB_PROGRESS';
+  static const jobFinished = 'JOB_FINISHED';
+  static const jobRemoved = 'JOB_REMOVED';
+  static const queuePaused = 'QUEUE_PAUSED';
+  static const queueResumed = 'QUEUE_RESUMED';
+  static const queueIdle = 'QUEUE_IDLE';
+  static const compareFinished = 'COMPARE_FINISHED';
+  static const appClosing = 'APP_CLOSING';
 }

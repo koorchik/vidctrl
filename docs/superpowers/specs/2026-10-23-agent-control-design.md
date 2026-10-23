@@ -188,7 +188,7 @@ screen).
 Closing the window is unchanged (it asks while converting). Its shutdown
 path (`WindowCloseGuard` → `QueueController.shutDown()`,
 `EstimateCache.stopMeasuring()`) also stops the server: it sends an
-`app-closing` event to subscribers, closes connections and deletes the
+`APP_CLOSING` event to subscribers, closes connections and deletes the
 endpoint file. A `wait` or `events` that was running exits with code 4.
 
 ## Commands
@@ -219,7 +219,7 @@ is an error that lists the valid ones.
 | `pause`, `resume` | the pause button | explicit, not a toggle, so a script can repeat them |
 | `cancel [job]` | cancel | the running one by default |
 | `queue convert-anyway <job>`, `queue convert-whole <job>` | "Convert anyway", "Convert the whole video" | |
-| `job <job>` | a finished job's row and (i) window | result path and size, chosen quality, outcome (`belowTarget` gives the `-check` name and says "look at it"), poorest piece's scores; `--command` adds "Show the command" (`forDisplay: true`) |
+| `job <job>` | a finished job's row and (i) window | result path and size, chosen quality, outcome (`BELOW_TARGET` gives the `-check` name and says "look at it"), poorest piece's scores; `--command` adds "Show the command" (`forDisplay: true`) |
 | `compare <job> [--no-wait]` | "Compare with the original" | waits for the result by default; words from `closenessOf` plus VMAF and XPSNR |
 | `wait [jobs…] [--timeout s]` | — | see below |
 | `events [--since-now]` | — | see below |
@@ -252,13 +252,14 @@ Exit codes, shared by every command:
 
 ### events
 
-JSON lines on stdout until the app closes, each `{ "event", "time", … }`:
-`video-added`, `video-ready`, `video-unreadable`, `video-removed`,
-`job-added`, `job-checking` (attempt N), `job-started`, `job-progress` (at
-most once a second per job), `job-finished` (status, output path, size,
-quality outcome), `job-removed`, `queue-paused`, `queue-resumed`,
-`queue-idle`, `compare-finished`, `app-closing`. Without `--since-now` it
-first prints the current state as `snapshot`, so a reader that starts late
+JSON lines on stdout until the app closes, each `{ "event", "time", … }`,
+the event named by its code:
+`VIDEO_ADDED`, `VIDEO_READY`, `VIDEO_UNREADABLE`, `VIDEO_REMOVED`,
+`JOB_ADDED`, `JOB_CHECKING` (attempt N), `JOB_STARTED`, `JOB_PROGRESS` (at
+most once a second per job), `JOB_FINISHED` (status, output path, size,
+quality outcome), `JOB_REMOVED`, `QUEUE_PAUSED`, `QUEUE_RESUMED`,
+`QUEUE_IDLE`, `COMPARE_FINISHED`, `APP_CLOSING`. Without `--since-now` it
+first prints the current state as `SNAPSHOT`, so a reader that starts late
 misses nothing. This is what an agent runs in the background to say "the
 first three are done" while the rest converts.
 
@@ -266,8 +267,33 @@ first three are done" while the rest converts.
 
 Plain words lead in the command's text output too ("Looks the same", "Kept
 as it is: converting would hardly make it smaller"), with the technical
-names beside, in English. `--json` carries ids and numbers, and the same
-English words as separate fields.
+names beside, in English. `--json` is for programs (the owner's call): it
+carries ids, numbers, paths and, for every value that is one of a few, a
+code in SCREAMING_SNAKE_CASE, and no words (no `...Text` fields; only an
+error's `message`, beside its `code`, is for people). Goal, option and
+choice ids stay as `--goal` and `--opt` take them (`archive.master`,
+`speed=fast`), so input and output share one spelling. The codes are
+listed once, in `lib/core/control/codes.dart`; a Dart enum's value becomes
+its code by `codeOf` (`audioOnly` is `AUDIO_ONLY`), and the manual
+explains each one:
+
+- Job status: `WAITING`, `RUNNING`, `PAUSED`, `DONE`, `SKIPPED`,
+  `FAILED`, `CANCELLED`; how a job ended (`wait`) may also be `REMOVED`.
+- Video status: `PROBING`, `READY`, `UNREADABLE`.
+- Plan: `SKIP`, `REMUX`, `AUDIO_ONLY`, `ENCODE`, `UNSUPPORTED`,
+  `KEPT_AS_IS`.
+- Closeness: `SAME`, `VERY_CLOSE`, `DIFFERS`.
+- Quality outcome: `STANDARD`, `RAISED`, `BELOW_TARGET`, `NOT_WORTH_IT`.
+- Window state: `STARTING`, `READY`, `FFMPEG_MISSING`.
+- Adding a path, and why `queue add` skipped one: `ADDED`, `KNOWN`,
+  `NOT_FOUND`, `UNREADABLE`.
+- Sample: `START`, `MIDDLE` (the flag stays `--sample start|middle`).
+- Comparison: `MEASURED`, `FAILED`.
+- Events: as listed under events.
+- Errors (`data.kind` on the wire, `{"error": {"code", "message"}}` from
+  the client): `BAD_ARGUMENT`, `NOT_FOUND`, `BUSY`, `UNKNOWN_METHOD`,
+  `FFMPEG_MISSING`, `UNAUTHORIZED`, `NOT_RUNNING`, `APP_CLOSED`, and the
+  client's own `TIMEOUT` and `UNEXPECTED`.
 
 ### The manual
 
@@ -288,7 +314,7 @@ running and starts nothing.
   `registry.dart` at build time, so the list cannot fall behind; the words
   come from the English ARB.
 - **What the outcomes mean**, so an agent can tell the owner: done,
-  skipped, kept as it is (and "Convert anyway"), `belowTarget` (the `-check`
+  skipped, kept as it is (and "Convert anyway"), `BELOW_TARGET` (the `-check`
   name: tell the owner to look at it by eye), failed, cancelled.
 - **What the app never does**, said plainly near the top: it deletes no file;
   "remove" takes a video off the list or a job out of the queue, and the
@@ -316,7 +342,7 @@ cannot ship undocumented, and that neither the manual nor any text the
 command prints speaks of deleting a file (a list of words, like the
 technical terms in `home_screen_test.dart`). The window's own
 `qualityCheckByEye` ("Check by eye before deleting the original") is not
-reused: the command words `belowTarget` as "worth a look by eye".
+reused: the command words `BELOW_TARGET` as "worth a look by eye".
 
 ## What changes in the window
 
@@ -432,8 +458,8 @@ must find it in the window and get an agent working in one paste.
   loopback socket. Each command is checked against what the same button
   does: e.g. `queue add` and `addSelected()` produce equal jobs; a duplicate
   is refused both ways; `cancel` and the cancel button leave the same state.
-- Events: a fake job finishing produces `job-finished`, a closing container
-  produces `app-closing`.
+- Events: a fake job finishing produces `JOB_FINISHED`, a closing container
+  produces `APP_CLOSING`.
 - The command: argument parsing and exit codes against a fake server; one
   test that starts it as a process (`dart run bin/vidctrl_client.dart`)
   against a server in the test.
