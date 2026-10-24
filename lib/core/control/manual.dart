@@ -528,7 +528,7 @@ How a job's quality was chosen: Archive measures each video before converting it
 - `value` (int, optional): the quality number chosen (lower is better).
 - `standardValue` (int, optional): the goal's usual number.
 - `vmaf` (number, optional): VMAF of the poorest piece; 95 and more looks the same.
-- `xpsnr` (number, optional): XPSNR of the poorest piece, in dB.
+- `xpsnr` (number, optional): XPSNR of the poorest piece, in dB; 100 for pictures identical to the original's.
 - `share` (number): the expected size as a share of the original's, 0 to 1.
 ''',
   'Outcome': '''

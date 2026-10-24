@@ -48,7 +48,9 @@ VideoView _videoView(
     width: picture?.width,
     height: picture?.height,
     videoCodec: picture?.codec,
-    audioCodecs: [for (final track in info?.audio ?? const []) track.codec],
+    audioCodecs: [
+      for (final track in info?.audio ?? const <AudioStream>[]) track.codec,
+    ],
     hdr: picture?.color.isHdr ?? false,
     preview: preview,
   );
@@ -87,9 +89,13 @@ QualityView _qualityView(QualityChoice choice) => QualityView(
   value: choice.value,
   standardValue: choice.standardValue,
   vmaf: choice.chosen.score.vmaf,
-  xpsnr: choice.chosen.score.lumaDb,
+  xpsnr: wireDb(choice.chosen.score.lumaDb),
   share: choice.share,
 );
+
+/// An XPSNR as a client reads it: identical pictures score infinity, which
+/// JSON cannot hold, so they read 100, beyond any real score.
+double wireDb(double lumaDb) => lumaDb.isFinite ? lumaDb : 100;
 
 /// What [recipe] would do to [video], as the video list shows it.
 GoalPreview goalPreview(

@@ -239,23 +239,17 @@ class _VideoTile extends ConsumerWidget {
       sourcesProvider.select((s) => s.selectedIds.contains(video.id)),
     );
     final preview = ref.watch(previewProvider.select((p) => p[video.id]));
-    final jobs = ref.watch(
-      queueProvider.select(
-        (q) => [
-          for (final job in q.jobs)
-            if (job.sourceId == video.id) job.status,
-        ],
-      ),
+    // Counted into a record, which compares by value, so the row is not
+    // rebuilt on every progress report of a conversion.
+    final (:queued, :done) = ref.watch(
+      queueProvider.select((q) {
+        final jobs = q.jobs.where((job) => job.sourceId == video.id);
+        return (
+          queued: jobs.where((job) => job.isPending).length,
+          done: jobs.where((job) => job.status == JobStatus.done).length,
+        );
+      }),
     );
-    final queued = jobs
-        .where(
-          (s) =>
-              s == JobStatus.waiting ||
-              s == JobStatus.running ||
-              s == JobStatus.paused,
-        )
-        .length;
-    final done = jobs.where((s) => s == JobStatus.done).length;
     final info = video.info;
     final unreadable = video.status == SourceStatus.unreadable;
 
@@ -358,16 +352,7 @@ class _VideoTile extends ConsumerWidget {
                         child: Text(l10n.videoDetails),
                       ),
                       PopupMenuItem(
-                        onTap: () {
-                          final args = ref
-                              .read(queueProvider.notifier)
-                              .commandForVideo(video);
-                          if (args == null) return;
-                          showDialog<void>(
-                            context: context,
-                            builder: (_) => CommandDialog(args: args),
-                          );
-                        },
+                        onTap: () => showCommandForVideo(context, ref, video),
                         child: Text(l10n.showCommand),
                       ),
                     ],
@@ -407,12 +392,12 @@ class _PreviewLine extends StatelessWidget {
     // What is being worked out, shown with a spinner.
     final working = preview.keptAsIs || estimate != null
         ? null
-        : preview.choosing
-        ? l10n.choosingQuality
-        : preview.measuring
-        ? (canComparePlan(preview.plan)
-              ? l10n.estimatingQuality
-              : l10n.estimating)
+        : preview.choosing || preview.measuring
+        ? measuringWords(
+            l10n,
+            choosing: preview.choosing,
+            comparing: canComparePlan(preview.plan),
+          )
         : null;
 
     final (text, color) = switch (preview.plan.kind) {

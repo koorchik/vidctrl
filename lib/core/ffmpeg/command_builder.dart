@@ -42,10 +42,10 @@ List<String> buildFfmpegArgs({
     // Before the input, so FFmpeg seeks instead of decoding up to the start.
     if (sample != null && sample.start > Duration.zero) ...[
       '-ss',
-      _seconds(sample.start),
+      ffmpegSeconds(sample.start),
     ],
     '-i', url(input),
-    if (sample != null) ...['-t', _seconds(sample.length)],
+    if (sample != null) ...['-t', ffmpegSeconds(sample.length)],
 
     // Only the main picture and the audio tracks are carried over. Data
     // tracks are dropped; FFmpeg rebuilds the timecode track from metadata.
@@ -82,7 +82,10 @@ List<String> buildFfmpegArgs({
   ];
 }
 
-String _seconds(Duration d) => (d.inMicroseconds / 1e6).toStringAsFixed(3);
+/// [d] as FFmpeg takes a time: seconds, to the millisecond. Cutting a piece,
+/// comparing it and grabbing its frame all seek with this, so they land on
+/// the same frame.
+String ffmpegSeconds(Duration d) => (d.inMicroseconds / 1e6).toStringAsFixed(3);
 
 /// A path as a person would type it. The `file:` prefix is kept only where
 /// FFmpeg would otherwise misread the name as an option or a protocol.

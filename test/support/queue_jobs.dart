@@ -1,6 +1,7 @@
 import 'package:vidctrl/app/queue/queue_state.dart';
 import 'package:vidctrl/app/recipe/recipe.dart';
 import 'package:vidctrl/core/estimate/progress_estimator.dart';
+import 'package:vidctrl/core/ffmpeg/command_builder.dart';
 import 'package:vidctrl/core/output/output_namer.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
 
@@ -13,6 +14,7 @@ QueueJob queueJob(
   JobStatus status, {
   int? attempt,
   JobProgress? progress,
+  SampleRange? sample,
 }) => QueueJob(
   id: id,
   sourceId: id,
@@ -24,6 +26,7 @@ QueueJob queueJob(
   status: status,
   attempt: attempt,
   progress: progress,
+  sample: sample,
 );
 
 QueueJob waitingJob(int id) => queueJob(id, JobStatus.waiting);

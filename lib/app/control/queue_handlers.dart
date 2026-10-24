@@ -129,8 +129,8 @@ Future<Object?> queueCancel(
     );
   }
   if (active == null) return {'cancelled': null};
-  // A job just starting has no conversion to stop yet; it is asked again
-  // until it has stopped.
+  // Answers once it has stopped. A job just starting stops as soon as it has
+  // started; it is asked again each second all the same.
   while (ref.read(queueProvider).activeJob?.id == active.id) {
     await ref.read(queueProvider.notifier).cancelActive();
     await _untilEnded(ref, active.id, within: const Duration(seconds: 1));

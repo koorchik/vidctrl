@@ -1090,6 +1090,7 @@ void main() {
               sleepInhibitor: FakeSleepInhibitor(),
               estimator: SampleEstimator(
                 FfmpegRunner(media!.paths.ffmpeg),
+                workDir: Directory(media!.file('app_estimates')),
                 compare: compare,
                 vmaf: compare && capabilities.hasFilter('libvmaf'),
               ),

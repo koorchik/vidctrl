@@ -30,6 +30,10 @@ import 'fake_media.dart';
 class FakeFfprobe implements Ffprobe {
   final files = <String, MediaInfo>{};
 
+  /// What probing a path throws instead of answering, as when ffprobe
+  /// cannot be started.
+  final errors = <String, Object>{};
+
   /// Registers a file. [like] supplies everything but the path.
   void add(String path, {MediaInfo? like}) {
     final info = like ?? clip();
@@ -51,6 +55,7 @@ class FakeFfprobe implements Ffprobe {
 
   @override
   Future<MediaInfo> probe(String path) async {
+    if (errors[path] case final error?) throw error;
     final info = files[path];
     if (info == null) throw FfprobeException('not a video');
     return info;
@@ -122,7 +127,7 @@ class FakeHandle implements ConversionHandle {
 
   void _complete(ConversionResult result) {
     if (_result.isCompleted) return;
-    _progress.close();
+    unawaited(_progress.close());
     _result.complete(result);
   }
 
@@ -176,8 +181,14 @@ class FakeSleepInhibitor implements SleepInhibitor {
   @override
   bool isActive = false;
 
+  /// When set, keeping the computer awake fails.
+  bool fails = false;
+
   @override
-  Future<void> acquire() async => isActive = true;
+  Future<void> acquire() async {
+    if (fails) throw StateError('No helper to keep the computer awake');
+    isActive = true;
+  }
 
   @override
   Future<void> release() async => isActive = false;
@@ -345,7 +356,7 @@ class FakeComparison implements ComparisonHandle {
 
   void _complete(ComparisonResult result) {
     if (_result.isCompleted) return;
-    _progress.close();
+    unawaited(_progress.close());
     _result.complete(result);
   }
 }

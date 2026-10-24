@@ -91,6 +91,17 @@ void main() {
       },
     );
 
+    test('a file that fails to be inspected is unreadable, not inspected '
+        'for ever', () async {
+      env.ffprobe.errors['/videos/a.mp4'] = StateError('ffprobe went away');
+
+      await sources().addPaths(['/videos/a.mp4', '/videos/b.mp4']);
+
+      expect(video('a.mp4').status, SourceStatus.unreadable);
+      expect(video('b.mp4').status, SourceStatus.ready);
+      expect(sourceState().selectedIds, {video('b.mp4').id});
+    });
+
     test('clicking selects one; the checkbox adds and removes', () async {
       await sources().addPaths(['/videos/a.mp4', '/videos/b.mp4']);
 
@@ -227,6 +238,19 @@ void main() {
       expect(env.inhibitor.isActive, isFalse);
     });
 
+    test('a computer that cannot be kept awake still converts', () async {
+      env.inhibitor.fails = true;
+      await sources().addPaths(['/videos/a.mp4']);
+
+      queue().addSelected();
+      await settle();
+
+      expect(env.executor.started, hasLength(1));
+      env.executor.last.finish();
+      await settle();
+      expect(queueState().busy, isFalse);
+    });
+
     test('pause holds the queue; continue goes on', () async {
       await sources().addPaths(['/videos/a.mp4', '/videos/b.mp4']);
       queue().addSelected();
@@ -268,6 +292,59 @@ void main() {
       ]);
     });
 
+    test(
+      'cancelling a job just starting stops it once it has started',
+      () async {
+        env.executor.holdStarts = true;
+        await sources().addPaths(['/videos/a.mp4', '/videos/b.mp4']);
+        queue().addSelected();
+        await settle();
+
+        await queue().cancelActive();
+        env.executor.holdStarts = false;
+        env.executor.releaseStarts();
+        await settle();
+
+        expect(env.executor.started.first.cancelRequested, isTrue);
+        expect(jobs().map((j) => j.status), [
+          JobStatus.cancelled,
+          JobStatus.running,
+        ]);
+      },
+    );
+
+    test('pausing a job just starting holds it once it has started', () async {
+      env.executor.holdStarts = true;
+      await sources().addPaths(['/videos/a.mp4']);
+      queue().addSelected();
+      await settle();
+
+      queue().pause();
+      env.executor.releaseStarts();
+      await settle();
+
+      expect(env.executor.last.paused, isTrue);
+      expect(jobs().single.status, JobStatus.paused);
+    });
+
+    test(
+      'pausing and continuing while a job starts leaves it running',
+      () async {
+        env.executor.holdStarts = true;
+        await sources().addPaths(['/videos/a.mp4']);
+        queue().addSelected();
+        await settle();
+
+        queue().pause();
+        queue().resume();
+        env.executor.releaseStarts();
+        await settle();
+
+        expect(env.executor.last.paused, isFalse);
+        expect(jobs().single.status, JobStatus.running);
+      },
+    );
+
     test('shutting down cancels the running job and starts no other', () async {
       await sources().addPaths(['/videos/a.mp4', '/videos/b.mp4']);
       queue().addSelected();
@@ -281,6 +358,24 @@ void main() {
       ]);
       expect(env.executor.started, hasLength(1));
       expect(queueState().busy, isFalse);
+    });
+
+    test('continue while shutting down starts nothing more', () async {
+      await sources().addPaths(['/videos/a.mp4', '/videos/b.mp4']);
+      queue().addSelected();
+      await settle();
+      env.executor.last.stopsLate = true;
+
+      var shutDown = false;
+      unawaited(queue().shutDown().then((_) => shutDown = true));
+      await settle();
+      queue().resume();
+      env.executor.last.stop();
+      await settle();
+
+      expect(shutDown, isTrue);
+      expect(env.executor.started, hasLength(1));
+      expect(jobs().last.status, JobStatus.waiting);
     });
 
     test('waiting jobs can be removed and reordered', () async {
@@ -585,6 +680,15 @@ void main() {
       final preview = container.read(previewProvider)[video('a.mp4').id]!;
       expect(preview.estimate!.bytes, 150000000);
       expect(env.estimator.measured, ['/videos/a.mp4']);
+    });
+
+    test('nothing more is measured once the app is leaving', () async {
+      await container.read(estimateCacheProvider.notifier).leave();
+
+      await sources().addPaths(['/videos/a.mp4']);
+      await settle();
+
+      expect(env.estimator.measured, isEmpty);
     });
 
     test('measuring waits while the queue converts', () async {

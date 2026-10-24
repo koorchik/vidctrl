@@ -119,8 +119,10 @@ class EndpointFile {
     if (unixLike && folderIsNew) await _chmod('700', folder.path);
     // Written aside and renamed, so a client never reads half a file. The
     // file is made empty and restricted before the token goes in, so the
-    // token is never readable by others.
-    final temporary = File('$path.tmp');
+    // token is never readable by others. Each write has its own temporary
+    // name, as two windows may start at once.
+    final suffix = Random().nextInt(1 << 32).toRadixString(16);
+    final temporary = File('$path.$pid.$suffix.tmp');
     try {
       await temporary.writeAsString('');
       if (unixLike) await _chmod('600', temporary.path);

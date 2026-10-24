@@ -16,6 +16,7 @@ import 'package:vidctrl/core/settings/settings_store.dart';
 import 'package:vidctrl/app/sources/sources_controller.dart';
 import 'package:vidctrl/app/theme.dart';
 import 'package:vidctrl/app/window.dart';
+import 'package:vidctrl/l10n/app_localizations.dart';
 
 import 'fakes.dart';
 
@@ -68,6 +69,18 @@ Future<void> addVideos(
 ) async {
   await tester.runAsync(() => sources.addPaths(paths));
   await tester.pump();
+}
+
+/// Presses the panel's "Add to queue", in whichever language the window
+/// speaks.
+Future<void> tapAddToQueue(WidgetTester tester) async {
+  final labels = [
+    for (final code in ['en', 'uk'])
+      lookupAppLocalizations(Locale(code)).addToQueue,
+  ];
+  await tester.tap(
+    find.byWidgetPredicate((w) => w is Text && labels.contains(w.data)),
+  );
 }
 
 /// Text on screen in the main, plain-language style: everything except the

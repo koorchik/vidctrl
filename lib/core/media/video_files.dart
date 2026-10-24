@@ -50,7 +50,12 @@ Future<List<String>> expandDroppedPaths(Iterable<String> paths) async {
   for (final path in paths) {
     if (await FileSystemEntity.isDirectory(path)) {
       final found = <String>[];
-      await for (final entity in Directory(path).list(recursive: true)) {
+      final listing = Directory(path)
+          .list(recursive: true)
+          // A subfolder it may not read (a drive's lost+found) is passed
+          // over; the rest is listed all the same.
+          .handleError((Object _) {}, test: (e) => e is FileSystemException);
+      await for (final entity in listing) {
         if (entity is! File || !looksLikeVideo(entity.path)) continue;
         final relative = p.relative(entity.path, from: path);
         if (p.split(relative).any((part) => part.startsWith('.'))) continue;

@@ -79,7 +79,7 @@ void main() {
   );
 
   Future<void> addToQueue(WidgetTester tester) async {
-    await tester.tap(find.text('Add to queue'));
+    await tapAddToQueue(tester);
     await tester.pump();
     await tester.pump();
   }
@@ -570,7 +570,7 @@ void main() {
         ]);
         await tester.tap(find.byIcon(Icons.movie_edit));
         await tester.pump();
-        await tester.tap(find.byType(FilledButton).last);
+        await tapAddToQueue(tester);
         await tester.pump();
 
         expectNoJargon(
@@ -590,7 +590,7 @@ void main() {
         'detail (${locale.languageCode})', (tester) async {
       final sources = await pumpApp(tester, env, locale: locale);
       await addVideos(tester, sources, ['/videos/holiday.mp4']);
-      await tester.tap(find.byType(FilledButton).last);
+      await tapAddToQueue(tester);
       await tester.pump();
       await tester.pump();
       env.executor.last.finish();

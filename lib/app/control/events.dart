@@ -170,6 +170,6 @@ Map<String, Object?> comparisonJson(int job, QualityMeasured check) => {
   'job': job,
   'status': ComparisonCodes.measured,
   'closeness': codeOf(check.closeness),
-  'xpsnr': check.lumaDb,
+  'xpsnr': wireDb(check.lumaDb),
   'vmaf': ?check.vmaf,
 };

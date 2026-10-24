@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/ffmpeg/capabilities.dart';
-import '../../core/scenarios/archive.dart';
+import '../../core/scenarios/option_visibility.dart';
 import '../../core/scenarios/scenario.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -130,57 +130,6 @@ String choiceHint(AppLocalizations l10n, String optionId, String choice) =>
       ('speed', 'gpu') => l10n.archiveGpuHint,
       _ => '',
     };
-
-/// Options that have no effect with the current choices are hidden rather
-/// than shown disabled, and so are those this computer cannot do: nobody can
-/// pick the graphics card on a machine without a usable one.
-bool optionVisible(
-  Preset preset,
-  PresetOption option,
-  OptionValues values,
-  Capabilities capabilities,
-) {
-  if (option.advanced) return false;
-  if (preset is ArchivePreset) {
-    return switch (option.id) {
-      ArchivePreset.codec => ArchivePreset.encodesAv1(capabilities),
-      ArchivePreset.speed =>
-        ArchivePreset.gpuEncoder(
-              capabilities,
-              ArchivePreset.formatFor(values, capabilities),
-            ) !=
-            null,
-      _ => true,
-    };
-  }
-  if (preset.id == 'resolve.studio' && option.id == 'quality') {
-    return preset.choice(values, 'convertVideo') == 'yes';
-  }
-  return true;
-}
-
-/// A yes/no option is shown as a switch instead of two buttons.
-bool isSwitch(PresetOption option) =>
-    option.choices.length == 2 &&
-    option.choices.contains('yes') &&
-    option.choices.contains('no');
-
-/// Options for people who want more control, shown under "More options".
-/// As with the basic ones, an option that would change nothing is hidden.
-bool advancedOptionVisible(
-  Preset preset,
-  PresetOption option,
-  OptionValues values,
-) {
-  if (!option.advanced) return false;
-  if (option.id == 'codec') {
-    final convertsPicture =
-        preset.id == 'resolve.free' ||
-        preset.choice(values, 'convertVideo') == 'yes';
-    return convertsPicture && preset.choice(values, 'quality') != 'smallest';
-  }
-  return true;
-}
 
 /// The options changed for a job, in the words the panel uses: "File size:
 /// Best quality", "Also convert the picture". A job made with the goal as it

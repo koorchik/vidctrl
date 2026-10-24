@@ -399,7 +399,7 @@ void main() {
     addTearDown(other.close);
     other.listen((socket) {
       socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-      socket.close();
+      unawaited(socket.close());
     });
     await file.write(_endpoint(other.port, 't'));
     expect(await connectIfLive(file, isAlive: _gone), isNull);

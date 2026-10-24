@@ -13,6 +13,7 @@ import 'package:vidctrl/core/control/process_alive.dart';
 import 'package:vidctrl/core/control/protocol.dart';
 import 'package:vidctrl/core/control/words.dart';
 
+import '../../support/eventually.dart';
 import '../../support/machine_json.dart';
 
 typedef _Answer = FutureOr<Object?> Function(
@@ -146,14 +147,6 @@ Future<_Run> _run(
     ),
   );
   return _Run(code, '$out', '$err');
-}
-
-Future<void> _until(bool Function() condition) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 4));
-  while (!condition()) {
-    if (DateTime.now().isAfter(deadline)) fail('It never happened.');
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
 }
 
 Map<String, Object?> _job(int id, String status, {String? outputPath}) => {
@@ -777,7 +770,7 @@ void main() {
     final out = StringBuffer();
     final err = StringBuffer();
     final running = _run(['wait'], out: out, err: err);
-    await _until(() => '$out'.contains('Job 1'));
+    await eventually(() => '$out'.contains('Job 1'));
     expect('$out', isNot(contains('Job 2')));
     answer.complete();
     final run = await running;
@@ -796,7 +789,7 @@ void main() {
       Methods.wait: (_, _) => Completer<Object?>().future,
     });
     final running = _run(['wait']);
-    await _until(() => app.asked(Methods.wait));
+    await eventually(() => app.asked(Methods.wait));
     await app.listener.close(farewell: false);
     final run = await running;
     expect(run.exitCode, ExitCode.appClosed);
@@ -838,7 +831,7 @@ void main() {
           }
           Timer(const Duration(milliseconds: 50), () {
             peer.notify(Events.jobFinished, {'time': 't1', ..._job(1, 'DONE')});
-            app.listener.close();
+            unawaited(app.listener.close());
           });
           return const <String, Object?>{};
         },

@@ -65,7 +65,7 @@ class ControlListener {
     }
     final peer = _Peer(socket, this);
     _peers.add(peer);
-    peer.closed.then((_) => _peers.remove(peer));
+    unawaited(peer.closed.then((_) => _peers.remove(peer)));
   }
 
   /// With [farewell], every client that said `hello` is told
@@ -99,7 +99,7 @@ class _Peer implements ControlPeer {
           cancelOnError: true,
         );
     // A write to a client that has gone shows up here, not at the write.
-    _socket.done.then((_) {}, onError: (Object _) => _finish());
+    unawaited(_socket.done.then((_) {}, onError: (Object _) => _finish()));
     _messages = jsonLines(_lines.stream, _write);
     _rpc =
         rpc.Peer.withoutJson(
@@ -233,7 +233,7 @@ class _Peer implements ControlPeer {
       _ending = true;
       _helloTimer.cancel();
       // A failure means the client has gone already; `done` reports it.
-      _socket.close().then((_) {}, onError: (Object _) {});
+      unawaited(_socket.close().then((_) {}, onError: (Object _) {}));
     }
     return closed.timeout(const Duration(seconds: 1), onTimeout: _finish);
   }
@@ -244,8 +244,8 @@ class _Peer implements ControlPeer {
     _ending = true;
     _helloTimer.cancel();
     _socket.destroy();
-    _subscription.cancel();
-    _lines.close();
-    _rpc.close();
+    unawaited(_subscription.cancel());
+    unawaited(_lines.close());
+    unawaited(_rpc.close());
   }
 }

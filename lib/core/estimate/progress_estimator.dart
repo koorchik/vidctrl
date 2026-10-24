@@ -102,6 +102,7 @@ class ProgressEstimator {
         _outTime.inMicroseconds >= total.inMicroseconds * 0.05 ||
         _outTime >= const Duration(seconds: 20);
     if (!enough) return null;
-    return (bytes * total.inMicroseconds / _outTime.inMicroseconds).round();
+    // The ratio first: bytes times microseconds overflows on a long film.
+    return (bytes * (total.inMicroseconds / _outTime.inMicroseconds)).round();
   }
 }

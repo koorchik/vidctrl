@@ -110,40 +110,28 @@ List<DetailSection> encodingDetails(Map<String, Object?> raw) {
   ];
 
   for (final stream in streams) {
-    final type = stream['codec_type'];
     final tags = _map(stream['tags']);
-    final DetailGroup group;
-    final rows = <DetailRow>[];
-    if (type == 'video' && _map(stream['disposition'])['attached_pic'] != 1) {
-      group = DetailGroup.video;
-      rows.addAll(_videoRows(stream));
-    } else if (type == 'audio') {
-      group = DetailGroup.audio;
-      rows.addAll(_audioRows(stream));
-    } else if (type == 'subtitle') {
-      group = DetailGroup.subtitle;
-      rows.add(DetailRow(DetailField.codec, _codec(stream)));
-    } else if (type == 'attachment' || type == 'video') {
-      group = DetailGroup.attachment;
-      if (_str(tags['filename']) case final name?) {
-        rows.add(DetailRow(DetailField.fileName, name));
-      }
-      rows.add(DetailRow(DetailField.codec, _codec(stream)));
-    } else if (stream['codec_tag_string'] == 'tmcd' ||
-        tags.containsKey('timecode')) {
-      group = DetailGroup.timecode;
-      rows.add(
-        DetailRow(
-          DetailField.timecode,
-          _str(tags['timecode']) ??
-              _str(_map(format['tags'])['timecode']) ??
-              '',
-        ),
-      );
-    } else {
-      group = DetailGroup.data;
-      rows.add(DetailRow(DetailField.codec, _codec(stream)));
-    }
+    final group = _groupOf(stream);
+    final rows = <DetailRow>[
+      ...switch (group) {
+        DetailGroup.video => _videoRows(stream),
+        DetailGroup.audio => _audioRows(stream),
+        DetailGroup.attachment => [
+          if (_str(tags['filename']) case final name?)
+            DetailRow(DetailField.fileName, name),
+          DetailRow(DetailField.codec, _codec(stream)),
+        ],
+        DetailGroup.timecode => [
+          DetailRow(
+            DetailField.timecode,
+            _str(tags['timecode']) ??
+                _str(_map(format['tags'])['timecode']) ??
+                '',
+          ),
+        ],
+        _ => [DetailRow(DetailField.codec, _codec(stream))],
+      },
+    ];
     if (_str(tags['language']) case final language? when language != 'und') {
       rows.add(DetailRow(DetailField.language, language));
     }
@@ -372,15 +360,7 @@ List<TagSection> metadataDetails(Map<String, Object?> raw) {
     TagSection(DetailGroup.file, 1, tags(raw['format'])),
   ];
   for (final stream in _list(raw['streams']).map(_map)) {
-    final group = switch (stream['codec_type']) {
-      'video' when _map(stream['disposition'])['attached_pic'] != 1 =>
-        DetailGroup.video,
-      'audio' => DetailGroup.audio,
-      'subtitle' => DetailGroup.subtitle,
-      'attachment' || 'video' => DetailGroup.attachment,
-      _ when stream['codec_tag_string'] == 'tmcd' => DetailGroup.timecode,
-      _ => DetailGroup.data,
-    };
+    final group = _groupOf(stream);
     sections.add(TagSection(group, next(group), tags(stream)));
   }
   final chapters = _list(raw['chapters']);
@@ -389,6 +369,22 @@ List<TagSection> metadataDetails(Map<String, Object?> raw) {
   }
   return sections;
 }
+
+/// What kind of track [stream] is, the same in both views. A picture
+/// attached to the file (a cover) is an attachment, not the video.
+DetailGroup _groupOf(Map<String, Object?> stream) =>
+    switch (stream['codec_type']) {
+      'video' when _map(stream['disposition'])['attached_pic'] != 1 =>
+        DetailGroup.video,
+      'audio' => DetailGroup.audio,
+      'subtitle' => DetailGroup.subtitle,
+      'attachment' || 'video' => DetailGroup.attachment,
+      _
+          when stream['codec_tag_string'] == 'tmcd' ||
+              _map(stream['tags']).containsKey('timecode') =>
+        DetailGroup.timecode,
+      _ => DetailGroup.data,
+    };
 
 /// The whole report, as indented JSON.
 String fullReport(Map<String, Object?> raw) =>
@@ -501,4 +497,21 @@ bool isPersonalTag(String key) {
       name.contains('location') ||
       name.contains('gps') ||
       name.contains('serial');
+}
+
+/// Picture first, then sound, then the file as a whole.
+List<DetailSection> orderedDetails(List<DetailSection> sections) {
+  const order = [
+    DetailGroup.video,
+    DetailGroup.audio,
+    DetailGroup.file,
+    DetailGroup.timecode,
+    DetailGroup.subtitle,
+    DetailGroup.data,
+    DetailGroup.attachment,
+    DetailGroup.chapters,
+  ];
+  return [
+    for (final group in order) ...sections.where((s) => s.group == group),
+  ];
 }

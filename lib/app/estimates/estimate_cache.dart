@@ -57,6 +57,9 @@ class EstimateCache extends Notifier<EstimateCacheState> {
   /// Raised to discard measurements that were under way when stopped.
   var _generation = 0;
 
+  /// Set as the app leaves: a measurement started then would outlive it.
+  var _left = false;
+
   @override
   EstimateCacheState build() {
     _env = ref.watch(environmentProvider).requireValue;
@@ -79,7 +82,8 @@ class EstimateCache extends Notifier<EstimateCacheState> {
     ConversionPlan plan, {
     RaisesQuality? raise,
   }) async {
-    if (state.estimates.containsKey(key) ||
+    if (_left ||
+        state.estimates.containsKey(key) ||
         state.measuring.contains(key) ||
         state.failed.contains(key)) {
       return;
@@ -140,6 +144,7 @@ class EstimateCache extends Notifier<EstimateCacheState> {
   /// Stops measuring for good and deletes the pieces kept to show hardest
   /// frames, as the app leaves. Completes once FFmpeg has exited.
   Future<void> leave() async {
+    _left = true;
     await stopMeasuring();
     await _env.estimator.discardKept();
   }

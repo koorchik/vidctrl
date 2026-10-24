@@ -3,6 +3,16 @@ import 'package:vidctrl/core/ffmpeg/command_builder.dart';
 import 'package:vidctrl/core/scenarios/scenario.dart';
 
 void main() {
+  test('times are given to FFmpeg in seconds, to the millisecond', () {
+    // Cutting a piece, comparing it and grabbing its frame all seek with
+    // this, so they land on the same frame.
+    expect(
+      ffmpegSeconds(const Duration(minutes: 2, seconds: 23, milliseconds: 250)),
+      '143.250',
+    );
+    expect(ffmpegSeconds(const Duration(microseconds: 1999)), '0.002');
+  });
+
   const audioFix = ConversionPlan(
     kind: PlanKind.audioOnly,
     audio: AudioEncode(codec: 'pcm_s24le'),

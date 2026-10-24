@@ -19,22 +19,29 @@ class Ffprobe {
   final String executable;
 
   Future<MediaInfo> probe(String path) async {
-    final result = await Process.run(
-      executable,
-      [
-        '-v',
-        'error',
-        '-print_format',
-        'json',
-        '-show_format',
-        '-show_streams',
-        '-show_chapters',
-        '-i',
-        inputUrl(path),
-      ],
-      stdoutEncoding: utf8,
-      stderrEncoding: utf8,
-    );
+    final ProcessResult result;
+    try {
+      result = await Process.run(
+        executable,
+        [
+          '-v',
+          'error',
+          '-print_format',
+          'json',
+          '-show_format',
+          '-show_streams',
+          '-show_chapters',
+          '-i',
+          inputUrl(path),
+        ],
+        // A camera may write its tags in another encoding than UTF-8; the
+        // video is no less readable for it.
+        stdoutEncoding: const Utf8Codec(allowMalformed: true),
+        stderrEncoding: const Utf8Codec(allowMalformed: true),
+      );
+    } on ProcessException catch (e) {
+      throw FfprobeException('ffprobe could not be run: ${e.message}');
+    }
     if (result.exitCode != 0) {
       throw FfprobeException((result.stderr as String).trim());
     }

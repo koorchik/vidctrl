@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vidctrl/core/ffmpeg/capabilities.dart';
 import 'package:vidctrl/core/ffmpeg/command_builder.dart';
 import 'package:vidctrl/core/media/media_info.dart';
 import 'package:vidctrl/core/quality/quality_meter.dart';
@@ -382,6 +383,17 @@ void main() {
         expect(canComparePlan(plan), comparable);
       });
     }
+
+    test('and only with an FFmpeg that has the filter that compares', () {
+      final plan = const ArchivePreset().plan(clip(), const {}, softwareOnly);
+      const noXpsnr = Capabilities(
+        ffmpegVersion: 'test',
+        encoders: {'libsvtav1'},
+      );
+
+      expect(comparableHere(plan, softwareOnly), isTrue);
+      expect(comparableHere(plan, noXpsnr), isFalse);
+    });
   });
 }
 

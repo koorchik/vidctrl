@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
@@ -29,16 +30,9 @@ final queueProvider = NotifierProvider<QueueController, QueueState>(
 class QueueController extends Notifier<QueueState> {
   late AppEnvironment _env;
   var _nextId = 0;
-  ConversionHandle? _activeHandle;
 
-  /// The job measuring its video before converting, if one is.
-  int? _checkingJob;
-
-  /// Set when that measuring is to stop.
-  var _checkCancelled = false;
-
-  /// Set when it stopped for a pause: the job waits and measures again.
-  var _checkPaused = false;
+  /// What is being done for the job under way, while there is one.
+  _ActiveWork? _work;
 
   /// The loop working through the queue, while there is one.
   Future<void>? _loop;
@@ -169,8 +163,7 @@ class QueueController extends Notifier<QueueState> {
   RaisesQuality? _raiserFor(QueueJob job) {
     return switch (findPreset(job.recipe.presetId)) {
       final RaisesQuality raise
-          when canComparePlan(job.plan) &&
-              _env.capabilities.hasFilter('xpsnr') =>
+          when comparableHere(job.plan, _env.capabilities) =>
         raise,
       _ => null,
     };
@@ -225,20 +218,50 @@ class QueueController extends Notifier<QueueState> {
     state = state.copyWith(busy: true);
     // Measuring sizes competes with converting for the processor.
     unawaited(ref.read(estimateCacheProvider.notifier).stopMeasuring());
-    await _env.sleepInhibitor.acquire();
     try {
-      while (ref.mounted && !state.paused) {
+      await _keepAwake(true);
+      while (ref.mounted && !state.paused && !_shuttingDown) {
         final waiting = state.waiting;
         if (waiting.isEmpty) break;
-        await _convert(waiting.first);
+        await _convertGuarded(waiting.first);
       }
     } finally {
-      await _env.sleepInhibitor.release();
+      await _keepAwake(false);
       if (ref.mounted) state = state.copyWith(busy: false);
     }
     // Continued while the loop was ending.
     if (ref.mounted && !_shuttingDown) _ensureRunning();
   }
+
+  /// Keeps the computer awake while converting, where it can be: converting
+  /// goes on without, under the computer's usual sleep settings.
+  Future<void> _keepAwake(bool awake) async {
+    try {
+      awake
+          ? await _env.sleepInhibitor.acquire()
+          : await _env.sleepInhibitor.release();
+    } on Object catch (error, stack) {
+      _report(error, stack);
+    }
+  }
+
+  /// [_convert], where a fault of the app's own fails the job instead of
+  /// leaving it under way for good with the queue stopped.
+  Future<void> _convertGuarded(QueueJob job) async {
+    _work = _ActiveWork();
+    try {
+      await _convert(job);
+    } on Object catch (error, stack) {
+      _report(error, stack);
+      _fail(job.id, error, clearAttempt: true);
+    } finally {
+      _work = null;
+    }
+  }
+
+  void _report(Object error, StackTrace stack) => FlutterError.reportError(
+    FlutterErrorDetails(exception: error, stack: stack, library: 'queue'),
+  );
 
   Future<void> _convert(QueueJob queued) async {
     if (!queued.plan.producesOutput) {
@@ -248,60 +271,10 @@ class QueueController extends Notifier<QueueState> {
     var job = queued;
     final raise = _raiserFor(job);
     if (raise != null && job.quality == null) {
-      final choice = _forJob(
-        _knownChoice(job.path, job.recipe) ?? await _check(job, raise),
-        job.recipe,
-      );
-      if (!ref.mounted) return;
-      // Cancelled after pausing: the cancel wins, as for a paused encode,
-      // and neither is left over for the next job's check.
-      if (_checkCancelled) {
-        _checkCancelled = false;
-        _checkPaused = false;
-        _update(
-          job.id,
-          (j) => j.copyWith(status: JobStatus.cancelled, clearAttempt: true),
-        );
-        return;
-      }
-      if (_checkPaused) {
-        _checkPaused = false;
-        _update(
-          job.id,
-          (j) => j.copyWith(status: JobStatus.waiting, clearAttempt: true),
-        );
-        return;
-      }
-      _update(job.id, (j) {
-        if (choice == null) return j.copyWith(clearAttempt: true);
-        final plan = choice.converts
-            ? planWithChoice(raise, j.plan, choice)
-            : j.plan;
-        return j.copyWith(
-          plan: plan,
-          quality: choice,
-          clearAttempt: true,
-          // Named for the quality chosen; one left as it is writes nothing.
-          outputPath: choice.converts
-              ? _outputPath(
-                  j.info,
-                  plan,
-                  j.recipe,
-                  j.output,
-                  _reservedOutputs()..remove(j.outputPath),
-                )
-              : '',
-        );
-      });
-      final checked = _find(job.id);
-      // Removed while its video was measured.
+      final checked = await _chooseQuality(job, raise);
+      // Cancelled, paused or taken out of the queue meanwhile.
       if (checked == null) return;
       job = checked;
-      // Paused meanwhile: it waits, its quality known.
-      if (state.paused) {
-        _update(job.id, (j) => j.copyWith(status: JobStatus.waiting));
-        return;
-      }
     }
     if (job.keptAsIs) {
       _update(
@@ -310,6 +283,103 @@ class QueueController extends Notifier<QueueState> {
       );
       return;
     }
+    final result = await _runConversion(job);
+    if (result != null) _record(job, result);
+  }
+
+  /// Gives [job] the quality its video needs, measured unless known. Null
+  /// when the job is not to convert now: cancelled, paused, or taken out of
+  /// the queue while its video was measured.
+  Future<QueueJob?> _chooseQuality(QueueJob job, RaisesQuality raise) async {
+    final work = _work!;
+    final choice = _forJob(
+      _knownChoice(job.path, job.recipe) ?? await _check(job, raise, work),
+      job.recipe,
+    );
+    if (!ref.mounted) return null;
+    // Cancelled after pausing: the cancel wins, as for a paused encode.
+    if (work.cancelRequested) {
+      _update(
+        job.id,
+        (j) => j.copyWith(status: JobStatus.cancelled, clearAttempt: true),
+      );
+      return null;
+    }
+    if (work.checkPaused) {
+      _update(
+        job.id,
+        (j) => j.copyWith(status: JobStatus.waiting, clearAttempt: true),
+      );
+      return null;
+    }
+    _update(job.id, (j) {
+      if (choice == null) return j.copyWith(clearAttempt: true);
+      final plan = choice.converts
+          ? planWithChoice(raise, j.plan, choice)
+          : j.plan;
+      return j.copyWith(
+        plan: plan,
+        quality: choice,
+        clearAttempt: true,
+        // Named for the quality chosen; one left as it is writes nothing.
+        outputPath: choice.converts
+            ? _outputPath(
+                j.info,
+                plan,
+                j.recipe,
+                j.output,
+                _reservedOutputs()..remove(j.outputPath),
+              )
+            : '',
+      );
+    });
+    final checked = _find(job.id);
+    // Removed while its video was measured.
+    if (checked == null) return null;
+    // Paused meanwhile: it waits, its quality known.
+    if (state.paused) {
+      _update(job.id, (j) => j.copyWith(status: JobStatus.waiting));
+      return null;
+    }
+    return checked;
+  }
+
+  /// Measures [job]'s video at the goal's standard quality and, where it
+  /// falls short, at better ones; the result is kept for the video list too.
+  /// Null when it could not be measured: the job then converts at the
+  /// standard quality.
+  Future<QualityChoice?> _check(
+    QueueJob job,
+    RaisesQuality raise,
+    _ActiveWork work,
+  ) async {
+    work.checking = true;
+    _update(job.id, (j) => j.copyWith(status: JobStatus.running, attempt: 1));
+    try {
+      final estimate = await _env.estimator.estimate(
+        job.info,
+        job.plan,
+        raise: raise,
+        onAttempt: (attempt) =>
+            _update(job.id, (j) => j.copyWith(attempt: attempt)),
+      );
+      if (estimate != null && ref.mounted && !work.cancelRequested) {
+        ref
+            .read(estimateCacheProvider.notifier)
+            .record(estimateKey(job.path, job.recipe), estimate);
+      }
+      return estimate?.choice;
+    } on Object {
+      return null;
+    } finally {
+      work.checking = false;
+    }
+  }
+
+  /// Converts [job] and returns how it ended; null when the conversion could
+  /// not even be started, the job then marked failed.
+  Future<ConversionResult?> _runConversion(QueueJob job) async {
+    final work = _work!;
     // Something may have appeared under that name since the job was added.
     var outputPath = job.outputPath;
     if (File(outputPath).existsSync()) {
@@ -326,7 +396,6 @@ class QueueController extends Notifier<QueueState> {
       (j) => j.copyWith(status: JobStatus.running, outputPath: outputPath),
     );
 
-    final ConversionResult result;
     try {
       final handle = await _env.executor.start(
         ConversionJob(
@@ -336,34 +405,34 @@ class QueueController extends Notifier<QueueState> {
           sample: job.sample,
         ),
       );
-      _activeHandle = handle;
-      // Asked to shut down, or taken out of the queue, while this job was
-      // starting: nothing could be cancelled then.
-      if (_shuttingDown || _find(job.id) == null) unawaited(handle.cancel());
+      work.handle = handle;
+      // Cancelled, asked to shut down, or taken out of the queue while this
+      // job was starting: nothing could be stopped then. Paused meanwhile:
+      // it is held now.
+      if (_shuttingDown || work.cancelRequested || _find(job.id) == null) {
+        unawaited(handle.cancel());
+      } else if (state.paused && handle.pause()) {
+        _update(job.id, (j) => j.copyWith(status: JobStatus.paused));
+      }
       final updates = handle.progress.listen(
         (progress) => _update(job.id, (j) => j.copyWith(progress: progress)),
       );
-      result = await handle.result;
+      final result = await handle.result;
       unawaited(updates.cancel());
+      return result;
     } on Object catch (error) {
       // The conversion could not even be started (FFmpeg vanished, the
       // output folder is not writable).
-      _update(
-        job.id,
-        (j) => j.copyWith(
-          status: JobStatus.failed,
-          result: ConversionResult(
-            status: ConversionStatus.failed,
-            elapsed: Duration.zero,
-            errorLines: ['$error'],
-          ),
-        ),
-      );
-      return;
+      _fail(job.id, error);
+      return null;
     } finally {
-      _activeHandle = null;
+      work.handle = null;
     }
+  }
 
+  /// Marks how [job]'s conversion ended; a sample also tells how large the
+  /// whole video will be.
+  void _record(QueueJob job, ConversionResult result) {
     _update(
       job.id,
       (j) => j.copyWith(
@@ -383,33 +452,18 @@ class QueueController extends Notifier<QueueState> {
     }
   }
 
-  /// Measures [job]'s video at the goal's standard quality and, where it
-  /// falls short, at better ones; the result is kept for the video list too.
-  /// Null when it could not be measured: the job then converts at the
-  /// standard quality.
-  Future<QualityChoice?> _check(QueueJob job, RaisesQuality raise) async {
-    _checkingJob = job.id;
-    _update(job.id, (j) => j.copyWith(status: JobStatus.running, attempt: 1));
-    try {
-      final estimate = await _env.estimator.estimate(
-        job.info,
-        job.plan,
-        raise: raise,
-        onAttempt: (attempt) =>
-            _update(job.id, (j) => j.copyWith(attempt: attempt)),
-      );
-      if (estimate != null && ref.mounted && !_checkCancelled) {
-        ref
-            .read(estimateCacheProvider.notifier)
-            .record(estimateKey(job.path, job.recipe), estimate);
-      }
-      return estimate?.choice;
-    } on Object {
-      return null;
-    } finally {
-      _checkingJob = null;
-    }
-  }
+  void _fail(int jobId, Object error, {bool clearAttempt = false}) => _update(
+    jobId,
+    (j) => j.copyWith(
+      status: JobStatus.failed,
+      clearAttempt: clearAttempt,
+      result: ConversionResult(
+        status: ConversionStatus.failed,
+        elapsed: Duration.zero,
+        errorLines: ['$error'],
+      ),
+    ),
+  );
 
   // ---- Controls ---------------------------------------------------------
 
@@ -422,22 +476,24 @@ class QueueController extends Notifier<QueueState> {
   void pause() {
     if (state.paused) return;
     final active = state.activeJob;
+    final work = _work;
     state = state.copyWith(paused: true);
-    if (_checkingJob != null) {
+    if (work != null && work.checking) {
       // Measuring cannot be held midway; it starts again on continuing.
-      _checkPaused = true;
+      work.checkPaused = true;
       unawaited(_env.estimator.cancelAll());
-    } else if (active != null && (_activeHandle?.pause() ?? false)) {
+    } else if (active != null && (work?.handle?.pause() ?? false)) {
       _update(active.id, (j) => j.copyWith(status: JobStatus.paused));
     }
   }
 
-  /// Continues the queue; does nothing if it is not paused.
+  /// Continues the queue; does nothing if it is not paused, or once it is
+  /// shutting down.
   void resume() {
-    if (!state.paused) return;
+    if (!state.paused || _shuttingDown) return;
     final active = state.activeJob;
     state = state.copyWith(paused: false);
-    if (active != null && (_activeHandle?.resume() ?? false)) {
+    if (active != null && (_work?.handle?.resume() ?? false)) {
       _update(active.id, (j) => j.copyWith(status: JobStatus.running));
     }
     _ensureRunning();
@@ -445,13 +501,21 @@ class QueueController extends Notifier<QueueState> {
 
   /// Cancels the job under way; the queue moves on to the next one.
   Future<void> cancelActive() async {
-    if (_checkingJob != null) {
-      _checkCancelled = true;
+    final work = _work;
+    if (work == null) return;
+    if (work.checking) {
+      work.cancelRequested = true;
       await _env.estimator.cancelAll();
       return;
     }
-    if (state.activeJob?.status == JobStatus.paused) _activeHandle?.resume();
-    await _activeHandle?.cancel();
+    final handle = work.handle;
+    if (handle == null) {
+      // Still starting: it is stopped as soon as it has started.
+      work.cancelRequested = true;
+      return;
+    }
+    if (state.activeJob?.status == JobStatus.paused) handle.resume();
+    await handle.cancel();
   }
 
   /// Stops for good, as when the app closes: nothing new starts and the job
@@ -615,4 +679,21 @@ OutputEstimate? wholeVideoEstimate(QueueJob job, ConversionResult result) {
     time: result.elapsed * scale,
     measured: true,
   );
+}
+
+/// What the queue is doing for the job under way: measuring its video,
+/// starting its conversion, or converting. Made anew for each job, so
+/// nothing asked of one is left over for the next.
+class _ActiveWork {
+  /// Measuring the video before converting.
+  bool checking = false;
+
+  /// The conversion, once it has started.
+  ConversionHandle? handle;
+
+  /// Cancelled while measuring or starting: acted on as soon as it can be.
+  bool cancelRequested = false;
+
+  /// Measuring stopped for a pause: the job waits and measures again.
+  bool checkPaused = false;
 }

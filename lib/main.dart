@@ -14,10 +14,13 @@ import 'app/licenses.dart';
 import 'app/settings.dart';
 import 'app/window.dart';
 import 'app/window_close_guard.dart';
+import 'core/platform/desktop_entry.dart';
 import 'core/settings/settings_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Before the window appears, which is when the desktop picks its icon.
+  if (Platform.isLinux) await _registerDesktopEntry();
   registerLicenses();
   await windowManager.ensureInitialized();
   // The sizes are what the app has inside the window; without the frame
@@ -61,6 +64,21 @@ Future<void> main() async {
               debugPrint('The control server did not start: $error'),
         ),
   );
+}
+
+/// Lets a Wayland desktop show the app's icon on its window. A computer where
+/// that cannot be written still runs the app, with a generic icon.
+Future<void> _registerDesktopEntry() async {
+  final dataHome = desktopDataHome(Platform.environment);
+  if (dataHome == null) return;
+  try {
+    await registerDesktopEntry(
+      executable: Platform.resolvedExecutable,
+      dataHome: dataHome,
+    );
+  } on Object catch (error) {
+    debugPrint('The desktop entry was not registered: $error');
+  }
 }
 
 /// What the system counts in a window's size beyond what the app has

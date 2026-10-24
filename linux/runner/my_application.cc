@@ -16,7 +16,8 @@ G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
 // Gives the window its icon, in every size the bundle carries. This is what
 // X11 desktops show. Wayland desktops ignore it and take the icon from the
-// application's desktop entry (see tool/desktop_entry.dart).
+// application's desktop entry, which the app registers as it starts
+// (lib/core/platform/desktop_entry.dart).
 static void set_window_icons(GtkWindow* window) {
   g_autofree gchar* executable = g_file_read_link("/proc/self/exe", nullptr);
   if (executable == nullptr) {

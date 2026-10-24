@@ -111,6 +111,29 @@ void main() {
     expect(File('${file.path}.tmp').existsSync(), isFalse);
   });
 
+  test('two windows starting at once each write a whole endpoint', () async {
+    final dir = await Directory.systemTemp.createTemp('endpoint');
+    addTearDown(() => dir.delete(recursive: true));
+    final path = p.join(dir.path, 'control.json');
+
+    await Future.wait([
+      for (var port = 1; port <= 20; port++)
+        EndpointFile(path).write(
+          Endpoint(
+            port: port,
+            token: 't$port',
+            pid: port,
+            version: '',
+            protocol: 1,
+          ),
+        ),
+    ]);
+
+    final written = (await EndpointFile(path).read())!;
+    expect(written.token, 't${written.port}');
+    expect(dir.listSync().map((f) => p.basename(f.path)), ['control.json']);
+  });
+
   test('a malformed endpoint file reads as none', () async {
     final dir = await Directory.systemTemp.createTemp('endpoint');
     addTearDown(() => dir.delete(recursive: true));

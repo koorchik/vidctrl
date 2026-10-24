@@ -7,7 +7,7 @@ import '../../core/ffmpeg/capabilities.dart';
 import '../../core/output/output_namer.dart';
 import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
-import '../home/scenario_texts.dart';
+import '../../core/scenarios/option_visibility.dart';
 import '../queue/queue_controller.dart';
 import '../queue/queue_state.dart';
 import '../recipe/recipe.dart';

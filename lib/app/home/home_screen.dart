@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -124,7 +126,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
           onDragExited: (_) => setState(() => _dragging = false),
           onDragDone: (details) {
             setState(() => _dragging = false);
-            sources.addPaths(details.files.map((f) => f.path));
+            unawaited(sources.addPaths(details.files.map((f) => f.path)));
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),

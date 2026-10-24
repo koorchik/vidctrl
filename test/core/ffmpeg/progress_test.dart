@@ -118,6 +118,17 @@ progress=continue
       expect(later.predictedBytes, 300000000);
     });
 
+    test('predicts the size of a long film once gigabytes are written', () {
+      // Bytes times microseconds of a 2-hour film no longer fit in 64 bits.
+      final estimator = ProgressEstimator(const Duration(hours: 2));
+      final progress = estimator.update(
+        at(3600, bytes: 2000000000),
+        const Duration(minutes: 30),
+      );
+
+      expect(progress.predictedBytes, 4000000000);
+    });
+
     test('never runs backwards when FFmpeg repeats an earlier time', () {
       final estimator = ProgressEstimator(minute);
       estimator.update(at(30), const Duration(seconds: 10));

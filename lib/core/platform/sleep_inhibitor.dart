@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 /// Keeps the computer from going to sleep while conversions run.
@@ -52,11 +53,13 @@ class _HelperInhibitor implements SleepInhibitor {
       final helper = await Process.start(_executable, _arguments);
       _helper = helper;
       // Nothing reads the helper's output, so it must be drained.
-      helper.stdout.drain<void>();
-      helper.stderr.drain<void>();
-      helper.exitCode.then((_) {
-        if (identical(_helper, helper)) _helper = null;
-      });
+      unawaited(helper.stdout.drain<void>());
+      unawaited(helper.stderr.drain<void>());
+      unawaited(
+        helper.exitCode.then((_) {
+          if (identical(_helper, helper)) _helper = null;
+        }),
+      );
     } on ProcessException {
       // The helper is missing on this system. Converting still works; the
       // computer just follows its normal sleep settings.

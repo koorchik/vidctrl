@@ -25,3 +25,7 @@ Preset? findPreset(String id) {
   }
   return null;
 }
+
+/// The goal that offers [preset].
+Scenario scenarioOf(Preset preset) =>
+    scenarios.firstWhere((s) => s.presets.contains(preset));

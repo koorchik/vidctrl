@@ -71,8 +71,7 @@ class QualityController extends Notifier<Map<int, QualityCheck>> {
   bool canCompare(QueueJob job) =>
       job.status == JobStatus.done &&
       job.result?.outputPath != null &&
-      canComparePlan(job.plan) &&
-      _env.capabilities.hasFilter('xpsnr');
+      comparableHere(job.plan, _env.capabilities);
 
   /// Compares [job]'s result with its original, unless another comparison is
   /// under way.

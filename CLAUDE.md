@@ -33,7 +33,7 @@ dart format lib test tool bin                         # CI fails on unformatted 
 flutter gen-l10n                                      # after editing lib/l10n/*.arb
 flutter test tool/make_icons.dart                     # redraws the app icon files
 flutter test tool/make_screenshots.dart               # redraws the README's pictures (docs/screenshots/)
-dart run tool/desktop_entry.dart                      # Linux: registers the icon with the desktop
+dart run tool/desktop_entry.dart --remove             # Linux: removes the icon the app registered
 tool/fetch_ffmpeg.sh linux                            # the pinned FFmpeg into third_party/ffmpeg/ (or windows, macos)
 tool/build_client.sh build/linux/x64/release/bundle   # vidctrl-client beside a built app
 tool/build_client.sh build/linux/x64/debug/bundle     # once, for the agent window under flutter run
@@ -285,7 +285,7 @@ videos and gets small files that look the same, with no help.
   Its format and speed rows each say under them what the chosen variant trades
   away (`choiceHint` in `scenario_texts.dart`; each variant's is also its
   tooltip). With both rows, the goal's own explanation waits for a 705 px
-  window (`explainedFrom` in `recipe_pane.dart`), so the smallest one still
+  window (`explainedFrom` in `panel_spacing.dart`), so the smallest one still
   fits; where the computer offers one of them only (no graphics card, as on
   an M1 Mac), it takes the other's room. `no_scrolling_test.dart` checks
   the three kinds of computer at that height too. Its "?", which opens how
@@ -524,10 +524,15 @@ The UI renders presets and options generically; it needs no other change.
   (`assets/app_icon.png`), so change the drawing and never the files. On Linux the runner sets the window icon, which only X11
   desktops show. Wayland desktops take it from a desktop entry named after
   the application identifier and show a generic icon without one. There is
-  no installer yet, so `tool/desktop_entry.dart` registers the entry on a
-  developer's computer: run it again after the icon changes, and with
-  `--remove` before changing the identifier. A window already open keeps the
-  icon it opened with, so restart the app to see a change.
+  no installer yet, so the app registers that entry and its icons for the
+  current user at each start, before its window appears
+  (`lib/core/platform/desktop_entry.dart`, under `~/.local/share`), hidden
+  from the menu and starting the app from where it is; it writes only what
+  changed. On KDE Plasma 6 the first start already shows the icon. Before
+  changing the identifier run `tool/desktop_entry.dart --remove`; the
+  identifier is `linuxApplicationId` there and `APPLICATION_ID` in
+  `linux/CMakeLists.txt`, and a test keeps them alike. A window already open
+  keeps the icon it opened with, so restart the app to see a change.
 - **Window size on macOS and Windows:** `window_manager` sizes a Mac
   window with its title bar (28 points) and a Windows one with its title
   bar and borders, the invisible ones for resizing included; GTK counts

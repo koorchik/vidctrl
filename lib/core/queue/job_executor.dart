@@ -141,7 +141,7 @@ class JobExecutor {
     stopwatch.stop();
     final partial = File(temporary);
     if (outcome.status != RunStatus.completed) {
-      if (await partial.exists()) await partial.delete();
+      await _discard(partial);
       return ConversionResult(
         status: outcome.status == RunStatus.cancelled
             ? ConversionStatus.cancelled
@@ -151,11 +151,28 @@ class JobExecutor {
       );
     }
 
-    final output = await partial.rename(job.outputPath);
+    final File output;
+    try {
+      output = await partial.rename(job.outputPath);
+    } on FileSystemException catch (e) {
+      // Something took the name meanwhile, or the folder went away.
+      await _discard(partial);
+      return ConversionResult(
+        status: ConversionStatus.failed,
+        elapsed: stopwatch.elapsed,
+        errorLines: ['$e'],
+      );
+    }
     if (job.plan.keepFileDate) {
       // Keeps converted footage sorted by shooting date in file managers.
-      final modified = await File(job.input.path).lastModified();
-      await output.setLastModified(modified);
+      // Only a convenience: the original may be gone by now (a card pulled
+      // out), and the result is whole all the same.
+      try {
+        final modified = await File(job.input.path).lastModified();
+        await output.setLastModified(modified);
+      } on FileSystemException {
+        // Left with the time it was written.
+      }
     }
     return ConversionResult(
       status: ConversionStatus.done,
@@ -163,5 +180,15 @@ class JobExecutor {
       outputPath: output.path,
       outputBytes: await output.length(),
     );
+  }
+
+  /// Deletes the unfinished file, where it can. One that cannot be deleted
+  /// is hidden, and does not change how the conversion ended.
+  Future<void> _discard(File partial) async {
+    try {
+      if (await partial.exists()) await partial.delete();
+    } on FileSystemException {
+      // Left behind, hidden.
+    }
   }
 }

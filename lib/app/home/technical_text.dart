@@ -196,7 +196,9 @@ String _audioName(AudioEncode audio) {
     return 'PCM ${RegExp(r'\d+').stringMatch(codec) ?? ''}-bit';
   }
   final index = audio.args.indexOf('-b:a');
-  final rate = index >= 0 ? ' ${audio.args[index + 1]}' : '';
+  final rate = index >= 0 && index + 1 < audio.args.length
+      ? ' ${audio.args[index + 1]}'
+      : '';
   return switch (codec) {
     'libmp3lame' => 'MP3 VBR',
     'flac' => 'FLAC',

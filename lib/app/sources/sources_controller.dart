@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/media/ffprobe.dart';
 import '../../core/media/media_info.dart';
 import '../../core/media/video_files.dart';
 import '../providers.dart';
@@ -145,7 +144,9 @@ class SourcesController extends Notifier<SourcesState> {
         video.id,
         (v) => v.copyWith(status: SourceStatus.ready, info: info),
       );
-    } on FfprobeException {
+    } on Object {
+      // Not a video, or ffprobe could not tell: either way it cannot be
+      // converted, and it must not stay "being inspected".
       _update(video.id, (v) => v.copyWith(status: SourceStatus.unreadable));
       state = state.copyWith(
         selectedIds: {...state.selectedIds}..remove(video.id),

@@ -105,7 +105,7 @@ Preset get _firstGoal => scenarios.first.presets.first;
 /// A goal as `goals` gives it, every option offered.
 GoalView _goalView(Preset preset) => GoalView(
   id: preset.id,
-  scenario: scenarios.firstWhere((s) => s.presets.contains(preset)).id,
+  scenario: scenarioOf(preset).id,
   options: [
     for (final option in preset.options)
       OptionView(
@@ -1047,7 +1047,7 @@ List<CommandDoc> commandDocs(
     json: [
       '`job` (int); `status` (string): `MEASURED`; `closeness` (string, see '
           '"Closeness"); `xpsnr` '
-          '(number, in dB); `vmaf` (number, optional: where this FFmpeg '
+          '(number, in dB; 100 for identical pictures); `vmaf` (number, optional: where this FFmpeg '
           'measures it). With `--no-wait`, `{"started": true}`.',
       ..._jsonBlock(_compareAnswer),
     ],

@@ -18,6 +18,10 @@ class FileSettingsStore implements SettingsStore {
   final File _file;
   final Map<String, Object?> _values;
 
+  /// The write under way: writes go one after another, as they share the
+  /// file they are written aside to.
+  Future<void> _writing = Future.value();
+
   /// A missing or damaged file starts from defaults rather than failing:
   /// losing a remembered language is better than not starting.
   static Future<FileSettingsStore> open(String path) async {
@@ -42,6 +46,13 @@ class FileSettingsStore implements SettingsStore {
     } else {
       _values[key] = value;
     }
+    final written = _writing.then((_) => _save());
+    // A failed write does not hold up the next one.
+    _writing = written.then((_) {}, onError: (Object _) {});
+    await written;
+  }
+
+  Future<void> _save() async {
     await _file.parent.create(recursive: true);
     // Written aside and renamed, so a crash mid-write cannot leave a
     // half-written file behind.

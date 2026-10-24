@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -34,7 +36,7 @@ class _WindowCloseGuardState extends ConsumerState<WindowCloseGuard>
   void initState() {
     super.initState();
     windowManager.addListener(this);
-    windowManager.setPreventClose(true);
+    unawaited(windowManager.setPreventClose(true));
   }
 
   @override

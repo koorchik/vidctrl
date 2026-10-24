@@ -108,20 +108,22 @@ Future<int> runClient(List<String> args, ClientIo io) {
     if (!code.isCompleted) code.complete(exitCode);
   }
 
-  runZonedGuarded(() async => end(await _runClient(args, io, output)), (
-    error,
-    _,
-  ) {
-    if (code.isCompleted) return;
-    final first = '$error'.split('\n').first;
-    end(
-      output.failWith(
-        ClientErrorCodes.unexpected,
-        'vidctrl-client stopped on an unexpected error: $first',
-        ExitCode.badArguments,
-      ),
-    );
-  });
+  unawaited(
+    runZonedGuarded(() async => end(await _runClient(args, io, output)), (
+      error,
+      _,
+    ) {
+      if (code.isCompleted) return;
+      final first = '$error'.split('\n').first;
+      end(
+        output.failWith(
+          ClientErrorCodes.unexpected,
+          'vidctrl-client stopped on an unexpected error: $first',
+          ExitCode.badArguments,
+        ),
+      );
+    }),
+  );
   return code.future;
 }
 

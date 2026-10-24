@@ -53,7 +53,7 @@ void main() {
       final answer = await client!.call(Methods.videosAdd, {
         'paths': [path],
       }) as Map;
-      final id = (answer['videos'] as List).single['id'];
+      final id = ((answer['videos'] as List).single as Map)['id'];
       await client!.call(Methods.queueAdd, {
         'videos': [id],
       });

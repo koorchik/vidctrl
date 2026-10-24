@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/platform/open_external.dart';
@@ -84,7 +86,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
             ),
             FilledButton(
               onPressed: () {
-                openWithDefaultApp(downloadUrl);
+                unawaited(openWithDefaultApp(downloadUrl));
                 Navigator.of(context).pop();
               },
               child: Text(l10n.updateDownload),

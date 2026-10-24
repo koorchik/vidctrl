@@ -17,7 +17,7 @@ import '../../core/scenarios/registry.dart';
 import '../../core/scenarios/scenario.dart';
 import '../../l10n/app_localizations.dart';
 import '../estimates/estimate_cache.dart';
-import '../home/widgets/media_details_dialog.dart';
+import '../home/detail_texts.dart';
 import '../providers.dart';
 import '../quality/quality_controller.dart';
 import '../queue/queue_controller.dart';
@@ -227,11 +227,7 @@ Future<Object?> videosEstimate(
     final info = video.info!;
     final plan = preset.plan(info, recipe.values, env.capabilities);
     // Known without measuring, or nothing to measure: as the list does.
-    if (estimateWithoutEncoding(info, plan) != null ||
-        !plan.producesOutput ||
-        plan.video is! VideoEncode) {
-      continue;
-    }
+    if (!needsMeasuring(info, plan)) continue;
     final key = estimateKey(video.path, recipe);
     bool converting() => ref.read(queueProvider).busy;
     bool measuring() => ref.read(estimateCacheProvider).measuring.contains(key);

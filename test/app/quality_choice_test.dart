@@ -43,7 +43,7 @@ void main() {
   }
 
   Future<void> addToQueue(WidgetTester tester) async {
-    await tester.tap(find.byType(FilledButton).last);
+    await tapAddToQueue(tester);
     await tester.pump();
     await tester.pump();
   }

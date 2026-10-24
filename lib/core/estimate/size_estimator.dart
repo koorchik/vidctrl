@@ -63,6 +63,14 @@ OutputEstimate? estimateWithoutEncoding(MediaInfo info, ConversionPlan plan) {
   return OutputEstimate(bytes: videoBytes + audioOutputBytes(info, plan));
 }
 
+/// Whether the expected size of [plan] on [info] has to be measured by
+/// encoding pieces: it encodes the picture to a quality, not to a size that
+/// can be calculated.
+bool needsMeasuring(MediaInfo info, ConversionPlan plan) =>
+    plan.producesOutput &&
+    plan.video is VideoEncode &&
+    estimateWithoutEncoding(info, plan) == null;
+
 /// Bytes the sound will take in the output. Sound is predictable: copied
 /// tracks keep their size, encoders are given a bitrate.
 int audioOutputBytes(MediaInfo info, ConversionPlan plan) {
@@ -180,14 +188,18 @@ class SampleEstimator implements OutputEstimator {
     Directory? workDir,
     this.compare = false,
     this.vmaf = false,
-  }) : _workDir =
-           workDir ??
-           Directory(
-             p.join(Directory.systemTemp.path, 'vidctrl_estimates_$pid'),
-           );
+  }) : _givenWorkDir = workDir;
 
   final FfmpegRunner _runner;
-  final Directory _workDir;
+  final Directory? _givenWorkDir;
+
+  /// Without a folder given, one of the app's own in the system's temporary
+  /// folder, made on first use: its name cannot be guessed and only this
+  /// user may enter it, as the pieces are of someone's videos.
+  Future<Directory>? _ownWorkDir;
+
+  /// Where the pieces go, once a measurement has started.
+  late Directory _workDir;
   final bool compare;
   final bool vmaf;
   final _running = <FfmpegRun>{};
@@ -229,7 +241,7 @@ class SampleEstimator implements OutputEstimator {
     if (samples.isEmpty) return null;
 
     final generation = _generation;
-    await _workDir.create(recursive: true);
+    _workDir = await _usableWorkDir();
     final comparable = compare && canComparePlan(plan);
 
     if (raise == null || !comparable) {
@@ -512,10 +524,33 @@ class SampleEstimator implements OutputEstimator {
     ]);
   }
 
+  Future<Directory> _usableWorkDir() {
+    final given = _givenWorkDir;
+    if (given != null) return given.create(recursive: true);
+    return _ownWorkDir ??= _makeOwnWorkDir();
+  }
+
+  static Future<Directory> _makeOwnWorkDir() async {
+    final folder = await Directory.systemTemp.createTemp('vidctrl_estimates_');
+    // Made with the usual permissions; the pieces are for this user only.
+    if (Platform.isLinux || Platform.isMacOS) {
+      await Process.run('chmod', ['700', folder.path]);
+    }
+    return folder;
+  }
+
   @override
   Future<void> discardKept() async {
     for (final path in _kept.toList()) {
       await _delete(path);
+    }
+    final own = _ownWorkDir;
+    if (own == null) return;
+    _ownWorkDir = null;
+    try {
+      await (await own).delete(recursive: true);
+    } on FileSystemException {
+      // Left to the system's clean-up of its temporary folder.
     }
   }
 }

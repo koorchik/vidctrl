@@ -26,7 +26,7 @@ void main() {
       locale: locale ?? const Locale('en'),
     );
     await addVideos(tester, sources, ['/videos/holiday.mp4']);
-    await tester.tap(find.byType(FilledButton).last);
+    await tapAddToQueue(tester);
     await tester.pump();
     await tester.pump();
   }
@@ -81,7 +81,7 @@ void main() {
       '/videos/second.mp4',
     ]);
     await tester.pump();
-    await tester.tap(find.byType(FilledButton).last);
+    await tapAddToQueue(tester);
     await tester.pump();
     await tester.pump();
 

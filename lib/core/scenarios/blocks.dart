@@ -110,7 +110,9 @@ int sourceVideoBytes(MediaInfo info) {
   if (video == null) return 0;
   final bitRate = video.bitRate;
   if (bitRate != null) {
-    return (bitRate * info.duration.inMicroseconds / 1e6 / 8).round();
+    // Seconds first: bits per second times microseconds overflows.
+    final seconds = info.duration.inMicroseconds / 1e6;
+    return (bitRate * seconds / 8).round();
   }
   final rest = info.sizeBytes - sourceAudioBytes(info);
   return rest > 0 ? rest : info.sizeBytes;

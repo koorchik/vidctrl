@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
 
+import '../ffmpeg/command_builder.dart';
+import '../ffmpeg/picture.dart';
 import '../media/ffprobe.dart';
 
 /// The two pictures of one frame a person compares: the original's and the
@@ -33,43 +34,24 @@ class FrameGrabber {
     Duration seek = Duration.zero,
     required int frame,
   }) async {
-    final Process process;
-    try {
-      process = await Process.start(ffmpeg, [
-        '-hide_banner',
-        '-nostdin',
-        '-v', 'error',
-        // Before the input and to the millisecond, as the piece was cut and
-        // compared, so frames are counted from the same one: a finer seek
-        // can land a frame later.
-        if (seek > Duration.zero) ...[
-          '-ss',
-          (seek.inMicroseconds / 1e6).toStringAsFixed(3),
-        ],
-        '-i', inputUrl(path),
-        '-map', '0:v:0',
-        '-vf',
-        'select=eq(n\\,$frame),'
-            'scale=flags=accurate_rnd+full_chroma_int,format=rgb24',
-        '-frames:v', '1',
-        '-c:v', 'png',
-        '-f', 'image2pipe',
-        'pipe:1',
-      ]);
-    } on ProcessException {
-      return null;
-    }
-    final bytes = BytesBuilder(copy: false);
-    final reading = process.stdout.forEach(bytes.add);
-    unawaited(process.stderr.drain<void>());
-    try {
-      final exitCode = await process.exitCode.timeout(timeout);
-      await reading;
-      return exitCode == 0 && bytes.isNotEmpty ? bytes.takeBytes() : null;
-    } on TimeoutException {
-      process.kill(ProcessSignal.sigkill);
-      return null;
-    }
+    return ffmpegPicture(ffmpeg, [
+      '-hide_banner',
+      '-nostdin',
+      '-v', 'error',
+      // Before the input and to the millisecond, as the piece was cut and
+      // compared, so frames are counted from the same one: a finer seek
+      // can land a frame later.
+      if (seek > Duration.zero) ...['-ss', ffmpegSeconds(seek)],
+      '-i', inputUrl(path),
+      '-map', '0:v:0',
+      '-vf',
+      'select=eq(n\\,$frame),'
+          'scale=flags=accurate_rnd+full_chroma_int,format=rgb24',
+      '-frames:v', '1',
+      '-c:v', 'png',
+      '-f', 'image2pipe',
+      'pipe:1',
+    ], timeout: timeout);
   }
 
   /// The same frame of [original] and [result]. [result] is either the

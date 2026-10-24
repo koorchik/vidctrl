@@ -60,8 +60,10 @@ class FfmpegRun {
 
   Future<RunResult> _watch() async {
     final parser = ProgressParser();
+    // Decoded leniently like stderr: a stray byte must not stop the reading,
+    // or FFmpeg would block once the pipe fills up.
     final stdoutDone = _process.stdout
-        .transform(utf8.decoder)
+        .transform(const Utf8Decoder(allowMalformed: true))
         .transform(const LineSplitter())
         .forEach((line) {
           final snapshot = parser.addLine(line);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:json_rpc_2/json_rpc_2.dart';
 import 'package:stream_channel/stream_channel.dart';
@@ -8,8 +10,9 @@ Client _clientOf(Map<String, Object? Function(Parameters)> methods) {
   final wire = StreamChannelController<Object?>();
   final server = Server.withoutJson(wire.local);
   methods.forEach(server.registerMethod);
-  server.listen();
-  final client = Client.withoutJson(wire.foreign)..listen();
+  unawaited(server.listen());
+  final client = Client.withoutJson(wire.foreign);
+  unawaited(client.listen());
   addTearDown(client.close);
   addTearDown(server.close);
   return client;

@@ -65,8 +65,7 @@ class PreviewController extends Notifier<Map<int, Preview>> {
           estimateWithoutEncoding(info, plan) ?? cache.estimates[key];
       final pending =
           estimate == null &&
-          plan.producesOutput &&
-          plan.video is VideoEncode &&
+          needsMeasuring(info, plan) &&
           !cache.measuring.contains(key) &&
           !cache.failed.contains(key);
       previews[video.id] = Preview(
@@ -82,14 +81,16 @@ class PreviewController extends Notifier<Map<int, Preview>> {
     if (!queueBusy && toMeasure.isNotEmpty) {
       // Started after this build: measuring updates the cache, which
       // rebuilds the previews with the result.
-      Future.microtask(() {
-        if (!ref.mounted) return;
-        final estimates = ref.read(estimateCacheProvider.notifier);
-        for (final (key, video, plan) in toMeasure) {
-          if (estimates.room(plan) <= 0) break;
-          unawaited(estimates.measure(key, video.info!, plan, raise: raise));
-        }
-      });
+      unawaited(
+        Future.microtask(() {
+          if (!ref.mounted) return;
+          final estimates = ref.read(estimateCacheProvider.notifier);
+          for (final (key, video, plan) in toMeasure) {
+            if (estimates.room(plan) <= 0) break;
+            unawaited(estimates.measure(key, video.info!, plan, raise: raise));
+          }
+        }),
+      );
     }
     return previews;
   }

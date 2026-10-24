@@ -24,10 +24,12 @@ import 'package:vidctrl/core/ffmpeg/capabilities.dart';
 import 'package:vidctrl/core/ffmpeg/command_text.dart';
 import 'package:vidctrl/core/media/media_info.dart';
 import 'package:vidctrl/core/output/output_namer.dart';
+import 'package:vidctrl/core/quality/quality_meter.dart';
 import 'package:vidctrl/core/quality/quality_search.dart';
 import 'package:vidctrl/core/scenarios/registry.dart';
 
 import '../../support/control.dart';
+import '../../support/eventually.dart';
 import '../../support/fake_media.dart';
 import '../../support/fakes.dart';
 import '../../support/machine_json.dart';
@@ -741,9 +743,7 @@ void main() {
 
     /// Until the fake executor has started [count] conversions.
     Future<void> started(int count) async {
-      for (var i = 0; i < 100 && env.executor.started.length < count; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
+      await eventually(() => env.executor.started.length >= count);
       expect(env.executor.started, hasLength(count));
     }
 
@@ -799,10 +799,7 @@ void main() {
       bool active() =>
           jobs(container)
               .any((job) => job.id == id && job.status == JobStatus.running);
-      for (var i = 0; i < 100 && !active(); i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
-      expect(active(), isTrue);
+      await eventually(active);
     }
 
     test('cancel of a job just starting asks again until it stops', () async {
@@ -822,16 +819,15 @@ void main() {
     });
 
     test('cancel of a job that ends first says how it ended', () async {
-      env.executor.holdStarts = true;
       final (container, client) = await startControlled(env);
-      final id = (await queue(client, ['a.mp4'])).single;
-      await underWay(container, id);
+      await queue(client, ['a.mp4']);
+      await started(1);
+      // FFmpeg finishes the file before the cancel reaches it.
+      final conversion = env.executor.started.single..stopsLate = true;
 
       final cancelling = client.call(Methods.queueCancel);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      env.executor.releaseStarts();
-      await started(1);
-      env.executor.started.single.finish();
+      await eventually(() => conversion.cancelRequested);
+      conversion.finish();
 
       final answer = await cancelling as Map;
       expect(answer['cancelled'], isNull);
@@ -851,19 +847,14 @@ void main() {
       await started(1);
 
       expect(env.executor.started.single.cancelRequested, isTrue);
-      for (var i = 0; i < 100 && container.read(queueProvider).busy; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
-      expect(container.read(queueProvider).busy, isFalse);
+      await eventually(() => !container.read(queueProvider).busy);
     });
 
     test('cancel stops a job still choosing its quality', () async {
       env.estimator.hold = true;
       final (container, client) = await startControlled(env);
       final id = (await queue(client, ['a.mp4'], goal: 'archive')).single;
-      for (var i = 0; i < 100 && jobs(container).single.attempt == null; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
+      await eventually(() => jobs(container).single.attempt != null);
       expect(jobs(container).single.checking, isTrue);
 
       expect(await client.call(Methods.queueCancel), {'cancelled': id});
@@ -1055,9 +1046,7 @@ void main() {
       env.estimator.choices[a] = fakeChoice(QualityOutcome.notWorthIt);
       final (container, client) = await startControlled(env);
       final kept = (await queue(client, ['a.mp4'], goal: 'archive')).single;
-      for (var i = 0; i < 100 && jobs(container).single.isPending; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
+      await eventually(() => !jobs(container).single.isPending);
       expect(jobs(container).single.keptAsIs, isTrue);
 
       final answer =
@@ -1112,16 +1101,9 @@ void main() {
       return ((answer['added'] as List).single as Map)['id'] as int;
     }
 
-    Future<void> until(bool Function() condition) async {
-      for (var i = 0; i < 100 && !condition(); i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
-      expect(condition(), isTrue);
-    }
-
     /// Until the fake executor has started [count] conversions.
     Future<void> started(int count) =>
-        until(() => env.executor.started.length >= count);
+        eventually(() => env.executor.started.length >= count);
 
     /// A job of [name] made no smaller in size, converted: its frames pair
     /// with the original's, so it can be compared.
@@ -1166,7 +1148,7 @@ void main() {
       env.executor.started.last.finish();
       await pumpEventQueue();
       final compared = client.call(Methods.jobCompare, {'job': hd});
-      await until(() => env.qualityMeter.started.isNotEmpty);
+      await eventually(() => env.qualityMeter.started.isNotEmpty);
       env.qualityMeter.last.finish(43, vmaf: 96);
       answers.addAll([
         sample,
@@ -1246,7 +1228,7 @@ void main() {
       env.estimator.choices[a] = fakeChoice(QualityOutcome.notWorthIt);
       final (container, client) = await startControlled(env);
       final id = await queue(client, 'a.mp4', goal: 'archive');
-      await until(() => !jobOf(container, id).isPending);
+      await eventually(() => !jobOf(container, id).isPending);
 
       final answer = await client.call(Methods.jobGet, {
         'job': id,
@@ -1266,7 +1248,7 @@ void main() {
       final id = await converted(client, 'hd.mp4');
 
       final answer = client.call(Methods.jobCompare, {'job': id});
-      await until(() => env.qualityMeter.started.isNotEmpty);
+      await eventually(() => env.qualityMeter.started.isNotEmpty);
       expect(container.read(qualityProvider)[id], isA<QualityComparing>());
       env.qualityMeter.last.finish(43);
 
@@ -1279,6 +1261,49 @@ void main() {
       expect(container.read(qualityProvider)[id], isA<QualityMeasured>());
     });
 
+    test(
+      'compare of identical pictures answers with an xpsnr of 100',
+      () async {
+        final (_, client) = await startControlled(env);
+        final heard = Heard(client);
+        final id = await converted(client, 'hd.mp4');
+        await client.call(Methods.subscribe, {'snapshot': false});
+
+        final answer = client.call(Methods.jobCompare, {'job': id});
+        await eventually(() => env.qualityMeter.started.isNotEmpty);
+        env.qualityMeter.last.finish(double.infinity);
+
+        expect(await answer, containsPair('xpsnr', 100.0));
+        final compared = await heard.first(Events.compareFinished);
+        expect(compared.params['xpsnr'], 100);
+      },
+    );
+
+    test('a job whose pieces came out identical can still be listed', () async {
+      final a = video('a.mp4');
+      final standard = fakeChoice(QualityOutcome.standard);
+      final identical = QualityTrial(
+        value: standard.chosen.value,
+        score: const QualityScore(double.infinity),
+        bytes: standard.chosen.bytes,
+        pieces: standard.chosen.pieces,
+      );
+      env.estimator.choices[a] = QualityChoice(
+        outcome: QualityOutcome.standard,
+        trials: [identical],
+        chosen: identical,
+        sourceBytes: standard.sourceBytes,
+      );
+      final (_, client) = await startControlled(env);
+      final id = await queue(client, 'a.mp4', goal: 'archive');
+      await started(1);
+
+      final answer = await client.call(Methods.jobGet, {'job': id}) as Map;
+
+      final job = answer['job'] as Map;
+      expect(job['quality'], containsPair('xpsnr', 100));
+    });
+
     test('compare --no-wait answers at once and tells when it ends', () async {
       final (_, client) = await startControlled(env);
       final heard = Heard(client);
@@ -1289,7 +1314,7 @@ void main() {
         await client.call(Methods.jobCompare, {'job': id, 'wait': false}),
         {'started': true},
       );
-      await until(() => env.qualityMeter.started.isNotEmpty);
+      await eventually(() => env.qualityMeter.started.isNotEmpty);
       env.qualityMeter.last.finish(41, vmaf: 94);
 
       final compared = await heard.first(Events.compareFinished);
@@ -1338,7 +1363,7 @@ void main() {
       final id = await converted(client, 'hd.mp4');
 
       final first = client.call(Methods.jobCompare, {'job': id});
-      await until(() => env.qualityMeter.started.isNotEmpty);
+      await eventually(() => env.qualityMeter.started.isNotEmpty);
       final again = client.call(Methods.jobCompare, {'job': id});
       expect(
         await client.call(Methods.jobCompare, {'job': id, 'wait': false}),
@@ -1356,7 +1381,7 @@ void main() {
       final id = await converted(client, 'hd.mp4');
 
       final answer = client.call(Methods.jobCompare, {'job': id});
-      await until(() => env.qualityMeter.started.isNotEmpty);
+      await eventually(() => env.qualityMeter.started.isNotEmpty);
       await container.read(qualityProvider.notifier).cancel();
 
       await expectLater(
@@ -1371,7 +1396,7 @@ void main() {
       final second = await converted(client, 'hd2.mp4');
 
       final answer = client.call(Methods.jobCompare, {'job': first});
-      await until(() => env.qualityMeter.started.isNotEmpty);
+      await eventually(() => env.qualityMeter.started.isNotEmpty);
       await expectLater(
         client.call(Methods.jobCompare, {'job': second}),
         _failsWith(ControlErrorKind.busy),
@@ -1560,7 +1585,7 @@ void main() {
         'videos': [a],
         'goal': 'space',
       });
-      await until(() => env.estimator.measured.contains(a));
+      await eventually(() => env.estimator.measured.contains(a));
       // Converting stops the measuring, as in the window.
       await queue(client, 'b.mp4');
 
@@ -1587,7 +1612,7 @@ void main() {
           ),
         );
       }
-      await until(() => env.estimator.measured.length == 3);
+      await eventually(() => env.estimator.measured.length == 3);
       final a = p.join(folder.path, 'a.mp4');
 
       final answer = client.call(Methods.videosEstimate, {
@@ -1646,9 +1671,7 @@ void main() {
 
     /// Until the fake executor has started [count] conversions.
     Future<void> started(int count) async {
-      for (var i = 0; i < 100 && env.executor.started.length < count; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
+      await eventually(() => env.executor.started.length >= count);
       expect(env.executor.started, hasLength(count));
     }
 

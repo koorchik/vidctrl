@@ -168,6 +168,27 @@ void main() {
         containsPair('handler_name', 'VideoHandler'),
       );
     });
+
+    test('names each track as the encoding view does', () {
+      // A data track carrying a timecode, as some cameras write it.
+      final raw = {
+        'format': {'format_name': 'mov', 'duration': '60'},
+        'streams': [
+          {'codec_type': 'video', 'codec_name': 'h264'},
+          {
+            'codec_type': 'data',
+            'codec_tag_string': '[0][0][0][0]',
+            'tags': {'timecode': '10:00:00:00'},
+          },
+          {'codec_type': 'data', 'codec_tag_string': 'gpmd'},
+        ],
+      };
+
+      expect(
+        [for (final s in metadataDetails(raw)) s.group],
+        [for (final s in encodingDetails(raw)) s.group],
+      );
+    });
   });
 
   test('the full report is the indented JSON', () {

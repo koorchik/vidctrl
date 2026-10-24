@@ -12,6 +12,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import '../ffmpeg/capabilities.dart';
 import '../ffmpeg/command_builder.dart';
 import '../ffmpeg/runner.dart';
 import '../media/ffprobe.dart';
@@ -103,6 +104,11 @@ bool canComparePlan(ConversionPlan plan) {
   return !resized && !toneMapped && !retimed;
 }
 
+/// Whether [plan]'s result can be compared with its original on this
+/// computer: [canComparePlan], with an FFmpeg that has the `xpsnr` filter.
+bool comparableHere(ConversionPlan plan, Capabilities capabilities) =>
+    canComparePlan(plan) && capabilities.hasFilter('xpsnr');
+
 /// FFmpeg arguments comparing [result] with [original]. For a sample,
 /// [range] picks the same piece of the original: the seek is made before the
 /// input, as the conversion made it, so both start at the same frame. With a
@@ -138,7 +144,6 @@ List<String> comparisonArgs({
   const byOrder =
       'settb=1/30,setpts=N,crop=trunc(iw/32)*32:ih:0:0,format=yuv420p10le,'
       'copy';
-  String seconds(Duration d) => (d.inMicroseconds / 1e6).toStringAsFixed(3);
   return [
     '-hide_banner',
     // Not `-loglevel error`: the score is printed at the normal level.
@@ -149,9 +154,9 @@ List<String> comparisonArgs({
     inputUrl(result),
     if (range != null && range.start > Duration.zero) ...[
       '-ss',
-      seconds(range.start),
+      ffmpegSeconds(range.start),
     ],
-    if (range != null) ...['-t', seconds(range.length)],
+    if (range != null) ...['-t', ffmpegSeconds(range.length)],
     '-i',
     inputUrl(original),
     '-lavfi',

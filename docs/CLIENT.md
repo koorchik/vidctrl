@@ -810,7 +810,7 @@ Job 1: Compared with the original. Very close to the original (VMAF 94.1; XPSNR 
 Job 1: Comparing with the original; `vidctrl-client compare 1` waits for the result.
 ```
 
-With `--json`: `job` (int); `status` (string): `MEASURED`; `closeness` (string, see "Closeness"); `xpsnr` (number, in dB); `vmaf` (number, optional: where this FFmpeg measures it). With `--no-wait`, `{"started": true}`.
+With `--json`: `job` (int); `status` (string): `MEASURED`; `closeness` (string, see "Closeness"); `xpsnr` (number, in dB; 100 for identical pictures); `vmaf` (number, optional: where this FFmpeg measures it). With `--no-wait`, `{"started": true}`.
 
 ```json
 {"job":1,"status":"MEASURED","closeness":"VERY_CLOSE","xpsnr":40.6,"vmaf":94.1}
@@ -1247,7 +1247,7 @@ How a job's quality was chosen: Archive measures each video before converting it
 - `value` (int, optional): the quality number chosen (lower is better).
 - `standardValue` (int, optional): the goal's usual number.
 - `vmaf` (number, optional): VMAF of the poorest piece; 95 and more looks the same.
-- `xpsnr` (number, optional): XPSNR of the poorest piece, in dB.
+- `xpsnr` (number, optional): XPSNR of the poorest piece, in dB; 100 for pictures identical to the original's.
 - `share` (number): the expected size as a share of the original's, 0 to 1.
 
 ### Outcome

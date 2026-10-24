@@ -1,9 +1,31 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/ffmpeg/command_text.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../queue/queue_controller.dart';
+import '../../sources/sources_controller.dart';
 import '../../theme.dart';
+
+/// Shows the command [video] would run with the panel's current settings,
+/// as "Show the command" does wherever it is offered.
+void showCommandForVideo(
+  BuildContext context,
+  WidgetRef ref,
+  SourceVideo video,
+) {
+  final args = ref.read(queueProvider.notifier).commandForVideo(video);
+  if (args == null) return;
+  unawaited(
+    showDialog<void>(
+      context: context,
+      builder: (_) => CommandDialog(args: args),
+    ),
+  );
+}
 
 /// Shows the FFmpeg command for one video, for people who want to see exactly
 /// what happens, run it themselves or adjust it.

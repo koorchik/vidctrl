@@ -85,7 +85,8 @@
    - Installers (AppImage/deb, Windows installer) and signing on Windows.
    - Linux: a desktop entry named after the application identifier, with the
      icons installed beside it. Wayland desktops take the window icon from
-     there; until then `tool/desktop_entry.dart` registers one by hand.
+     there; until then the app registers one for the current user at each
+     start (`lib/core/platform/desktop_entry.dart`).
    - Make the conversion tests pass on Windows (they pass on macOS). CI runs
      only the quick FFmpeg check, so they have to be run on a Windows
      machine.

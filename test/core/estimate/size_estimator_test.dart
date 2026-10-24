@@ -95,6 +95,22 @@ void main() {
       );
     });
 
+    test('a copy of a long, high-bitrate master keeps its size', () {
+      // ProRes 4444 XQ at 4K60 for an hour and a half: bits per second times
+      // microseconds no longer fit in 64 bits.
+      const plan = ConversionPlan(kind: PlanKind.remux);
+      final info = clip(
+        videoBitRate: 2400000000,
+        audio: [],
+        duration: const Duration(minutes: 90),
+      );
+
+      expect(
+        estimateWithoutEncoding(info, plan)!.bytes,
+        2400000000 ~/ 8 * 90 * 60,
+      );
+    });
+
     test('a quality-targeted encode has to be measured', () {
       const plan = ConversionPlan(
         kind: PlanKind.encode,
@@ -102,6 +118,26 @@ void main() {
       );
 
       expect(estimateWithoutEncoding(clip(), plan), isNull);
+    });
+
+    test('only a quality-targeted picture encode needs measuring', () {
+      const encode = ConversionPlan(
+        kind: PlanKind.encode,
+        video: VideoEncode(encoder: 'libx265', pixFmt: 'yuv420p10le'),
+      );
+      const fixedRate = ConversionPlan(
+        kind: PlanKind.encode,
+        video: VideoEncode(encoder: 'prores_ks', pixFmt: 'yuv422p10le'),
+        estimatedBytes: 1000,
+      );
+
+      expect(needsMeasuring(clip(), encode), isTrue);
+      expect(needsMeasuring(clip(), fixedRate), isFalse);
+      expect(
+        needsMeasuring(clip(), const ConversionPlan(kind: PlanKind.remux)),
+        isFalse,
+      );
+      expect(needsMeasuring(clip(), const ConversionPlan.skip()), isFalse);
     });
 
     test('nothing is estimated for a file that is skipped', () {

@@ -20,7 +20,7 @@ class ControlConnection {
           onDone: _finish,
           cancelOnError: true,
         );
-    _socket.done.then((_) {}, onError: (Object _) => _finish());
+    unawaited(_socket.done.then((_) {}, onError: (Object _) => _finish()));
     final messages = jsonLines(_lines.stream, (line) {
       if (!_done.isCompleted) _socket.write('$line\n');
     });
@@ -138,10 +138,10 @@ class ControlConnection {
     if (_done.isCompleted) return;
     _done.complete();
     _socket.destroy();
-    _subscription.cancel();
-    _lines.close();
-    _rpc.close();
-    _notifications.close();
+    unawaited(_subscription.cancel());
+    unawaited(_lines.close());
+    unawaited(_rpc.close());
+    unawaited(_notifications.close());
   }
 }
 

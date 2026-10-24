@@ -140,7 +140,8 @@ class ControlController extends Notifier<ControlState>
   }
 
   void _unfollow() {
-    for (final subscription in _following ?? const []) {
+    for (final subscription
+        in _following ?? const <ProviderSubscription<Object?>>[]) {
       subscription.close();
     }
     _following = null;
@@ -184,7 +185,7 @@ class ControlController extends Notifier<ControlState>
     _follow();
     if (_subscribers.containsKey(peer)) return;
     _subscribers[peer] = _Subscriber();
-    peer.closed.then((_) => _subscribers.remove(peer));
+    unawaited(peer.closed.then((_) => _subscribers.remove(peer)));
   }
 
   @override
@@ -194,9 +195,11 @@ class ControlController extends Notifier<ControlState>
     final wait = _Wait(peer, tracker);
     _waits.add(wait);
     if (tracker.paused) _tellPaused(peer);
-    peer.closed.then((_) {
-      if (_waits.remove(wait)) wait.done.completeError(_closed);
-    });
+    unawaited(
+      peer.closed.then((_) {
+        if (_waits.remove(wait)) wait.done.completeError(_closed);
+      }),
+    );
     return wait.done.future;
   }
 

@@ -50,5 +50,30 @@ void main() {
         'clip.Mkv',
       ]);
     });
+
+    test(
+      'a subfolder that cannot be read is passed over',
+      () async {
+        await touch('A001.MOV');
+        await touch(p.join('B', 'B001.MOV'));
+        // Like a drive's lost+found, readable only by the system.
+        final locked = Directory(p.join(folder.path, 'lost+found'));
+        await locked.create();
+        await Process.run('chmod', ['000', locked.path]);
+        addTearDown(() => Process.run('chmod', ['755', locked.path]));
+
+        final found = await expandDroppedPaths([folder.path]);
+
+        expect(found.map((f) => p.relative(f, from: folder.path)), [
+          'A001.MOV',
+          p.join('B', 'B001.MOV'),
+        ]);
+      },
+      // Windows has no chmod, and root reads every folder.
+      skip: Platform.isWindows || _isRoot(),
+    );
   });
 }
+
+bool _isRoot() =>
+    (Process.runSync('id', ['-u']).stdout as String).trim() == '0';

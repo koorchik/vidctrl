@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vidctrl/core/media/ffprobe.dart';
 import 'package:vidctrl/core/media/media_info.dart';
@@ -5,6 +7,21 @@ import 'package:vidctrl/core/media/media_info.dart';
 import '../../support/fake_media.dart';
 
 void main() {
+  test('an ffprobe that cannot be run reads as an unreadable file', () async {
+    final missing = Ffprobe(
+      [
+        Directory.systemTemp.path,
+        'no-such-folder',
+        'ffprobe',
+      ].join(Platform.pathSeparator),
+    );
+
+    await expectLater(
+      missing.probe('clip.mp4'),
+      throwsA(isA<FfprobeException>()),
+    );
+  });
+
   group('pixel format', () {
     const depths = {
       'yuv420p': 8,
