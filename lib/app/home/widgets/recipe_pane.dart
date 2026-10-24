@@ -83,6 +83,21 @@ class RecipePane extends ConsumerWidget {
             selected.choice(recipe.values, option.id),
           ).isNotEmpty,
     );
+    // Where two options explain themselves, the goal's explanation needs a
+    // taller panel than the smallest one.
+    bool goalExplained(BoxConstraints constraints) =>
+        explainedOptions.length < 2 ||
+        constraints.maxHeight >= _Spacing.explainedFrom;
+    // The archive's settings were measured, not guessed; "?" tells how.
+    final help = scenario == archiveScenario
+        ? (
+            l10n.archiveQualityHelp,
+            () => showDialog<void>(
+              context: context,
+              builder: (_) => const ArchiveQualityDialog(),
+            ),
+          )
+        : null;
     final advanced = [
       for (final option in selected.options)
         if (advancedOptionVisible(selected, option, recipe.values)) option,
@@ -163,23 +178,8 @@ class RecipePane extends ConsumerWidget {
                         // graphics card), it takes the other's room.
                         if (presets.length > 1)
                           _Hint(presetHint(l10n, selected.id))
-                        else if (explainedOptions.length < 2 ||
-                            constraints.maxHeight >= _Spacing.explainedFrom)
-                          _Hint(
-                            scenarioHint(l10n, scenario.id),
-                            // The archive's settings were measured, not
-                            // guessed; "?" tells how.
-                            help: scenario == archiveScenario
-                                ? (
-                                    l10n.archiveQualityHelp,
-                                    () => showDialog<void>(
-                                      context: context,
-                                      builder: (_) =>
-                                          const ArchiveQualityDialog(),
-                                    ),
-                                  )
-                                : null,
-                          ),
+                        else if (goalExplained(constraints))
+                          _Hint(scenarioHint(l10n, scenario.id), help: help),
                         _Hint(scenarioNotice(l10n, scenario.id), notice: true),
                         // People who edit in Resolve often shoot on
                         // Blackmagic cameras, which CamCtrl controls. Only
@@ -202,13 +202,20 @@ class RecipePane extends ConsumerWidget {
                               onChanged: (value) =>
                                   controller.setOption(option.id, value),
                             ),
-                            // What the chosen variant trades away.
+                            // What the chosen variant trades away. The
+                            // goal's "?" follows the first of these while
+                            // its explanation waits, so it is always there.
                             _Hint(
                               choiceHint(
                                 l10n,
                                 option.id,
                                 selected.choice(recipe.values, option.id),
                               ),
+                              help:
+                                  !goalExplained(constraints) &&
+                                      option == explainedOptions.first
+                                  ? help
+                                  : null,
                             ),
                           ],
                         _LabeledRow(

@@ -415,7 +415,7 @@ void main() {
       });
 
       testWidgets('explains itself in the smallest window when the computer '
-          'offers no graphics card', (tester) async {
+          'offers no graphics card, and offers its "?" in any', (tester) async {
         const help = 'How the archive keeps the quality';
         await pumpApp(tester, env, size: minimumWindowSize);
         expect(find.textContaining('far less space'), findsOneWidget);
@@ -424,14 +424,16 @@ void main() {
 
         // With a card, its row takes the room: the format and speed say
         // what they trade away, and the explanation waits for a window a
-        // little taller, still with the compact spacing (a MacBook's).
+        // little taller, still with the compact spacing (a MacBook's). Its
+        // "?" stays, after what the format trades away.
         await tester.pumpWidget(const SizedBox());
         await pumpApp(
           tester,
           FakeEnvironment(capabilities: withGpu({'av1_nvenc'})),
           size: minimumWindowSize,
         );
-        expect(find.byTooltip(help), findsNothing);
+        expect(find.textContaining('far less space'), findsNothing);
+        expect(find.byTooltip(help), findsOneWidget);
 
         await tester.pumpWidget(const SizedBox());
         await pumpApp(

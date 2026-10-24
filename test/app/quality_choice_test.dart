@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vidctrl/app/home/technical_text.dart';
+import 'package:vidctrl/app/home/widgets/archive_quality_dialog.dart';
 import 'package:vidctrl/app/home/widgets/busy_mark.dart';
 import 'package:vidctrl/app/home/widgets/quality_report.dart';
 import 'package:vidctrl/app/window.dart';
 import 'package:vidctrl/core/quality/quality_search.dart';
 
+import '../support/fake_media.dart';
 import '../support/fakes.dart';
 import '../support/pump_app.dart';
 import 'home_screen_test.dart' show expectNoJargon;
@@ -412,6 +414,29 @@ void main() {
       // A line that does not fit throws while it is laid out.
       expect(tester.takeException(), isNull);
       expect(find.byType(QualityChoiceLine), findsWidgets);
+    });
+
+    testWidgets('how the archive keeps the quality opens from the smallest '
+        'window, with a graphics card too (${locale.languageCode})', (
+      tester,
+    ) async {
+      for (final capabilities in [
+        softwareOnly,
+        withGpu({'av1_nvenc'}),
+      ]) {
+        await tester.pumpWidget(const SizedBox());
+        await pumpApp(
+          tester,
+          FakeEnvironment(capabilities: capabilities),
+          locale: locale,
+          size: minimumWindowSize,
+        );
+
+        await tester.tap(find.byIcon(Icons.help_outline_rounded));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(ArchiveQualityDialog), findsOneWidget);
+      }
     });
 
     testWidgets('the numbers stay secondary detail (${locale.languageCode})', (

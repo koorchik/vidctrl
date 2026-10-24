@@ -288,7 +288,9 @@ videos and gets small files that look the same, with no help.
   window (`explainedFrom` in `recipe_pane.dart`), so the smallest one still
   fits; where the computer offers one of them only (no graphics card, as on
   an M1 Mac), it takes the other's room. `no_scrolling_test.dart` checks
-  the three kinds of computer at that height too.
+  the three kinds of computer at that height too. Its "?", which opens how
+  the archive keeps the quality, is always there: while the explanation
+  waits, it ends the format's.
 - More is available on request only: "More options…", and "Show the command"
   and "Video details" in the ⋯ menus.
 
