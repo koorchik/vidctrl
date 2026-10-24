@@ -127,7 +127,7 @@ class EndpointFile {
       await temporary.writeAsString('');
       if (unixLike) await _chmod('600', temporary.path);
       await temporary.writeAsString(jsonEncode(e.toJson()));
-      await temporary.rename(path);
+      await _renameInto(temporary, path);
     } on Object {
       try {
         await temporary.delete();
@@ -135,6 +135,20 @@ class EndpointFile {
         // Nothing left to clean.
       }
       rethrow;
+    }
+  }
+
+  /// Windows refuses to replace a file while another window is replacing
+  /// it at the same moment; it goes through once that one is done.
+  static Future<void> _renameInto(File temporary, String path) async {
+    for (var attempt = 1; ; attempt++) {
+      try {
+        await temporary.rename(path);
+        return;
+      } on FileSystemException {
+        if (attempt == 20) rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 5 * attempt));
+      }
     }
   }
 
