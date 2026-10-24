@@ -8,7 +8,7 @@ VidCtrl is open on this computer, and the person watches its window. The program
 
 - Run `vidctrl-client manual` first: it explains every command, the goals and what the results mean. Add `--json` to a command to read its answer as JSON.
 - Finding the videos is your job (with `find`, `du` or the like). Give their paths to `vidctrl-client add`, or straight to `vidctrl-client queue add --goal <goal>`.
-- The window converts one video at a time, and that can take hours. To know when it ends, run `vidctrl-client wait` in the background (or follow `vidctrl-client events`), and tell the person when it returns: each result, and any marked "worth a look by eye".
+- The window converts one video at a time, which can take hours. Run `vidctrl-client wait --json` in the background if your shell can; if it blocks, `vidctrl-client wait --any --timeout 540 --json` (under your tool's time limit), then again with the ids in `pending` until it is empty. Each answer has every job that ended, in full: tell the person each result, and any with `needsALook`.
 - Never delete, move or rename any file. "Remove" only takes a video off the list or a job out of the queue.
 
 ## What VidCtrl is
@@ -18,7 +18,7 @@ A window that converts videos by goal; `vidctrl-client` changes what it shows, a
 - **Videos**: the window's list. `add` is like dropping a file there; each file is listed once, and videos just added become the selection.
 - **Jobs**: `queue add` makes one per video, a snapshot of video, goal, options and folder that later changes do not touch. The queue starts by itself and goes in order.
 - **The window shows everything**; the person may act there too, and this program sees it.
-- **Nothing converts without the window.** Every command but `status`, `manual` and `help` opens one if none is ("Starting VidCtrl…" on stderr, up to 30 s); closing it stops conversions. Two commands at once may each open one: run `vidctrl-client queue` first, then `events` in the background.
+- **Nothing converts without the window.** Every command but `status`, `manual` and `help` opens one if none is ("Starting VidCtrl…" on stderr, up to 30 s); closing it stops conversions. Two commands at once may each open one: run one first.
 - **Results** are new files, by default in `Converted` beside each video, named with the settings (`beach.mov` gives `Converted/beach_av1-crf35.mp4`, a second ` (2)`), written as a hidden `.part` until whole.
 - **Samples**: 10 seconds from the start or middle, with the whole's settings, into `Samples` there (`beach_av1-crf35_sample10s.mp4`, `_sample10s-mid`).
 - **Ids** count from 0, lasting, like the list and queue, while the window is open. Digits only is an id: a file named `3` is `./3`. Paths may be relative or start with `~`.
@@ -52,7 +52,7 @@ VidCtrl deletes no file: "remove" takes a video off the list or a job out of the
 - `job <job> [--command]`: One job; `--command`: the FFmpeg command it runs, to show, not run. → `{job: Job, command?: string}`
 - `compare <job> [--no-wait]`: Compares a `DONE` result with its original, taking about as long as the video, one at a time (`BUSY`); not after resizing, retiming or HDR to SDR. `--no-wait`: `{started: true}`, then `COMPARE_FINISHED`. → `{job: int, status, closeness, xpsnr: number, vmaf?: number}`
 - `status`: Whether the window is open, and its queue; never opens it. → `{running: false}`, or `{running: true, …Status}`
-- `wait [jobs…] [--timeout <seconds>]`: Waits until the jobs end (see "Waiting"). → `{outcomes: [Outcome]}` at the end
+- `wait [jobs…] [--any] [--timeout <seconds>]`: Waits until the jobs end; `--any`: until one does; `--timeout`: that long at most (exit 3, the answer all the same). See "Waiting". → `{ended: [Job], pending: [Pending], paused: bool}`
 - `events [--since-now]`: Prints events as they happen (see "Codes"): a `SNAPSHOT` first (not with `--since-now`), until the window closes (exit 4). → `{event, time, …its fields}` per line
 - `goals`: The goals with the options this computer offers. → `{goals: [Goal]}`
 - `manual`: This guide. → `{commands: […], goals: […], events: […], exitCodes: {…}, codes: {…}}`
@@ -66,9 +66,9 @@ Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never word
 
 - Video: `id` int, `path`, `status`, `sizeBytes`? int, `durationSeconds`? number, `width`? int, `height`? int, `videoCodec`?, `audioCodecs` [string], `hdr` bool, `preview`? Preview.
 - Preview: `goal`, `plan`, `expectedBytes`? int, `measured` bool (by encoding pieces), `measuring` bool, `closeness`?.
-- Job: `id` int, `videoId` int, `path`, `goal`, `options` {option: choice} (as made here: report these), `sample`?, `status`, `fraction`? 0-1, `remainingSeconds`? number, `attempt`? int, `outputPath`?, `outputBytes`? int, `quality`? Quality, `needsALook` bool, `errorLines` [string].
+- Job: `id` int, `videoId` int, `path`, `goal`, `options` {option: choice} (as made here: report these), `sample`?, `status`, `fraction`? 0-1, `remainingSeconds`? number, `attempt`? int, `outputPath`?, `outputBytes`? int, `sourceBytes`? int (the original's), `seconds`? number (once ended), `quality`? Quality, `needsALook` bool, `errorLines` [string].
 - Quality: `outcome`, `value`? int (lower is better), `standardValue`? int, `vmaf`? number, `xpsnr`? number (of the poorest piece), `share` number (expected size / original's).
-- Outcome: `jobId` int, `path`, `status`, `outputPath`?, `needsALook` bool.
+- Pending: `id` int, `status`, `fraction`?, `remainingSeconds`?, `attempt`? int.
 - Status: `state`, `version`, `busy` bool, `paused` bool, `jobs` {status: int}.
 - Goal: `id` (`archive.master`), `scenario`, `options` [{`id`, `defaultChoice`, `advanced` bool, `choices` [string]}]; what each is for is under "Goals".
 - Error, on stderr: `{"error": {"code", "message"}}`; read `code`, the message is for people.
@@ -77,7 +77,7 @@ Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never word
 
 Where each kind is found, then its codes; in full in `vidctrl-client help <command>`.
 
-- **Job statuses** (Job and Outcome `status`, Status `jobs` keys): `WAITING`; `RUNNING` converting or choosing quality; `PAUSED` held by a pause; `DONE` result at `outputPath`; `SKIPPED` nothing written, not a failure; `FAILED` see `errorLines`; `CANCELLED` a failure for `wait`; `REMOVED` `wait` only: taken out, not a failure.
+- **Job statuses** (Job and Pending `status`, Status `jobs` keys): `WAITING`; `RUNNING` converting or choosing quality; `PAUSED` held by a pause; `DONE` result at `outputPath`; `SKIPPED` nothing written, not a failure; `FAILED` see `errorLines`; `CANCELLED` a failure for `wait`; `REMOVED` `wait` only: taken out, not a failure.
 - **Video statuses** (Video `status`): `PROBING` being read; `READY` can be queued; `UNREADABLE` not a video FFmpeg opens.
 - **Plans** (Preview `plan`): `SKIP` already fine (`SKIPPED`); `REMUX` copied into another file type; `AUDIO_ONLY` only the sound converted; `ENCODE` the picture converted: slow; `UNSUPPORTED` nothing the goal can do (`SKIPPED`); `KEPT_AS_IS` Archive: not worth it (`SKIPPED`).
 - **Closeness** (Preview `closeness`, `compare`): `SAME` looks the same (VMAF 95+ on the poorest piece); `VERY_CLOSE` VMAF 93+; `DIFFERS` may visibly differ.
@@ -105,12 +105,12 @@ By name or full id; choices default first. No picture: `UNSUPPORTED` but for `au
 
 ## Waiting
 
-`vidctrl-client wait [jobs…]` waits for those jobs, or until none waits, converts or is paused, maybe for hours: run it in the background. It counts jobs not ended when it starts and those added or retried meanwhile (an old failure does not count); with none, it exits 0 at once. A job taken out is `REMOVED`, not a failure; a cancelled one is. A paused queue keeps it waiting. Exit codes, of every command:
+`vidctrl-client wait [jobs…]` answers once those jobs, or all pending, have ended: `ended` holds each in full, `pending` the rest (exit 3 after `--timeout`). It counts jobs added or retried meanwhile, not those ended before (but given ids). A job taken out is `REMOVED`, not a failure; a cancelled one is. A paused queue keeps it waiting. Not `events` to wait: it prints progress every second. Exit codes, of every command:
 
 - 0: done; for `wait`, every job done or skipped
 - 1: a job failed or was cancelled
 - 2: no window, none could open (or `--no-start`), or it refused
-- 3: `--timeout` passed; the jobs go on
+- 3: `--timeout` passed, jobs `pending`; they go on
 - 4: the window closed meanwhile
 - 5: bad arguments, or the client went wrong
 - 6: no FFmpeg; the window says what to do
@@ -122,10 +122,10 @@ Queue every video over 2 GB in ~/Videos and say when done (look at `find`'s list
 ```sh
 find ~/Videos -type f -size +2G \( -iname '*.mov' -o -iname '*.mp4' \) -not -path '*/Converted/*' \
   -print0 | xargs -0 vidctrl-client queue add --goal archive --json
-vidctrl-client wait 0 1 2 --json   # in the background; the ids from each answer's `added`
+vidctrl-client wait --json   # every job pending, those queued already too; see "Waiting"
 ```
 
-Videos in `alreadyQueued` have jobs already: find them with `vidctrl-client queue --json` and wait for them too. Then tell the person each `outputPath` and `needsALook`, and on exit 1 each failed job's `errorLines`.
+Then tell the person each `ended` job's `outputPath`, `outputBytes` beside `sourceBytes`, `quality` and `needsALook`, and on exit 1 each failed job's `errorLines`.
 
 Samples first, then the whole:
 
@@ -362,8 +362,8 @@ It prints, for example:
 The queue is converting:
 Job 0: Done. /home/alice/Videos/beach.mov
   archive.master, codec=av1, speed=cpu, video 0
-  Result: /home/alice/Videos/Converted/beach_av1-crf35.mp4, 598.0 MB
-  Usual quality (crf 35; VMAF 96.4; XPSNR 43.1 dB). Expected at 14% of the original's size.
+  Result: /home/alice/Videos/Converted/beach_av1-crf35.mp4, 598.0 MB, 14% of the original's 4.20 GB; took 32:05
+  Usual quality (crf 35; VMAF 96.4; XPSNR 43.1 dB).
 Job 1: Converting, 42%, about 21 min left. /home/alice/Videos/party.mov
   archive.master, codec=av1, speed=cpu, video 1
   Result: /home/alice/Videos/Converted/party_av1-crf20-check.mp4
@@ -375,7 +375,7 @@ Job 2: Waiting. /home/alice/Videos/dog.mp4
 With `--json`: `paused` (bool): the queue is paused in the window; `busy` (bool): it is working through jobs; `jobs` (list of Job), in queue order.
 
 ```json
-{"paused":false,"busy":true,"jobs":[{"id":0,"videoId":0,"path":"/home/alice/Videos/beach.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"DONE","outputPath":"/home/alice/Videos/Converted/beach_av1-crf35.mp4","outputBytes":598000000,"quality":{"outcome":"STANDARD","value":35,"standardValue":35,"vmaf":96.4,"xpsnr":43.1,"share":0.14},"needsALook":false,"errorLines":[]},{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","needsALook":false,"errorLines":[]}]}
+{"paused":false,"busy":true,"jobs":[{"id":0,"videoId":0,"path":"/home/alice/Videos/beach.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"DONE","outputPath":"/home/alice/Videos/Converted/beach_av1-crf35.mp4","outputBytes":598000000,"sourceBytes":4200000000,"seconds":1925.4,"quality":{"outcome":"STANDARD","value":35,"standardValue":35,"vmaf":96.4,"xpsnr":43.1,"share":0.14},"needsALook":false,"errorLines":[]},{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","sourceBytes":2900000000,"needsALook":false,"errorLines":[]}]}
 ```
 
 ### `vidctrl-client queue add <videos…>`
@@ -414,7 +414,7 @@ Not queued, video 3: it cannot be read.
 With `--json`: `goal` (string): the goal's id; `options` (object): every option of the goal and the choice made on this computer, as in Job; `added` (list of Job): the new jobs; `alreadyQueued` (list of int): the videos that were queued already; `skipped` (list): `video` (int or string, as given) and `reason` (string: `UNREADABLE` or `NOT_FOUND`).
 
 ```json
-{"goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"added":[{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","needsALook":false,"errorLines":[]}],"alreadyQueued":[0],"skipped":[{"video":3,"reason":"UNREADABLE"}]}
+{"goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"added":[{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","sourceBytes":2900000000,"needsALook":false,"errorLines":[]}],"alreadyQueued":[0],"skipped":[{"video":3,"reason":"UNREADABLE"}]}
 ```
 
 Errors:
@@ -438,10 +438,10 @@ find ~/Videos -type f -size +2G \( -iname '*.mov' -o -iname '*.mp4' -o -iname '*
   -not -path '*/Converted/*' -print0 | xargs -0 vidctrl-client queue add --goal archive --json
 ```
 
-For a long list `xargs` may run `queue add` more than once: each run prints one JSON answer on its own line. Take the job ids from every answer's `added` (`added[].id`); videos in `alreadyQueued` were in the queue already, and `vidctrl-client queue --json` shows their jobs. Then wait for those jobs, in the background, as it can take hours:
+For a long list `xargs` may run `queue add` more than once: each run prints one JSON answer on its own line, its new jobs in `added`. Then wait for every job pending, those in `alreadyQueued` too, in the background, as it can take hours:
 
 ```sh
-vidctrl-client wait 0 1 2 --json             # the job ids from `added`
+vidctrl-client wait --json
 ```
 
 On Windows, in PowerShell:
@@ -451,10 +451,10 @@ $files = Get-ChildItem "$HOME\Videos" -Recurse -File -Include *.mov,*.mp4,*.mts,
   Where-Object { $_.Length -gt 2GB -and $_.FullName -notmatch '\\Converted\\' }
 $files.Count                     # 0: tell the person no video was found, and stop
 vidctrl-client queue add --goal archive --json @($files.FullName)
-vidctrl-client wait 0 1 2 --json             # the job ids from `added`
+vidctrl-client wait --json
 ```
 
-`wait` returns when the last of those jobs has ended. Then tell the person each result (`outputPath`), and name every one with `needsALook` true: worth a look by eye. `vidctrl-client queue --json` gives each job's size and quality too, and on exit 1 each failed job's `errorLines`: tell the person why it failed. Once the cause is put right, `vidctrl-client queue retry <job>` tries a job again.
+`wait` returns when the last of those jobs has ended, each in `ended`. Then tell the person each result: `outputPath`, `outputBytes` beside `sourceBytes`, `seconds` and `quality`, and name every one with `needsALook` true: worth a look by eye. On exit 1 tell the person why each failed job failed (`errorLines`). Once the cause is put right, `vidctrl-client queue retry <job>` tries a job again.
 
 ### `vidctrl-client queue remove <jobs…>`
 
@@ -511,7 +511,7 @@ The queue, in order:
 With `--json`: `jobs` (list of Job): the whole queue, in its new order.
 
 ```json
-{"jobs":[{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","needsALook":false,"errorLines":[]},{"id":0,"videoId":0,"path":"/home/alice/Videos/beach.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"DONE","outputPath":"/home/alice/Videos/Converted/beach_av1-crf35.mp4","outputBytes":598000000,"quality":{"outcome":"STANDARD","value":35,"standardValue":35,"vmaf":96.4,"xpsnr":43.1,"share":0.14},"needsALook":false,"errorLines":[]}]}
+{"jobs":[{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","sourceBytes":2900000000,"needsALook":false,"errorLines":[]},{"id":0,"videoId":0,"path":"/home/alice/Videos/beach.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"DONE","outputPath":"/home/alice/Videos/Converted/beach_av1-crf35.mp4","outputBytes":598000000,"sourceBytes":4200000000,"seconds":1925.4,"quality":{"outcome":"STANDARD","value":35,"standardValue":35,"vmaf":96.4,"xpsnr":43.1,"share":0.14},"needsALook":false,"errorLines":[]}]}
 ```
 
 Errors:
@@ -539,7 +539,7 @@ Job 2: Queued again. /home/alice/Videos/dog.mp4
 With `--json`: `job` (Job): the job, waiting again.
 
 ```json
-{"job":{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","needsALook":false,"errorLines":[]}}
+{"job":{"id":2,"videoId":2,"path":"/home/alice/Videos/dog.mp4","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"WAITING","sourceBytes":2900000000,"needsALook":false,"errorLines":[]}}
 ```
 
 Errors:
@@ -765,8 +765,8 @@ It prints, for example:
 ```
 Job 1: Done. /home/alice/Videos/party.mov
   archive.master, codec=av1, speed=cpu, video 1
-  Result: /home/alice/Videos/Converted/party_av1-crf20-check.mp4, 2.10 GB
-  Worth a look by eye: even the best quality falls a little short somewhere (crf 20, usual 35; VMAF 93.8; XPSNR 40.2 dB). Expected at 52% of the original's size.
+  Result: /home/alice/Videos/Converted/party_av1-crf20-check.mp4, 2.10 GB, 52% of the original's 4.04 GB; took 1:26:51
+  Worth a look by eye: even the best quality falls a little short somewhere (crf 20, usual 35; VMAF 93.8; XPSNR 40.2 dB).
   Its name ends in -check: look at it beside the original.
 The command, as "Show the command" in the window gives it:
   ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -svtav1-params tune=0:enable-variance-boost=1:enable-qm=1:qm-min=0:keyint=10s:scd=1 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -metadata major_brand= -metadata minor_version= -metadata compatible_brands= -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4
@@ -775,7 +775,7 @@ The command, as "Show the command" in the window gives it:
 With `--json`: `job` (Job); `command` (string, optional): with `--command`, left out for a job that runs nothing (one that ended skipped or is kept as it is).
 
 ```json
-{"job":{"id":1,"videoId":1,"path":"/home/alice/Videos/party.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"DONE","outputPath":"/home/alice/Videos/Converted/party_av1-crf20-check.mp4","outputBytes":2100000000,"quality":{"outcome":"BELOW_TARGET","value":20,"standardValue":35,"vmaf":93.8,"xpsnr":40.2,"share":0.52},"needsALook":true,"errorLines":[]},"command":"ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -svtav1-params tune=0:enable-variance-boost=1:enable-qm=1:qm-min=0:keyint=10s:scd=1 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -metadata major_brand= -metadata minor_version= -metadata compatible_brands= -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4"}
+{"job":{"id":1,"videoId":1,"path":"/home/alice/Videos/party.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"DONE","outputPath":"/home/alice/Videos/Converted/party_av1-crf20-check.mp4","outputBytes":2100000000,"sourceBytes":4040000000,"seconds":5210.8,"quality":{"outcome":"BELOW_TARGET","value":20,"standardValue":35,"vmaf":93.8,"xpsnr":40.2,"share":0.52},"needsALook":true,"errorLines":[]},"command":"ffmpeg -hide_banner -i /home/alice/Videos/party.mov -map 0:v:0 -map '0:a?' -map_metadata 0 -c:v libsvtav1 -preset 5 -crf 20 -svtav1-params tune=0:enable-variance-boost=1:enable-qm=1:qm-min=0:keyint=10s:scd=1 -pix_fmt yuv420p10le -c:a copy -movflags +faststart+use_metadata_tags -metadata major_brand= -metadata minor_version= -metadata compatible_brands= -f mp4 /home/alice/Videos/Converted/party_av1-crf20-check.mp4"}
 ```
 
 Errors:
@@ -853,53 +853,62 @@ With `--json`: `{"running": false}` when the window is not open; otherwise `runn
 
 ### `vidctrl-client wait [jobs…]`
 
-Waits until the jobs are finished, and says how each ended.
+Waits until the jobs have ended, and tells each result.
 
-Without job ids, until no job is waiting or converting; with ids, until those have ended. Jobs added meanwhile, by this program or the person, count too. The rules are under "Waiting". Conversions can take hours: run it in the background.
+Without job ids, until no job is waiting or converting; with ids, until those have ended. Jobs added meanwhile, by this program or the person, count too. The rules are under "Waiting".
 
-Each job is printed as soon as it ends; the last line sums up. Exit 0 when every job ended done or skipped, 1 when one failed or was cancelled, 3 after `--timeout`, 4 when the window closed.
+Each job is printed as soon as it ends; then what is not ended yet and the command that waits on. Exit 0 when every job ended done or skipped (with `--any`, the one that ended), 1 when one failed or was cancelled, 3 when the time passed with jobs pending, 4 when the window closed.
 
 Options:
 
-- `--timeout <seconds>`: give up after this long, with exit 3; the jobs go on in the window.
+- `--any`: answer as soon as one of the jobs has ended, at once if one of those given has already.
+- `--timeout <seconds>`: answer after this long at most (0: now), with exit 3 while jobs are pending; they go on in the window.
 
 Examples:
 
 ```sh
-vidctrl-client wait
-vidctrl-client wait 3 4 --timeout 600 --json
+vidctrl-client wait --json
+vidctrl-client wait 1 2 --any --timeout 540 --json
 ```
 
 It prints, for example:
 
 ```
 Job 0: Done. /home/alice/Videos/beach.mov
-  Result: /home/alice/Videos/Converted/beach_av1-crf35.mp4, 598.0 MB
-  Usual quality (crf 35; VMAF 96.4; XPSNR 43.1 dB). Expected at 14% of the original's size.
-Job 1: Done. /home/alice/Videos/party.mov
-  Result: /home/alice/Videos/Converted/party_av1-crf20-check.mp4, 2.10 GB
-  Worth a look by eye: even the best quality falls a little short somewhere (crf 20, usual 35; VMAF 93.8; XPSNR 40.2 dB). Expected at 52% of the original's size.
-All done.
+  Result: /home/alice/Videos/Converted/beach_av1-crf35.mp4, 598.0 MB, 14% of the original's 4.20 GB; took 32:05
+  Usual quality (crf 35; VMAF 96.4; XPSNR 43.1 dB).
+Not ended yet: job 1 converting, 42%, about 21 min left; job 2 waiting.
+To go on: vidctrl-client wait 1 2 --any --timeout 540
 ```
 
-With `--json`: `outcomes` (list of Outcome), once all have ended; nothing is printed before.
+With `--json`: `ended` (list of Job): each job counted that has ended, in full, `REMOVED` for one taken out; `pending` (list of Pending): the others, as they stand; `paused` (bool): the queue is paused in the window. Here `wait --any --timeout 540` once job 0 has ended:
 
 ```json
-{"outcomes":[{"jobId":0,"path":"/home/alice/Videos/beach.mov","status":"DONE","outputPath":"/home/alice/Videos/Converted/beach_av1-crf35.mp4","needsALook":false},{"jobId":1,"path":"/home/alice/Videos/party.mov","status":"DONE","outputPath":"/home/alice/Videos/Converted/party_av1-crf20-check.mp4","needsALook":true}]}
+{"ended":[{"id":0,"videoId":0,"path":"/home/alice/Videos/beach.mov","goal":"archive.master","options":{"codec":"av1","speed":"cpu"},"status":"DONE","outputPath":"/home/alice/Videos/Converted/beach_av1-crf35.mp4","outputBytes":598000000,"sourceBytes":4200000000,"seconds":1925.4,"quality":{"outcome":"STANDARD","value":35,"standardValue":35,"vmaf":96.4,"xpsnr":43.1,"share":0.14},"needsALook":false,"errorLines":[]}],"pending":[{"id":1,"status":"RUNNING","fraction":0.42,"remainingSeconds":1260.0},{"id":2,"status":"WAITING"}],"paused":false}
 ```
 
 Errors:
 
 - A job id not in the queue: exit 5.
 
+#### Report each file as it finishes, from a shell that blocks
+
+```sh
+vidctrl-client wait --any --timeout 540 --json         # the jobs pending now
+vidctrl-client wait 1 2 --any --timeout 540 --json     # the ids in the last answer's `pending`
+```
+
+Each answer comes once a job has ended (exit 0, or 1 if it failed) or after 540 seconds (exit 3): tell the person about each job in `ended`, then wait again for the ids in `pending`, until it is empty. A job that ends between two waits is not missed: it is given by its id. With `--timeout 0` it answers at once, how those jobs stand.
+
 #### Waiting
 
-- `vidctrl-client wait` without ids waits until no job is waiting, converting or paused; with ids, until those have ended.
-- The jobs it counts are those not yet ended when it starts, and any added or tried again while it waits, by this program or the person. Jobs that ended before it started do not count, so an old failure does not make every later `wait` exit 1.
+- `vidctrl-client wait` without ids waits until no job is waiting, converting or paused; with ids, until those have ended; with `--any`, until one has.
+- The jobs it counts are those not yet ended when it starts, and any added or tried again while it waits, by this program or the person. Jobs that ended before it started do not count, so an old failure does not make every later `wait` exit 1. Given ids, those count, ended or not.
 - With nothing waiting when it starts, it exits 0 at once.
 - A job taken out of the queue while it waits is told as `REMOVED`, not as a failure; one cancelled is a failure.
-- A paused queue keeps it waiting, as the person may continue it; it says so once on stderr.
-- It may run for hours: run it in the background and tell the person when it returns.
+- A paused queue keeps it waiting, as the person may continue it; it says so once on stderr, and the answer's `paused` is true.
+- With `--timeout` the window answers when the time passes, with every job ended so far and the rest in `pending` (exit 3): nothing is lost. With `--any` it answers once one has ended.
+- It may run for hours: run it in the background and tell the person when it returns; where the shell cannot, wait with `--any --timeout` and the ids in `pending`, as the recipe below.
 
 #### Exit codes
 
@@ -907,10 +916,10 @@ The same for every command:
 
 | Code | Meaning |
 |---|---|
-| 0 | Done. For `wait`: every job ended done or skipped, those worth a look by eye included (flagged in the output). |
+| 0 | Done. For `wait`: every job ended done or skipped, those worth a look by eye included (flagged in the output); with `--any`, the one that ended. |
 | 1 | At least one job failed or was cancelled. |
 | 2 | VidCtrl is not open and could not be opened (or `--no-start` was given), or it is open but refused the connection or did not answer. |
-| 3 | `--timeout` passed; the jobs go on in the window. |
+| 3 | `--timeout` passed with jobs still pending: `wait` answers all the same, with those in `pending`; they go on in the window. |
 | 4 | The window closed while waiting or following. |
 | 5 | Bad arguments: an unknown command, goal, option, choice, video or job; or the client itself went wrong. |
 | 6 | VidCtrl could not find FFmpeg; the window says what to do. |
@@ -937,8 +946,8 @@ It prints, for example:
 Job 1: Converting. /home/alice/Videos/party.mov
 Job 1: 42%, about 21 min left.
 Job 0: Done. /home/alice/Videos/beach.mov
-  Result: /home/alice/Videos/Converted/beach_av1-crf35.mp4, 598.0 MB
-  Usual quality (crf 35; VMAF 96.4; XPSNR 43.1 dB). Expected at 14% of the original's size.
+  Result: /home/alice/Videos/Converted/beach_av1-crf35.mp4, 598.0 MB, 14% of the original's 4.20 GB; took 32:05
+  Usual quality (crf 35; VMAF 96.4; XPSNR 43.1 dB).
 The queue has nothing more to do.
 ```
 
@@ -948,14 +957,14 @@ With `--json`: one JSON object per line: `event` (string, the event's code), `ti
 {"event":"JOB_PROGRESS","time":"2026-10-23T14:05:09.120Z","job":1,"fraction":0.42,"remainingSeconds":1260.0}
 ```
 
-#### Report each file as it finishes
+#### Follow everything that happens
 
 ```sh
 vidctrl-client queue                          # opens the window first, if it is not open
 vidctrl-client events --since-now --json      # in the background
 ```
 
-Read its lines as they come. On each `JOB_FINISHED`, tell the person about that job: its `status`, `outputPath`, `outputBytes`, `quality.outcome` and `needsALook`. On `QUEUE_IDLE` the queue has nothing more to do: stop following. On `APP_CLOSING` the window closed.
+Read its lines as they come; `JOB_PROGRESS` comes once a second while a job converts, so to wait for results `wait` is shorter. On each `JOB_FINISHED`, tell the person about that job: its `status`, `outputPath`, `outputBytes`, `quality.outcome` and `needsALook`. On `QUEUE_IDLE` the queue has nothing more to do: stop following. On `APP_CLOSING` the window closed.
 
 #### Events
 
@@ -1138,7 +1147,7 @@ It prints, for example:
 With `--json`: the same as data: `commands` (list: `name`, `arguments`, `description`, `options`), `goals` (list: like Goal, with every option, `goal`, the name `--goal` takes, and the window's words: `title`, `subtitle` and `hint` for a goal, `title` and `hint` for an option, and each choice as `id`, `label` and `hint`), `exitCodes` (object: code to meaning), `events` (list: `name`, `fields`, `description`) and `codes` (object: for each kind of code, as the manual's "Codes" lists them, a list of `code` and `description`). Here with one of each:
 
 ```json
-{"commands":[{"name":"resume","arguments":"","description":"lets a paused queue go on","options":[]}],"goals":[{"id":"archive.master","scenario":"archive","goal":"archive","title":"Archive","subtitle":"no quality loss","hint":"Camera videos take far less space and look the same as the originals. Dates, camera details, sound and colours are kept.","options":[{"id":"codec","title":"Format","hint":"","defaultChoice":"av1","advanced":false,"choices":[{"id":"av1","label":"Smallest file","hint":"Plays on computers (Macs from M1) and newer devices: iPhone 15 Pro and later, TVs from about 2020."},{"id":"hevc","label":"Works everywhere","hint":"The same look in a file up to a third larger. Plays almost everywhere, older iPhones, Macs and TVs included."}]},{"id":"speed","title":"Speed","hint":"","defaultChoice":"cpu","advanced":false,"choices":[{"id":"cpu","label":"Thorough","hint":"The processor encodes: slower, and the file is the smallest."},{"id":"gpu","label":"Fast","hint":"The graphics card encodes: several times faster. Busy footage comes out the same size, calm footage up to 2.5 times larger."}]}]}],"exitCodes":{"0":"Done. For `wait`: every job ended done or skipped, those worth a look by eye included (flagged in the output)."},"events":[{"name":"SNAPSHOT","fields":"`videos` (list of Video), `jobs` (list of Job), `paused` (bool), `busy` (bool)","description":"How everything stands; first, unless `--since-now`."}],"codes":{"jobStatus":[{"code":"WAITING","description":"Waiting. In the queue, its turn not come yet."}]}}
+{"commands":[{"name":"resume","arguments":"","description":"lets a paused queue go on","options":[]}],"goals":[{"id":"archive.master","scenario":"archive","goal":"archive","title":"Archive","subtitle":"no quality loss","hint":"Camera videos take far less space and look the same as the originals. Dates, camera details, sound and colours are kept.","options":[{"id":"codec","title":"Format","hint":"","defaultChoice":"av1","advanced":false,"choices":[{"id":"av1","label":"Smallest file","hint":"Plays on computers (Macs from M1) and newer devices: iPhone 15 Pro and later, TVs from about 2020."},{"id":"hevc","label":"Works everywhere","hint":"The same look in a file up to a third larger. Plays almost everywhere, older iPhones, Macs and TVs included."}]},{"id":"speed","title":"Speed","hint":"","defaultChoice":"cpu","advanced":false,"choices":[{"id":"cpu","label":"Thorough","hint":"The processor encodes: slower, and the file is the smallest."},{"id":"gpu","label":"Fast","hint":"The graphics card encodes: several times faster. Busy footage comes out the same size, calm footage up to 2.5 times larger."}]}]}],"exitCodes":{"0":"Done. For `wait`: every job ended done or skipped, those worth a look by eye included (flagged in the output); with `--any`, the one that ended."},"events":[{"name":"SNAPSHOT","fields":"`videos` (list of Video), `jobs` (list of Job), `paused` (bool), `busy` (bool)","description":"How everything stands; first, unless `--since-now`."}],"codes":{"jobStatus":[{"code":"WAITING","description":"Waiting. In the queue, its turn not come yet."}]}}
 ```
 
 ### `vidctrl-client help [command]`
@@ -1235,6 +1244,8 @@ A job in the queue.
 - `attempt` (int, optional): while choosing the quality, which try this is.
 - `outputPath` (string, optional): where the result goes, once known; the result is there once the job is `DONE`.
 - `outputBytes` (int, optional): the result's size, once done.
+- `sourceBytes` (int, optional): the original's size.
+- `seconds` (number, optional): once it has ended, the time spent on it: choosing its quality and converting, pauses left out.
 - `quality` (Quality, optional): how its quality was chosen.
 - `needsALook` (bool): worth a look by eye, see `BELOW_TARGET`.
 - `errorLines` (list of string): why it failed, in FFmpeg's last words.
@@ -1250,15 +1261,13 @@ How a job's quality was chosen: Archive measures each video before converting it
 - `xpsnr` (number, optional): XPSNR of the poorest piece, in dB; 100 for pictures identical to the original's.
 - `share` (number): the expected size as a share of the original's, 0 to 1.
 
-### Outcome
+### Pending
 
-How a job ended, as `wait` tells it.
+A job a `wait` counts that has not ended yet, as it stands.
 
-- `jobId` (int).
-- `path` (string): the video's file.
-- `status` (string): `DONE`, `SKIPPED`, `FAILED`, `CANCELLED` or `REMOVED`, see "Job statuses".
-- `outputPath` (string, optional): the result, when done.
-- `needsALook` (bool): worth a look by eye, see `BELOW_TARGET`.
+- `id` (int).
+- `status` (string): `WAITING`, `RUNNING` or `PAUSED`, see "Job statuses".
+- `fraction` (number, optional), `remainingSeconds` (number, optional), `attempt` (int, optional): as in Job.
 
 ## Codes in full
 
@@ -1266,7 +1275,7 @@ Every code by where it is found, with the words the client prints for people and
 
 ### Job statuses
 
-Job and Outcome `status`, Status `jobs` keys:
+Job and Pending `status`, Status `jobs` keys:
 
 - `WAITING`: Waiting. In the queue, its turn not come yet.
 - `RUNNING`: Converting. Being converted now, or its quality being chosen (`attempt`).
@@ -1356,5 +1365,5 @@ Job `sample`:
 - `UNAUTHORIZED`: the window is open but refused the connection or did not answer; no other window is started (exit 2).
 - `NOT_RUNNING`: the window is not open and could not be opened (exit 2).
 - `APP_CLOSED`: the window closed meanwhile (exit 4).
-- `TIMEOUT`: `--timeout` passed; the jobs go on in the window (exit 3).
+- `TIMEOUT`: `--timeout` passed with jobs still pending; they go on in the window (exit 3).
 - `UNEXPECTED`: the client itself went wrong; the message says how (exit 5).

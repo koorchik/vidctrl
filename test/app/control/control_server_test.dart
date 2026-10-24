@@ -1789,34 +1789,140 @@ void main() {
       expect(compared.params['closeness'], 'SAME');
     });
 
-    test('wait returns when the queue is done, with each outcome', () async {
-      final (_, client) = await startControlled(env);
-      final ids = await queue(client, ['a.mp4', 'b.mp4']);
-      var answered = false;
-      final waiting = client.call(Methods.wait).then((answer) {
-        answered = true;
-        return answer as Map;
-      });
-      await caughtUp(client);
-      await started(1);
+    test(
+      'wait returns when the queue is done, with each job as it ended',
+      () async {
+        final (_, client) = await startControlled(env);
+        final ids = await queue(client, ['a.mp4', 'b.mp4']);
+        var answered = false;
+        final waiting = client.call(Methods.wait).then((answer) {
+          answered = true;
+          return answer as Map;
+        });
+        await caughtUp(client);
+        await started(1);
 
-      env.executor.started.first.finish();
-      await started(2);
-      expect(answered, isFalse);
-      env.executor.started.last.fail();
+        env.executor.started.first.finish(
+          bytes: 150000000,
+          elapsed: const Duration(seconds: 90),
+        );
+        await started(2);
+        expect(answered, isFalse);
+        env.executor.started.last.fail();
 
-      final outcomes = (await waiting)['outcomes'] as List;
-      expect(outcomes.map((o) => ((o as Map)['jobId'], o['status'])), [
-        (ids.first, 'DONE'),
-        (ids.last, 'FAILED'),
-      ]);
-      expect((outcomes.first as Map)['outputPath'], isA<String>());
-    });
+        final answer = await waiting;
+        expectMachineJson(answer);
+        final ended = answer['ended'] as List;
+        expect(ended.map((j) => ((j as Map)['id'], j['status'])), [
+          (ids.first, 'DONE'),
+          (ids.last, 'FAILED'),
+        ]);
+        final done = ended.first as Map;
+        expect(done['outputPath'], isA<String>());
+        expect(done['outputBytes'], 150000000);
+        expect(done['sourceBytes'], 750000000);
+        expect(done['seconds'], 90);
+        expect((ended.last as Map)['errorLines'], isNotEmpty);
+        expect(answer['pending'], isEmpty);
+        expect(answer['paused'], isFalse);
+      },
+    );
 
     test('wait with nothing pending answers at once', () async {
       final (_, client) = await startControlled(env);
 
-      expect(await client.call(Methods.wait), {'outcomes': isEmpty});
+      expect(await client.call(Methods.wait), {
+        'ended': isEmpty,
+        'pending': isEmpty,
+        'paused': false,
+      });
+    });
+
+    test('wait with any answers once one job has ended, with the rest still '
+        'pending', () async {
+      final (_, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4', 'b.mp4']);
+      final waiting = client.call(Methods.wait, {'any': true});
+      await caughtUp(client);
+      await started(1);
+
+      env.executor.started.first.finish();
+
+      final answer = await waiting as Map;
+      expect(
+        [for (final j in answer['ended'] as List) (j as Map)['id']],
+        [ids.first],
+      );
+      expect(answer['pending'], [
+        {'id': ids.last, 'status': 'WAITING'},
+      ]);
+
+      // Asked again with the ids still pending, it waits for the next.
+      final next = client.call(Methods.wait, {
+        'jobs': [ids.last],
+        'any': true,
+      });
+      await caughtUp(client);
+      await started(2);
+      env.executor.started.last.finish();
+      final second = await next as Map;
+      expect(
+        [for (final j in second['ended'] as List) (j as Map)['id']],
+        [ids.last],
+      );
+      expect(second['pending'], isEmpty);
+    });
+
+    test('wait with a time limit answers when it passes, with what ended and '
+        'how far the rest is', () async {
+      final (_, client) = await startControlled(env);
+      final ids = await queue(client, ['a.mp4', 'b.mp4', 'c.mp4']);
+      await started(1);
+      env.executor.started.first.finish();
+      await started(2);
+      env.executor.started.last.report(0.42);
+      await pumpEventQueue();
+
+      final answer =
+          await client.call(Methods.wait, {'jobs': ids, 'timeout': 0.2}) as Map;
+
+      expectMachineJson(answer);
+      expect(
+        [for (final j in answer['ended'] as List) (j as Map)['id']],
+        [ids.first],
+      );
+      final pending = answer['pending'] as List;
+      expect(pending.first, {
+        'id': ids[1],
+        'status': 'RUNNING',
+        'fraction': 0.42,
+        'remainingSeconds': isA<num>(),
+      });
+      expect(pending.last, {'id': ids[2], 'status': 'WAITING'});
+
+      // No time at all: how they stand now.
+      final now = await client.call(Methods.wait, {
+        'jobs': [ids[2]],
+        'timeout': 0,
+      });
+      expect(now, {
+        'ended': isEmpty,
+        'pending': [
+          {'id': ids[2], 'status': 'WAITING'},
+        ],
+        'paused': false,
+      });
+    });
+
+    test('wait refuses a time limit that is not a number of seconds', () async {
+      final (_, client) = await startControlled(env);
+
+      for (final timeout in [-1, 'soon']) {
+        await expectLater(
+          client.call(Methods.wait, {'timeout': timeout}),
+          _failsWith(ControlErrorKind.badArgument, contains('timeout')),
+        );
+      }
     });
 
     test('wait for an unknown job is not found', () async {

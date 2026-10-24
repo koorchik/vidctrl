@@ -38,6 +38,7 @@ class QueueJob {
     this.result,
     this.quality,
     this.attempt,
+    this.checkTime,
   });
 
   final int id;
@@ -64,6 +65,9 @@ class QueueJob {
   /// While the job measures its video before converting: 1 checks the
   /// standard quality, from 2 on better ones are tried. Null otherwise.
   final int? attempt;
+
+  /// How long choosing its quality took, once it has been chosen.
+  final Duration? checkTime;
 
   /// Whether the job is measuring its video, not converting yet.
   bool get checking => attempt != null;
@@ -97,6 +101,7 @@ class QueueJob {
     ConversionPlan? plan,
     QualityChoice? quality,
     int? attempt,
+    Duration? checkTime,
     bool clearAttempt = false,
     bool clearProgress = false,
   }) => QueueJob(
@@ -113,6 +118,7 @@ class QueueJob {
     result: clearProgress ? null : result ?? this.result,
     quality: quality ?? this.quality,
     attempt: clearAttempt ? null : attempt ?? this.attempt,
+    checkTime: checkTime ?? this.checkTime,
   );
 }
 

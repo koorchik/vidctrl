@@ -292,16 +292,22 @@ class QueueController extends Notifier<QueueState> {
   /// the queue while its video was measured.
   Future<QueueJob?> _chooseQuality(QueueJob job, RaisesQuality raise) async {
     final work = _work!;
+    final clock = Stopwatch()..start();
     final choice = _forJob(
       _knownChoice(job.path, job.recipe) ?? await _check(job, raise, work),
       job.recipe,
     );
+    final checkTime = clock.elapsed;
     if (!ref.mounted) return null;
     // Cancelled after pausing: the cancel wins, as for a paused encode.
     if (work.cancelRequested) {
       _update(
         job.id,
-        (j) => j.copyWith(status: JobStatus.cancelled, clearAttempt: true),
+        (j) => j.copyWith(
+          status: JobStatus.cancelled,
+          clearAttempt: true,
+          checkTime: checkTime,
+        ),
       );
       return null;
     }
@@ -313,7 +319,9 @@ class QueueController extends Notifier<QueueState> {
       return null;
     }
     _update(job.id, (j) {
-      if (choice == null) return j.copyWith(clearAttempt: true);
+      if (choice == null) {
+        return j.copyWith(clearAttempt: true, checkTime: checkTime);
+      }
       final plan = choice.converts
           ? planWithChoice(raise, j.plan, choice)
           : j.plan;
@@ -321,6 +329,7 @@ class QueueController extends Notifier<QueueState> {
         plan: plan,
         quality: choice,
         clearAttempt: true,
+        checkTime: checkTime,
         // Named for the quality chosen; one left as it is writes nothing.
         outputPath: choice.converts
             ? _outputPath(

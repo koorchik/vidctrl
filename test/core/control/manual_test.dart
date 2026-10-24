@@ -172,8 +172,9 @@ void main() {
       text.indexOf('## What VidCtrl is'),
     );
     expect(start, contains('Finding the videos is your job'));
-    expect(start, contains('`vidctrl-client wait`'));
-    expect(start, contains('`vidctrl-client events`'));
+    expect(start, contains('`vidctrl-client wait --json`'));
+    expect(start, contains('`vidctrl-client wait --any --timeout 540 --json`'));
+    expect(start, contains('`pending`'));
     expect(start, contains(filesRule));
   });
 
@@ -286,6 +287,8 @@ void main() {
       attempt: 1,
       outputPath: '/videos/Converted/a.mp4',
       outputBytes: 1,
+      sourceBytes: 1,
+      seconds: 1,
       quality: QualityView(
         outcome: 'standard',
         value: 35,
@@ -329,12 +332,12 @@ void main() {
         ),
       ],
     );
-    const outcome = JobOutcome(
-      jobId: 0,
-      path: '/videos/a.mov',
-      status: 'done',
-      outputPath: '/videos/Converted/a.mp4',
-      needsALook: false,
+    const pending = PendingJob(
+      id: 0,
+      status: 'running',
+      fraction: .5,
+      remainingSeconds: 1,
+      attempt: 1,
     );
     const status = StatusView(
       state: 'ready',
@@ -347,7 +350,7 @@ void main() {
       job.toJson(),
       video.toJson(),
       goal.toJson(),
-      outcome.toJson(),
+      pending.toJson(),
       status.toJson(),
     ]);
     for (final key in keys) {

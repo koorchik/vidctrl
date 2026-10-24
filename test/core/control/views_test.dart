@@ -21,6 +21,8 @@ void main() {
       status: JobStatusCodes.done,
       outputPath: '/videos/Converted/a_av1-crf35.mp4',
       outputBytes: 10,
+      sourceBytes: 50,
+      seconds: 61.5,
       quality: QualityView(
         outcome: OutcomeCodes.belowTarget,
         value: 20,
@@ -82,16 +84,16 @@ void main() {
     );
     expect(GoalView.fromJson(_through(goal.toJson())).toJson(), goal.toJson());
 
-    final outcome = JobOutcome(
-      jobId: 3,
-      path: '/videos/a.mov',
-      status: JobStatusCodes.done,
-      outputPath: '/videos/Converted/a.mp4',
-      needsALook: false,
+    final pending = PendingJob(
+      id: 4,
+      status: JobStatusCodes.running,
+      fraction: .42,
+      remainingSeconds: 1260,
+      attempt: 2,
     );
     expect(
-      JobOutcome.fromJson(_through(outcome.toJson())).toJson(),
-      outcome.toJson(),
+      PendingJob.fromJson(_through(pending.toJson())).toJson(),
+      pending.toJson(),
     );
   });
 
@@ -141,13 +143,8 @@ void main() {
       paused: false,
       jobs: {JobStatusCodes.waiting: 1},
     ).toJson();
-    final outcome = JobOutcome(
-      jobId: 3,
-      path: '/videos/a.mov',
-      status: JobStatusCodes.removed,
-      needsALook: false,
-    ).toJson();
-    for (final json in [video, job, status, outcome]) {
+    final pending = PendingJob(id: 4, status: JobStatusCodes.waiting).toJson();
+    for (final json in [video, job, status, pending]) {
       expectMachineJson(json);
     }
     expect((video['preview'] as Map)['plan'], 'KEPT_AS_IS');

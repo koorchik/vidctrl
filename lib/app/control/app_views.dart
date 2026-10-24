@@ -57,11 +57,18 @@ VideoView _videoView(
 }
 
 /// [job] as a client reads it, its options as they are applied with
-/// [capabilities].
-JobView jobView(QueueJob job, Capabilities capabilities) {
+/// [capabilities]; [removed] when it was taken out of the queue while a
+/// `wait` counted it.
+JobView jobView(
+  QueueJob job,
+  Capabilities capabilities, {
+  bool removed = false,
+}) {
   final progress = job.isActive ? job.progress : null;
   final remaining = progress?.remaining;
   final result = job.result;
+  final ended = !job.isPending && !removed;
+  final spent = (job.checkTime ?? Duration.zero) + (result?.elapsed ?? .zero);
   return JobView(
     id: job.id,
     videoId: job.sourceId,
@@ -69,12 +76,16 @@ JobView jobView(QueueJob job, Capabilities capabilities) {
     goal: job.recipe.presetId,
     options: appliedOptions(job.recipe, capabilities),
     sample: job.recipe.isSample ? codeOf(job.recipe.sample) : null,
-    status: codeOf(job.status),
-    fraction: progress?.fraction,
-    remainingSeconds: remaining == null ? null : _seconds(remaining),
+    status: removed ? JobStatusCodes.removed : codeOf(job.status),
+    fraction: wireFraction(progress?.fraction),
+    remainingSeconds: wireSeconds(remaining),
     attempt: job.attempt,
     outputPath: job.outputPath.isEmpty ? null : job.outputPath,
     outputBytes: result?.outputBytes,
+    sourceBytes: job.info.sizeBytes,
+    seconds: ended && spent > Duration.zero
+        ? _rounded(_seconds(spent), 1)
+        : null,
     quality: switch (job.quality) {
       final choice? => _qualityView(choice),
       null => null,
@@ -84,18 +95,46 @@ JobView jobView(QueueJob job, Capabilities capabilities) {
   );
 }
 
+/// [job], still waiting or under way, as a `wait` tells it.
+PendingJob pendingView(QueueJob job) {
+  final progress = job.isActive ? job.progress : null;
+  final remaining = progress?.remaining;
+  return PendingJob(
+    id: job.id,
+    status: codeOf(job.status),
+    fraction: wireFraction(progress?.fraction),
+    remainingSeconds: wireSeconds(remaining),
+    attempt: job.attempt,
+  );
+}
+
 QualityView _qualityView(QualityChoice choice) => QualityView(
   outcome: codeOf(choice.outcome),
   value: choice.value,
   standardValue: choice.standardValue,
-  vmaf: choice.chosen.score.vmaf,
-  xpsnr: wireDb(choice.chosen.score.lumaDb),
-  share: choice.share,
+  vmaf: wireScore(choice.chosen.score.vmaf),
+  xpsnr: wireScore(wireDb(choice.chosen.score.lumaDb)),
+  share: _rounded(choice.share, 3)!,
 );
 
 /// An XPSNR as a client reads it: identical pictures score infinity, which
 /// JSON cannot hold, so they read 100, beyond any real score.
 double wireDb(double lumaDb) => lumaDb.isFinite ? lumaDb : 100;
+
+/// [value] to [digits] decimals: a client has no use for more, and each
+/// digit costs a reader.
+double? _rounded(double? value, int digits) =>
+    value == null ? null : double.parse(value.toStringAsFixed(digits));
+
+/// How far a job is, 0 to 1, as a client reads it.
+double? wireFraction(double? fraction) => _rounded(fraction, 3);
+
+/// A time left, in whole seconds.
+double? wireSeconds(Duration? time) =>
+    time == null ? null : (time.inMilliseconds / 1000).roundToDouble();
+
+/// A VMAF, or an XPSNR as [wireDb] gives it, to two decimals.
+double? wireScore(double? score) => _rounded(score, 2);
 
 /// What [recipe] would do to [video], as the video list shows it.
 GoalPreview goalPreview(

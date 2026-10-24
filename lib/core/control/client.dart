@@ -341,7 +341,12 @@ ArgParser _parser() {
       'compare',
       _withGlobals(ArgParser())..addFlag('wait', defaultsTo: true),
     )
-    ..addCommand('wait', _withGlobals(ArgParser())..addOption('timeout'))
+    ..addCommand(
+      'wait',
+      _withGlobals(ArgParser())
+        ..addFlag('any', negatable: false)
+        ..addOption('timeout'),
+    )
     ..addCommand(
       'events',
       _withGlobals(ArgParser())..addFlag('since-now', negatable: false),
@@ -561,7 +566,7 @@ _Command? _command(ArgResults top, ClientIo io) {
       final timeout = command.option('timeout');
       final seconds = timeout == null ? null : double.tryParse(timeout);
       if (timeout != null &&
-          (seconds == null || !seconds.isFinite || seconds <= 0)) {
+          (seconds == null || !seconds.isFinite || seconds < 0)) {
         throw _bad('--timeout takes a number of seconds, not "$timeout".');
       }
       return _Command(
@@ -571,10 +576,10 @@ _Command? _command(ArgResults top, ClientIo io) {
           o,
           io.endpoint,
           jobs: jobs.isEmpty ? null : jobs,
-          timeout: seconds == null
-              ? null
-              // Longer than that is as good as no limit, and fits a Duration.
-              : Duration(milliseconds: (min(seconds, 1e9) * 1000).round()),
+          any: command.flag('any'),
+          // Longer than that is as good as no limit.
+          seconds: seconds == null ? null : min(seconds, 1e9),
+          timeout: timeout,
         ),
       );
     case 'events':
@@ -752,13 +757,17 @@ Future<int> _status(ControlConnection? connection, _Output output) async {
 
 /// Waits for the jobs and prints how each ended as soon as it is known. A
 /// second connection follows the events, so each result is printed when it
-/// comes, not only once the last is in.
+/// comes, not only once the last is in. The window keeps the time limit,
+/// [seconds] ([timeout] as typed), and answers when it passes with what has
+/// ended so far; this side gives up a little later, should it not.
 Future<int> _wait(
   ControlConnection connection,
   _Output output,
   EndpointFile endpoint, {
   required List<int>? jobs,
-  required Duration? timeout,
+  required bool any,
+  required double? seconds,
+  required String? timeout,
 }) async {
   final printed = <int>{};
   var toldPaused = false;
@@ -774,6 +783,12 @@ Future<int> _wait(
         }
     }
   }
+
+  int timedOut() => output.failWith(
+    ClientErrorCodes.timeout,
+    'Still waiting after ${seconds!} seconds; the jobs go on in the window.',
+    ExitCode.timeout,
+  );
 
   final listening = [connection.notifications.listen(onEvent)];
   ControlConnection? events;
@@ -793,41 +808,55 @@ Future<int> _wait(
     }
   }
   try {
-    var answer = connection.call(Methods.wait, {'jobs': ?jobs});
-    if (timeout != null) answer = answer.timeout(timeout);
+    var answer = connection.call(Methods.wait, {
+      'jobs': ?jobs,
+      if (any) 'any': true,
+      'timeout': ?seconds,
+    });
+    if (seconds != null) {
+      answer = answer.timeout(
+        Duration(milliseconds: (seconds * 1000).round()) + _answerGrace,
+      );
+    }
     final Map<String, Object?> result;
     try {
       result = _object(await answer);
     } on TimeoutException {
-      return output.failWith(
-        ClientErrorCodes.timeout,
-        'Still waiting after ${timeout!.inMilliseconds / 1000} seconds; the '
-        'jobs go on in the window.',
-        ExitCode.timeout,
-      );
+      return timedOut();
     }
-    final outcomes = [
-      for (final o in result['outcomes'] as List)
-        JobOutcome.fromJson(_object(o)),
+    final ended = [
+      for (final j in result['ended'] as List) JobView.fromJson(_object(j)),
     ];
+    final pending = [
+      for (final j in result['pending'] as List)
+        PendingJob.fromJson(_object(j)),
+    ];
+    final failed = ended
+        .where((job) => _failedOrCancelled.contains(job.status))
+        .length;
     output.answer(result, () {
-      final failed = outcomes
-          .where((o) => _failedOrCancelled.contains(o.status))
-          .length;
       return [
-        for (final outcome in outcomes)
-          if (printed.add(outcome.jobId)) ...outcomeText(outcome),
-        if (outcomes.isEmpty)
+        for (final job in ended)
+          if (printed.add(job.id)) ...finishedText(job),
+        if (pending.isNotEmpty)
+          ...pendingText(
+            pending,
+            goOn: [
+              if (any) ' --any',
+              if (timeout != null) ' --timeout $timeout',
+            ].join(),
+          )
+        else if (ended.isEmpty)
           'No job was waiting.'
         else if (failed > 0)
-          '$failed of ${outcomes.length} failed or were cancelled.'
+          '$failed of ${ended.length} failed or were cancelled.'
         else
           'All done.',
       ];
     });
-    return outcomes.any((o) => _failedOrCancelled.contains(o.status))
-        ? ExitCode.jobsFailed
-        : ExitCode.ok;
+    // Over once nothing is pending, or with --any once one has ended.
+    if (pending.isNotEmpty && !(any && ended.isNotEmpty)) return timedOut();
+    return failed > 0 ? ExitCode.jobsFailed : ExitCode.ok;
   } finally {
     for (final subscription in listening) {
       unawaited(subscription.cancel());
@@ -835,6 +864,9 @@ Future<int> _wait(
     await events?.close();
   }
 }
+
+/// How much longer than its time limit a `wait` gives the window to answer.
+const _answerGrace = Duration(seconds: 2);
 
 const _failedOrCancelled = {JobStatusCodes.failed, JobStatusCodes.cancelled};
 

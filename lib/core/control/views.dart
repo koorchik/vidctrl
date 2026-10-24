@@ -135,6 +135,8 @@ class JobView {
     this.attempt,
     this.outputPath,
     this.outputBytes,
+    this.sourceBytes,
+    this.seconds,
     this.quality,
   });
 
@@ -153,6 +155,8 @@ class JobView {
     attempt: _opt<int>(json, 'attempt'),
     outputPath: _opt<String>(json, 'outputPath'),
     outputBytes: _opt<int>(json, 'outputBytes'),
+    sourceBytes: _opt<int>(json, 'sourceBytes'),
+    seconds: _double(json, 'seconds'),
     quality: json['quality'] == null
         ? null
         : QualityView.fromJson(_map(json['quality'])),
@@ -176,6 +180,13 @@ class JobView {
   final int? attempt;
   final String? outputPath;
   final int? outputBytes;
+
+  /// The original's size.
+  final int? sourceBytes;
+
+  /// The time spent on it once it has ended: measuring its quality and
+  /// converting, pauses left out.
+  final double? seconds;
   final QualityView? quality;
   final bool needsALook;
   final List<String> errorLines;
@@ -193,6 +204,8 @@ class JobView {
     'attempt': ?attempt,
     'outputPath': ?outputPath,
     'outputBytes': ?outputBytes,
+    'sourceBytes': ?sourceBytes,
+    'seconds': ?seconds,
     'quality': ?quality?.toJson(),
     'needsALook': needsALook,
     'errorLines': errorLines,
@@ -333,37 +346,38 @@ class OptionView {
   };
 }
 
-/// How a job ended, as `wait` reports it.
-class JobOutcome {
-  const JobOutcome({
-    required this.jobId,
-    required this.path,
+/// A job a `wait` still waits for, as it stands: how far it is when under
+/// way.
+class PendingJob {
+  const PendingJob({
+    required this.id,
     required this.status,
-    required this.needsALook,
-    this.outputPath,
+    this.fraction,
+    this.remainingSeconds,
+    this.attempt,
   });
 
-  factory JobOutcome.fromJson(Map<String, Object?> json) => JobOutcome(
-    jobId: json['jobId'] as int,
-    path: json['path'] as String,
+  factory PendingJob.fromJson(Map<String, Object?> json) => PendingJob(
+    id: json['id'] as int,
     status: json['status'] as String,
-    outputPath: _opt<String>(json, 'outputPath'),
-    needsALook: json['needsALook'] as bool? ?? false,
+    fraction: _double(json, 'fraction'),
+    remainingSeconds: _double(json, 'remainingSeconds'),
+    attempt: _opt<int>(json, 'attempt'),
   );
 
-  final int jobId;
-  final String path;
+  final int id;
 
-  /// A [JobStatusCodes] code: done, skipped, failed, cancelled or removed.
+  /// A [JobStatusCodes] code: waiting, running or paused.
   final String status;
-  final String? outputPath;
-  final bool needsALook;
+  final double? fraction;
+  final double? remainingSeconds;
+  final int? attempt;
 
   Map<String, Object?> toJson() => {
-    'jobId': jobId,
-    'path': path,
+    'id': id,
     'status': status,
-    'outputPath': ?outputPath,
-    'needsALook': needsALook,
+    'fraction': ?fraction,
+    'remainingSeconds': ?remainingSeconds,
+    'attempt': ?attempt,
   };
 }

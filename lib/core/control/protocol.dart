@@ -8,7 +8,7 @@ import 'codes.dart';
 
 /// The version of the conversation between a client and the window. It goes
 /// in the endpoint file and in the `hello` answer.
-const controlProtocol = 1;
+const controlProtocol = 2;
 
 /// Why a request failed, as the client needs to tell it apart.
 enum ControlErrorKind {

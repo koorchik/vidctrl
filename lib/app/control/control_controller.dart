@@ -166,7 +166,7 @@ class ControlController extends Notifier<ControlState>
       wait.tracker.update(queue);
       if (wait.tracker.finished) {
         _waits.remove(wait);
-        wait.done.complete();
+        wait.end();
       } else if (!wasPaused && wait.tracker.paused) {
         _tellPaused(wait.peer);
       }
@@ -189,15 +189,24 @@ class ControlController extends Notifier<ControlState>
   }
 
   @override
-  Future<void> waitFor(ControlPeer peer, WaitTracker tracker) {
-    if (tracker.finished) return Future.value();
+  Future<void> waitFor(
+    ControlPeer peer,
+    WaitTracker tracker, {
+    Duration? timeout,
+  }) {
+    if (tracker.finished || timeout == Duration.zero) return Future.value();
     _follow();
     final wait = _Wait(peer, tracker);
     _waits.add(wait);
     if (tracker.paused) _tellPaused(peer);
+    if (timeout != null) {
+      wait.timer = Timer(timeout, () {
+        if (_waits.remove(wait)) wait.end();
+      });
+    }
     unawaited(
       peer.closed.then((_) {
-        if (_waits.remove(wait)) wait.done.completeError(_closed);
+        if (_waits.remove(wait)) wait.end(error: _closed);
       }),
     );
     return wait.done.future;
@@ -225,7 +234,7 @@ class ControlController extends Notifier<ControlState>
     await listener.close(farewell: true);
     // Their clients have been told the window is closing.
     for (final wait in _waits) {
-      wait.done.completeError(_closed);
+      wait.end(error: _closed);
     }
     _waits.clear();
     if ((await file.read())?.token == _token) await file.delete();
@@ -255,4 +264,13 @@ class _Wait {
   final ControlPeer peer;
   final WaitTracker tracker;
   final done = Completer<void>();
+
+  /// Answers it at its time limit.
+  Timer? timer;
+
+  /// Answers it, or fails it with [error].
+  void end({ControlError? error}) {
+    timer?.cancel();
+    error == null ? done.complete() : done.completeError(error);
+  }
 }

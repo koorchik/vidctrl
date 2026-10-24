@@ -72,7 +72,7 @@ $powerShell''';
 String _firstSteps(String c) =>
     '''
 - Finding the videos is your job (with `find`, `du` or the like). Give their paths to `$c add`, or straight to `$c queue add --goal <goal>`.
-- The window converts one video at a time, and that can take hours. To know when it ends, run `$c wait` in the background (or follow `$c events`), and tell the person when it returns: each result, and any marked "worth a look by eye".
+- The window converts one video at a time, which can take hours. Run `$c wait --json` in the background if your shell can; if it blocks, `$c wait --any --timeout 540 --json` (under your tool's time limit), then again with the ids in `pending` until it is empty. Each answer has every job that ended, in full: tell the person each result, and any with `needsALook`.
 - $filesRule "Remove" only takes a video off the list or a job out of the queue.
 ''';
 
@@ -278,7 +278,7 @@ A window that converts videos by goal; `$c` changes what it shows, as the person
 - **Videos**: the window's list. `add` is like dropping a file there; each file is listed once, and videos just added become the selection.
 - **Jobs**: `queue add` makes one per video, a snapshot of video, goal, options and folder that later changes do not touch. The queue starts by itself and goes in order.
 - **The window shows everything**; the person may act there too, and this program sees it.
-- **Nothing converts without the window.** Every command but `status`, `manual` and `help` opens one if none is ("Starting VidCtrl…" on stderr, up to 30 s); closing it stops conversions. Two commands at once may each open one: run `$c queue` first, then `events` in the background.
+- **Nothing converts without the window.** Every command but `status`, `manual` and `help` opens one if none is ("Starting VidCtrl…" on stderr, up to 30 s); closing it stops conversions. Two commands at once may each open one: run one first.
 - **Results** are new files, by default in `Converted` beside each video, named with the settings (`beach.mov` gives `Converted/beach_av1-crf35.mp4`, a second ` (2)`), written as a hidden `.part` until whole.
 - **Samples**: 10 seconds from the start or middle, with the whole's settings, into `Samples` there (`beach_av1-crf35_sample10s.mp4`, `_sample10s-mid`).
 - **Ids** count from 0, lasting, like the list and queue, while the window is open. Digits only is an id: a file named `3` is `./3`. Paths may be relative or start with `~`.
@@ -422,7 +422,8 @@ final _errorCodes = [
   (
     ClientErrorCodes.timeout,
     '3, the jobs go on',
-    '`--timeout` passed; the jobs go on in the window (exit 3)',
+    '`--timeout` passed with jobs still pending; they go on in the window '
+        '(exit 3)',
   ),
   (
     ClientErrorCodes.unexpected,
@@ -440,9 +441,9 @@ Answers hold ids, numbers, paths and codes in capitals (see "Codes"), never word
 
 - Video: `id` int, `path`, `status`, `sizeBytes`? int, `durationSeconds`? number, `width`? int, `height`? int, `videoCodec`?, `audioCodecs` [string], `hdr` bool, `preview`? Preview.
 - Preview: `goal`, `plan`, `expectedBytes`? int, `measured` bool (by encoding pieces), `measuring` bool, `closeness`?.
-- Job: `id` int, `videoId` int, `path`, `goal`, `options` {option: choice} (as made here: report these), `sample`?, `status`, `fraction`? 0-1, `remainingSeconds`? number, `attempt`? int, `outputPath`?, `outputBytes`? int, `quality`? Quality, `needsALook` bool, `errorLines` [string].
+- Job: `id` int, `videoId` int, `path`, `goal`, `options` {option: choice} (as made here: report these), `sample`?, `status`, `fraction`? 0-1, `remainingSeconds`? number, `attempt`? int, `outputPath`?, `outputBytes`? int, `sourceBytes`? int (the original's), `seconds`? number (once ended), `quality`? Quality, `needsALook` bool, `errorLines` [string].
 - Quality: `outcome`, `value`? int (lower is better), `standardValue`? int, `vmaf`? number, `xpsnr`? number (of the poorest piece), `share` number (expected size / original's).
-- Outcome: `jobId` int, `path`, `status`, `outputPath`?, `needsALook` bool.
+- Pending: `id` int, `status`, `fraction`?, `remainingSeconds`?, `attempt`? int.
 - Status: `state`, `version`, `busy` bool, `paused` bool, `jobs` {status: int}.
 - Goal: `id` (`archive.master`), `scenario`, `options` [{`id`, `defaultChoice`, `advanced` bool, `choices` [string]}]; what each is for is under "Goals".
 - Error, on stderr: `{"error": {"code", "message"}}`; read `code`, the message is for people.
@@ -517,6 +518,8 @@ A job in the queue.
 - `attempt` (int, optional): while choosing the quality, which try this is.
 - `outputPath` (string, optional): where the result goes, once known; the result is there once the job is `DONE`.
 - `outputBytes` (int, optional): the result's size, once done.
+- `sourceBytes` (int, optional): the original's size.
+- `seconds` (number, optional): once it has ended, the time spent on it: choosing its quality and converting, pauses left out.
 - `quality` (Quality, optional): how its quality was chosen.
 - `needsALook` (bool): worth a look by eye, see `BELOW_TARGET`.
 - `errorLines` (list of string): why it failed, in FFmpeg's last words.
@@ -531,14 +534,12 @@ How a job's quality was chosen: Archive measures each video before converting it
 - `xpsnr` (number, optional): XPSNR of the poorest piece, in dB; 100 for pictures identical to the original's.
 - `share` (number): the expected size as a share of the original's, 0 to 1.
 ''',
-  'Outcome': '''
-How a job ended, as `wait` tells it.
+  'Pending': '''
+A job a `wait` counts that has not ended yet, as it stands.
 
-- `jobId` (int).
-- `path` (string): the video's file.
-- `status` (string): `DONE`, `SKIPPED`, `FAILED`, `CANCELLED` or `REMOVED`, see "Job statuses".
-- `outputPath` (string, optional): the result, when done.
-- `needsALook` (bool): worth a look by eye, see `BELOW_TARGET`.
+- `id` (int).
+- `status` (string): `WAITING`, `RUNNING` or `PAUSED`, see "Job statuses".
+- `fraction` (number, optional), `remainingSeconds` (number, optional), `attempt` (int, optional): as in Job.
 ''',
 };
 
@@ -549,7 +550,7 @@ const _shapeCodes = {
   'Preview': ['plan', 'closeness'],
   'Job': ['jobStatus', 'sample'],
   'Quality': ['qualityOutcome'],
-  'Outcome': ['jobStatus'],
+  'Pending': ['jobStatus'],
 };
 
 /// The kinds of code [doc]'s answer carries, in the order of [codeKinds].
@@ -765,7 +766,7 @@ final List<CodeKind> codeKinds = [
   (
     name: 'jobStatus',
     title: 'Job statuses',
-    where: 'Job and Outcome `status`, Status `jobs` keys',
+    where: 'Job and Pending `status`, Status `jobs` keys',
     codes: [
       for (final (code, brief, note) in _jobStatuses)
         (code: code, brief: brief, meaning: '${statusWords(code)}. $note'),
@@ -1080,7 +1081,8 @@ const _exitCodes = [
     ExitCode.ok,
     'done; for `wait`, every job done or skipped',
     'Done. For `wait`: every job ended done or skipped, those '
-        'worth a look by eye included (flagged in the output).',
+        'worth a look by eye included (flagged in the output); with '
+        '`--any`, the one that ended.',
   ),
   (
     ExitCode.jobsFailed,
@@ -1096,8 +1098,9 @@ const _exitCodes = [
   ),
   (
     ExitCode.timeout,
-    '`--timeout` passed; the jobs go on',
-    '`--timeout` passed; the jobs go on in the window.',
+    '`--timeout` passed, jobs `pending`; they go on',
+    '`--timeout` passed with jobs still pending: `wait` answers all the '
+        'same, with those in `pending`; they go on in the window.',
   ),
   (
     ExitCode.appClosed,
@@ -1210,23 +1213,28 @@ const _waitRules = [
   'The jobs it counts are those not yet ended when it starts, and any added '
       'or tried again while it waits, by this program or the person. Jobs '
       'that ended before it started do not count, so an old failure does '
-      'not make every later `wait` exit 1.',
+      'not make every later `wait` exit 1. Given ids, those count, ended or '
+      'not.',
   'With nothing waiting when it starts, it exits 0 at once.',
   'A job taken out of the queue while it waits is told as `REMOVED`, not as '
       'a failure; one cancelled is a failure.',
   'A paused queue keeps it waiting, as the person may continue it; it says '
-      'so once on stderr.',
+      'so once on stderr, and the answer\'s `paused` is true.',
+  'With `--timeout` the window answers when the time passes, with every job '
+      'ended so far and the rest in `pending` (exit 3): nothing is lost. With '
+      '`--any` it answers once one has ended.',
 ];
 
 String _waitingPart(String c) => [
   '## Waiting',
   '',
-  '`$c wait [jobs…]` waits for those jobs, or until none waits, converts '
-      'or is paused, maybe for hours: run it in the background. It counts '
-      'jobs not ended when it starts and those added or retried meanwhile '
-      '(an old failure does not count); with none, it exits 0 at once. A job '
-      'taken out is `REMOVED`, not a failure; a cancelled one is. A paused '
-      'queue keeps it waiting. Exit codes, of every command:',
+  '`$c wait [jobs…]` answers once those jobs, or all pending, have ended: '
+      '`ended` holds each in full, `pending` the rest (exit 3 after '
+      '`--timeout`). It counts jobs added or retried meanwhile, not those '
+      'ended before (but given ids). A job taken out is `REMOVED`, not a '
+      'failure; a cancelled one is. A paused queue keeps it waiting. Not '
+      '`events` to wait: it prints progress every second. Exit codes, of '
+      'every command:',
   '',
   for (final (code, brief, _) in _exitCodes) '- $code: $brief',
   '',
@@ -1236,10 +1244,12 @@ String _waitingInFull(String c) => [
   '#### Waiting',
   '',
   '- `$c wait` without ids waits until no job is waiting, converting or '
-      'paused; with ids, until those have ended.',
+      'paused; with ids, until those have ended; with `--any`, until one '
+      'has.',
   for (final rule in _waitRules) '- $rule',
   '- It may run for hours: run it in the background and tell the person '
-      'when it returns.',
+      'when it returns; where the shell cannot, wait with `--any --timeout` '
+      'and the ids in `pending`, as the recipe below.',
   '',
   '#### Exit codes',
   '',
@@ -1278,10 +1288,10 @@ Queue every video over 2 GB in ~/Videos and say when done (look at `find`'s list
 
 ```sh
 find ~/Videos -type f -size +2G \\( -iname '*.mov' -o -iname '*.mp4' \\) -not -path '*/Converted/*' \\\n  -print0 | xargs -0 $c queue add --goal archive --json
-$c wait 0 1 2 --json   # in the background; the ids from each answer's `added`
+$c wait --json   # every job pending, those queued already too; see "Waiting"
 ```
 
-Videos in `alreadyQueued` have jobs already: find them with `$c queue --json` and wait for them too. Then tell the person each `outputPath` and `needsALook`, and on exit 1 each failed job's `errorLines`.
+Then tell the person each `ended` job's `outputPath`, `outputBytes` beside `sourceBytes`, `quality` and `needsALook`, and on exit 1 each failed job's `errorLines`.
 
 Samples first, then the whole:
 
@@ -1313,10 +1323,10 @@ If it lists nothing, tell the person no video was found, and stop. Otherwise que
 $_videoFind -print0 | xargs -0 $c queue add --goal archive --json
 ```
 
-For a long list `xargs` may run `queue add` more than once: each run prints one JSON answer on its own line. Take the job ids from every answer's `added` (`added[].id`); videos in `alreadyQueued` were in the queue already, and `$c queue --json` shows their jobs. Then wait for those jobs, in the background, as it can take hours:
+For a long list `xargs` may run `queue add` more than once: each run prints one JSON answer on its own line, its new jobs in `added`. Then wait for every job pending, those in `alreadyQueued` too, in the background, as it can take hours:
 
 ```sh
-$c wait 0 1 2 --json             # the job ids from `added`
+$c wait --json
 ```
 
 On Windows, in PowerShell:
@@ -1326,21 +1336,32 @@ On Windows, in PowerShell:
   Where-Object { \$_.Length -gt 2GB -and \$_.FullName -notmatch '\\\\Converted\\\\' }
 \$files.Count                     # 0: tell the person no video was found, and stop
 $c queue add --goal archive --json @(\$files.FullName)
-$c wait 0 1 2 --json             # the job ids from `added`
+$c wait --json
 ```
 
-`wait` returns when the last of those jobs has ended. Then tell the person each result (`outputPath`), and name every one with `needsALook` true: worth a look by eye. `$c queue --json` gives each job's size and quality too, and on exit 1 each failed job's `errorLines`: tell the person why it failed. Once the cause is put right, `$c queue retry <job>` tries a job again.
+`wait` returns when the last of those jobs has ended, each in `ended`. Then tell the person each result: `outputPath`, `outputBytes` beside `sourceBytes`, `seconds` and `quality`, and name every one with `needsALook` true: worth a look by eye. On exit 1 tell the person why each failed job failed (`errorLines`). Once the cause is put right, `$c queue retry <job>` tries a job again.
+''',
+  'wait':
+      '''
+#### Report each file as it finishes, from a shell that blocks
+
+```sh
+$c wait --any --timeout 540 --json         # the jobs pending now
+$c wait 1 2 --any --timeout 540 --json     # the ids in the last answer's `pending`
+```
+
+Each answer comes once a job has ended (exit 0, or 1 if it failed) or after 540 seconds (exit 3): tell the person about each job in `ended`, then wait again for the ids in `pending`, until it is empty. A job that ends between two waits is not missed: it is given by its id. With `--timeout 0` it answers at once, how those jobs stand.
 ''',
   'events':
       '''
-#### Report each file as it finishes
+#### Follow everything that happens
 
 ```sh
 $c queue                          # opens the window first, if it is not open
 $c events --since-now --json      # in the background
 ```
 
-Read its lines as they come. On each `JOB_FINISHED`, tell the person about that job: its `status`, `outputPath`, `outputBytes`, `quality.outcome` and `needsALook`. On `QUEUE_IDLE` the queue has nothing more to do: stop following. On `APP_CLOSING` the window closed.
+Read its lines as they come; `JOB_PROGRESS` comes once a second while a job converts, so to wait for results `wait` is shorter. On each `JOB_FINISHED`, tell the person about that job: its `status`, `outputPath`, `outputBytes`, `quality.outcome` and `needsALook`. On `QUEUE_IDLE` the queue has nothing more to do: stop following. On `APP_CLOSING` the window closed.
 ''',
   'queue convert-whole':
       '''

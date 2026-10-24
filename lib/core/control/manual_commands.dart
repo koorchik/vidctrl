@@ -154,6 +154,8 @@ const _doneJob = JobView(
   status: JobStatusCodes.done,
   outputPath: '$_folder/Converted/beach_av1-crf35.mp4',
   outputBytes: 598000000,
+  sourceBytes: 4200000000,
+  seconds: 1925.4,
   quality: QualityView(
     outcome: OutcomeCodes.standard,
     value: 35,
@@ -176,6 +178,7 @@ const _runningJob = JobView(
   fraction: .42,
   remainingSeconds: 1260,
   outputPath: '$_folder/Converted/party_av1-crf20-check.mp4',
+  sourceBytes: 4040000000,
   quality: QualityView(
     outcome: OutcomeCodes.belowTarget,
     value: 20,
@@ -197,6 +200,8 @@ const _checkedJob = JobView(
   status: JobStatusCodes.done,
   outputPath: '$_folder/Converted/party_av1-crf20-check.mp4',
   outputBytes: 2100000000,
+  sourceBytes: 4040000000,
+  seconds: 5210.8,
   quality: QualityView(
     outcome: OutcomeCodes.belowTarget,
     value: 20,
@@ -216,6 +221,7 @@ const _waitingJob = JobView(
   goal: 'archive.master',
   options: _options,
   status: JobStatusCodes.waiting,
+  sourceBytes: 2900000000,
   needsALook: false,
   errorLines: [],
 );
@@ -272,23 +278,19 @@ final _againAnswer = {
   'alreadyQueued': false,
 };
 
+/// What `wait --any --timeout 540` answers once job 0 has ended.
 final _waitAnswer = {
-  'outcomes': [
-    const JobOutcome(
-      jobId: 0,
-      path: '$_folder/beach.mov',
-      status: JobStatusCodes.done,
-      outputPath: '$_folder/Converted/beach_av1-crf35.mp4',
-      needsALook: false,
+  'ended': [_doneJob.toJson()],
+  'pending': [
+    const PendingJob(
+      id: 1,
+      status: JobStatusCodes.running,
+      fraction: .42,
+      remainingSeconds: 1260,
     ).toJson(),
-    const JobOutcome(
-      jobId: 1,
-      path: '$_folder/party.mov',
-      status: JobStatusCodes.done,
-      outputPath: '$_folder/Converted/party_av1-crf20-check.mp4',
-      needsALook: true,
-    ).toJson(),
+    const PendingJob(id: 2, status: JobStatusCodes.waiting).toJson(),
   ],
+  'paused': false,
 };
 
 /// What "Show the command" shows for [_checkedJob], made as the window
@@ -1090,37 +1092,49 @@ List<CommandDoc> commandDocs(
     'wait',
     area: CommandArea.waiting,
     arguments: '[jobs…]',
-    summary: 'waits until the jobs are finished, and says how each ended',
-    brief: 'Waits until the jobs end (see "Waiting").',
-    answer: '`{outcomes: [Outcome]}` at the end',
+    summary: 'waits until the jobs have ended, and tells each result',
+    brief:
+        'Waits until the jobs end; `--any`: until one does; `--timeout`: '
+        'that long at most (exit 3, the answer all the same). See "Waiting".',
+    answer: '`{ended: [Job], pending: [Pending], paused: bool}`',
     about: [
       'Without job ids, until no job is waiting or converting; with ids, '
           'until those have ended. Jobs added meanwhile, by this program or '
-          'the person, count too. The rules are under "Waiting". '
-          'Conversions can take hours: run it in the background.',
-      'Each job is printed as soon as it ends; the last line sums up. '
-          'Exit 0 when every job ended done or skipped, 1 when one failed or '
-          'was cancelled, 3 after `--timeout`, 4 when the window closed.',
+          'the person, count too. The rules are under "Waiting".',
+      'Each job is printed as soon as it ends; then what is not ended yet '
+          'and the command that waits on. Exit 0 when every job ended done '
+          'or skipped (with `--any`, the one that ended), 1 when one failed '
+          'or was cancelled, 3 when the time passed with jobs pending, 4 '
+          'when the window closed.',
     ],
     options: [
       (
+        '--any',
+        'answer as soon as one of the jobs has ended, at once if one of '
+            'those given has already.',
+      ),
+      (
         '--timeout <seconds>',
-        'give up after this long, with exit 3; the jobs '
-            'go on in the window.',
+        'answer after this long at most (0: now), with exit 3 while jobs are '
+            'pending; they go on in the window.',
       ),
     ],
-    examples: ['$c wait', '$c wait 3 4 --timeout 600 --json'],
+    examples: ['$c wait --json', '$c wait 1 2 --any --timeout 540 --json'],
     text: [
       ...finishedText(_doneJob),
-      ...finishedText(_checkedJob),
-      'All done.',
+      ...pendingText([
+        for (final job in _waitAnswer['pending'] as List)
+          PendingJob.fromJson(job as Map<String, Object?>),
+      ], goOn: ' --any --timeout 540'),
     ],
     json: [
-      '`outcomes` (list of Outcome), once all have ended; nothing is printed '
-          'before.',
+      '`ended` (list of Job): each job counted that has ended, in full, '
+          '`REMOVED` for one taken out; `pending` (list of Pending): the '
+          'others, as they stand; `paused` (bool): the queue is paused in the '
+          'window. Here `wait --any --timeout 540` once job 0 has ended:',
       ..._jsonBlock(_waitAnswer),
     ],
-    shapes: ['Outcome'],
+    shapes: ['Job', 'Quality', 'Pending'],
     errors: ['A job id not in the queue: exit 5.'],
   ),
   CommandDoc(

@@ -21,8 +21,8 @@ T? fromCode<T extends Enum>(Iterable<T> values, Object? code) {
 /// What every code looks like.
 final codePattern = RegExp(r'^[A-Z][A-Z0-9_]*$');
 
-/// A job's status (Job `status`, and the keys of Status `jobs`), and how a
-/// job ended (Outcome `status`).
+/// A job's status (Job and Pending `status`, and the keys of Status
+/// `jobs`).
 abstract final class JobStatusCodes {
   static const waiting = 'WAITING';
   static const running = 'RUNNING';
@@ -32,7 +32,8 @@ abstract final class JobStatusCodes {
   static const failed = 'FAILED';
   static const cancelled = 'CANCELLED';
 
-  /// Only in an Outcome: taken out of the queue while it was waited for.
+  /// Only in `wait`'s `ended`: taken out of the queue while it was waited
+  /// for.
   static const removed = 'REMOVED';
 
   static const all = [

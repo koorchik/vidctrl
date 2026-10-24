@@ -188,6 +188,8 @@ List<String> jobText(JobView job) {
     ..._resultText(
       outputPath: job.outputPath,
       outputBytes: job.outputBytes,
+      sourceBytes: job.sourceBytes,
+      seconds: job.seconds,
       quality: job.quality,
       needsALook: job.needsALook,
       errorLines: job.errorLines,
@@ -313,38 +315,61 @@ String _recipe(String goal, Map<Object?, Object?> options) => [
   for (final MapEntry(:key, :value) in options.entries) '$key=$value',
 ].join(', ');
 
-/// How a job ended, as `wait` reports it.
-List<String> outcomeText(JobOutcome outcome) => [
-  'Job ${outcome.jobId}: ${statusWords(outcome.status)}. ${outcome.path}',
-  ..._resultText(
-    outputPath: outcome.outputPath,
-    needsALook: outcome.needsALook,
-  ),
-];
-
-/// How a job ended, from its [Events.jobFinished] event.
+/// How a job ended, from its [Events.jobFinished] event or a `wait`.
 List<String> finishedText(JobView job) => [
   'Job ${job.id}: ${statusWords(job.status)}. ${job.path}',
-  ..._resultText(
-    outputPath: job.status == JobStatusCodes.done ? job.outputPath : null,
-    outputBytes: job.outputBytes,
-    quality: job.quality,
-    needsALook: job.needsALook,
-    errorLines: job.errorLines,
-  ),
+  if (job.status != JobStatusCodes.removed)
+    ..._resultText(
+      outputPath: job.status == JobStatusCodes.done ? job.outputPath : null,
+      outputBytes: job.outputBytes,
+      sourceBytes: job.sourceBytes,
+      seconds: job.seconds,
+      quality: job.quality,
+      needsALook: job.needsALook,
+      errorLines: job.errorLines,
+    ),
 ];
+
+/// The jobs a `wait` answered without, and the command that waits on for
+/// them, [goOn] being its options.
+List<String> pendingText(List<PendingJob> pending, {String goOn = ''}) {
+  String told(PendingJob job) {
+    final progress = [
+      if (job.fraction case final fraction?) _percent(fraction),
+      if (job.remainingSeconds case final seconds?) _timeLeft(seconds),
+    ];
+    final state = switch (job.status) {
+      JobStatusCodes.running when job.attempt != null =>
+        'choosing the quality, try ${job.attempt}',
+      JobStatusCodes.paused => 'held by a pause',
+      final status => statusWords(status).toLowerCase(),
+    };
+    return 'job ${job.id} ${[state, ...progress].join(', ')}';
+  }
+
+  const shown = 3;
+  return [
+    'Not ended yet: ${[for (final job in pending.take(shown)) told(job), if (pending.length > shown) '${pending.length - shown} more'].join('; ')}.',
+    'To go on: vidctrl-client wait '
+        '${[for (final job in pending) job.id].join(' ')}$goOn',
+  ];
+}
 
 List<String> _resultText({
   String? outputPath,
   int? outputBytes,
+  int? sourceBytes,
+  double? seconds,
   QualityView? quality,
   required bool needsALook,
   List<String> errorLines = const [],
 }) => [
   if (outputPath != null)
     '  Result: $outputPath'
-        '${outputBytes == null ? '' : ', ${formatBytes(outputBytes)}'}',
-  if (quality != null) '  ${_qualityText(quality)}',
+        '${outputBytes == null ? '' : ', ${_sizeText(outputBytes, sourceBytes)}'}'
+        '${seconds == null ? '' : '; took ${_clock(seconds)}'}',
+  if (quality != null)
+    '  ${_qualityText(quality, expected: outputBytes == null)}',
   if (needsALook && quality?.outcome != OutcomeCodes.belowTarget)
     '  Worth a look by eye: its name ends in -check.',
   // FFmpeg's last words say why it failed.
@@ -352,7 +377,15 @@ List<String> _resultText({
     '  > $line',
 ];
 
-String _qualityText(QualityView quality) {
+/// A result's size, and its share of the original's when that is known.
+String _sizeText(int bytes, int? original) => original == null || original <= 0
+    ? formatBytes(bytes)
+    : '${formatBytes(bytes)}, ${(bytes / original * 100).round()}% of the '
+          'original\'s ${formatBytes(original)}';
+
+/// [quality] in words; with [expected], the size it is expected to come out
+/// at, until the result's own is known.
+String _qualityText(QualityView quality, {required bool expected}) {
   final standard = quality.standardValue;
   final numbers = [
     if (quality.value case final value?)
@@ -361,7 +394,7 @@ String _qualityText(QualityView quality) {
           : 'crf $value, usual $standard',
     ..._scores(quality.vmaf, quality.xpsnr),
   ];
-  final size = quality.share > 0
+  final size = expected && quality.share > 0
       ? ' Expected at ${(quality.share * 100).round()}% of the original\'s '
             'size.'
       : '';

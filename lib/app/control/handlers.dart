@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -70,9 +71,13 @@ abstract interface class ControlSessions {
   /// From now on [peer] is told every event.
   void subscribe(ControlPeer peer);
 
-  /// Completes when [tracker] is finished; throws [ControlError] when the
-  /// window closes first.
-  Future<void> waitFor(ControlPeer peer, WaitTracker tracker);
+  /// Completes when [tracker] is finished, or once [timeout] has passed;
+  /// throws [ControlError] when the window closes first.
+  Future<void> waitFor(
+    ControlPeer peer,
+    WaitTracker tracker, {
+    Duration? timeout,
+  });
 }
 
 /// Answers one request. `status` answers at once; every other method waits
@@ -439,7 +444,9 @@ Future<Object?> _subscribe(
 }
 
 /// Answers once no job it counts is pending: the given ones, or else those
-/// pending now and any that become pending meanwhile.
+/// pending now and any that become pending meanwhile; with `any`, once one
+/// of them has ended; with `timeout`, after that many seconds at most. The
+/// answer holds each counted job that has ended, and how the others stand.
 Future<Object?> _wait(
   Ref ref,
   ControlSessions sessions,
@@ -462,9 +469,29 @@ Future<Object?> _wait(
       ids.add(id);
     }
   }
-  final tracker = WaitTracker(ref.read(queueProvider), jobs: ids);
-  await sessions.waitFor(peer, tracker);
+  final any = params['any'] ?? false;
+  if (any is! bool) throw badArgument('"any" is true or false.');
+  final limit = params['timeout'];
+  if (limit != null && (limit is! num || !(limit >= 0))) {
+    throw badArgument('"timeout" is a number of seconds, 0 or more.');
+  }
+  final seconds = limit as num?;
+  final tracker = WaitTracker(ref.read(queueProvider), jobs: ids, any: any);
+  await sessions.waitFor(
+    peer,
+    tracker,
+    timeout: seconds == null
+        ? null
+        // Longer than that is as good as no limit, and fits a Duration.
+        : Duration(milliseconds: (min(seconds, 1e9) * 1000).round()),
+  );
+  final capabilities = ref.read(environmentProvider).requireValue.capabilities;
   return {
-    'outcomes': [for (final outcome in tracker.outcomes) outcome.toJson()],
+    'ended': [
+      for (final (:job, :removed) in tracker.ended)
+        jobView(job, capabilities, removed: removed).toJson(),
+    ],
+    'pending': [for (final job in tracker.pending) pendingView(job).toJson()],
+    'paused': tracker.paused,
   };
 }

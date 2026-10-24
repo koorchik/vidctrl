@@ -161,17 +161,22 @@ Map<String, Object?> _job(int id, String status, {String? outputPath}) => {
   'errorLines': <String>[],
 };
 
-Map<String, Object?> _outcome(
-  int id,
-  String status, {
-  bool needsALook = false,
-}) => {
-  'jobId': id,
-  'path': '/videos/clip$id.mov',
-  'status': status,
-  if (status == 'done') 'outputPath': '/videos/Converted/clip$id.mp4',
-  'needsALook': needsALook,
-};
+/// A job as `wait` tells it once ended.
+Map<String, Object?> _ended(int id, String status, {bool needsALook = false}) =>
+    {
+      ..._job(
+        id,
+        status,
+        outputPath: status == 'DONE' ? '/videos/Converted/clip$id.mp4' : null,
+      ),
+      'needsALook': needsALook,
+    };
+
+/// A `wait` answer: the jobs ended, and those still pending.
+Map<String, Object?> _waited(
+  List<Map<String, Object?>> ended, [
+  List<Map<String, Object?>> pending = const [],
+]) => {'ended': ended, 'pending': pending, 'paused': false};
 
 Map<String, Object?> _video(int id) => {
   'id': id,
@@ -722,26 +727,128 @@ void main() {
   });
 
   test('wait exits 1 when a job failed and 0 when all are done', () async {
-    var outcomes = [_outcome(1, 'DONE'), _outcome(2, 'FAILED')];
+    var ended = [_ended(1, 'DONE'), _ended(2, 'FAILED')];
     final app = await _FakeApp.start(_endpoint, {
-      Methods.wait: (_, _) => {'outcomes': outcomes},
+      Methods.wait: (_, _) => _waited(ended),
     });
     final failed = await _run(['wait']);
     expect(failed.exitCode, ExitCode.jobsFailed);
     expect(failed.out, contains('Job 1: Done'));
     expect(failed.out, contains('Job 2: Failed'));
 
-    outcomes = [_outcome(1, 'DONE'), _outcome(2, 'SKIPPED')];
+    ended = [_ended(1, 'DONE'), _ended(2, 'SKIPPED')];
     expect((await _run(['wait', '1', '2'])).exitCode, ExitCode.ok);
     expect(app.paramsOf(Methods.wait), {
       'jobs': [1, 2],
     });
 
-    outcomes = [_outcome(3, 'CANCELLED')];
+    ended = [_ended(3, 'CANCELLED')];
     expect((await _run(['wait'])).exitCode, ExitCode.jobsFailed);
     // Taken out of the queue is not a failure.
-    outcomes = [_outcome(3, 'REMOVED')];
+    ended = [_ended(3, 'REMOVED')];
     expect((await _run(['wait'])).exitCode, ExitCode.ok);
+  });
+
+  test('wait tells the result in full: its size beside the original\'s, the '
+      'quality chosen and the time it took', () async {
+    await _FakeApp.start(_endpoint, {
+      Methods.wait: (_, _) => _waited([
+        {
+          ..._ended(1, 'DONE'),
+          'outputBytes': 598000000,
+          'sourceBytes': 4200000000,
+          'seconds': 1925.4,
+          'quality': {
+            'outcome': 'STANDARD',
+            'value': 35,
+            'standardValue': 35,
+            'vmaf': 96.4,
+            'xpsnr': 43.1,
+            'share': .14,
+          },
+        },
+      ]),
+    });
+
+    final run = await _run(['wait']);
+
+    expect(run.exitCode, ExitCode.ok);
+    expect(
+      run.out,
+      contains(
+        '  Result: /videos/Converted/clip1.mp4, 598.0 MB, 14% of the '
+        'original\'s 4.20 GB; took 32:05',
+      ),
+    );
+    expect(run.out, contains('crf 35; VMAF 96.4; XPSNR 43.1 dB'));
+    // The size is known: no expectation is told.
+    expect(run.out, isNot(contains('Expected')));
+  });
+
+  test('wait --any and --timeout go to the window, which answers with what '
+      'ended and what is still pending', () async {
+    var answer = _waited(
+      [_ended(1, 'DONE')],
+      [
+        {
+          'id': 2,
+          'status': 'RUNNING',
+          'fraction': .42,
+          'remainingSeconds': 1260.0,
+        },
+        {'id': 3, 'status': 'WAITING'},
+      ],
+    );
+    final app = await _FakeApp.start(_endpoint, {
+      Methods.wait: (_, _) => answer,
+    });
+
+    // The time passed with jobs still pending: exit 3, the answer all the
+    // same.
+    final json = await _run(['wait', '--timeout', '540', '--json']);
+    expect(app.paramsOf(Methods.wait), {'timeout': 540});
+    expect(json.exitCode, ExitCode.timeout);
+    expect(jsonDecode(json.out), answer);
+    expect(
+      (jsonDecode(json.err) as Map)['error'],
+      containsPair('code', 'TIMEOUT'),
+    );
+
+    final text = await _run(['wait', '1', '2', '3', '--timeout', '540']);
+    expect(text.exitCode, ExitCode.timeout);
+    expect(text.out, contains('Job 1: Done'));
+    expect(
+      text.out,
+      contains(
+        'Not ended yet: job 2 converting, 42%, about 21 min left; job 3 '
+        'waiting.',
+      ),
+    );
+    expect(
+      text.out,
+      contains('To go on: vidctrl-client wait 2 3 --timeout 540'),
+    );
+
+    // With --any, one job ended is the wait over: exit 0.
+    final any = await _run(['wait', '--any', '--json']);
+    expect(app.paramsOf(Methods.wait), {'any': true});
+    expect(any.exitCode, ExitCode.ok);
+    expect(jsonDecode(any.out), answer);
+    final anyText = await _run(['wait', '--any']);
+    expect(anyText.out, contains('To go on: vidctrl-client wait 2 3 --any'));
+
+    // With --any, the time passed with none ended: exit 3.
+    answer = _waited([], [
+      {'id': 2, 'status': 'PAUSED'},
+    ]);
+    final none = await _run(['wait', '2', '--any', '--timeout', '0']);
+    expect(app.paramsOf(Methods.wait), {
+      'jobs': [2],
+      'any': true,
+      'timeout': 0,
+    });
+    expect(none.exitCode, ExitCode.timeout);
+    expect(none.out, contains('job 2 held by a pause'));
   });
 
   test('wait prints each outcome as it is known', () async {
@@ -762,9 +869,7 @@ void main() {
           subscriber.notify(Events.queuePaused, const {});
         }
         await answer.future;
-        return {
-          'outcomes': [_outcome(1, 'DONE'), _outcome(2, 'DONE')],
-        };
+        return _waited([_ended(1, 'DONE'), _ended(2, 'DONE')]);
       },
     });
     final out = StringBuffer();
@@ -796,23 +901,27 @@ void main() {
     expect(run.err, isNotEmpty);
   }, timeout: const Timeout(Duration(seconds: 5)));
 
-  test('wait --timeout exits 3', () async {
-    await _FakeApp.start(_endpoint, {
-      Methods.wait: (_, _) => Completer<Object?>().future,
-    });
-    final watch = Stopwatch()..start();
-    final run = await _run(['wait', '--timeout', '0.2']);
-    expect(run.exitCode, ExitCode.timeout);
-    expect(watch.elapsed, lessThan(const Duration(seconds: 3)));
-    expect(run.err, isNotEmpty);
+  test(
+    'wait --timeout exits 3 when the window does not answer in time',
+    () async {
+      await _FakeApp.start(_endpoint, {
+        Methods.wait: (_, _) => Completer<Object?>().future,
+      });
+      final watch = Stopwatch()..start();
+      final run = await _run(['wait', '--timeout', '0.2']);
+      expect(run.exitCode, ExitCode.timeout);
+      expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
+      expect(run.err, isNotEmpty);
 
-    final json = await _run(['wait', '--timeout', '0.2', '--json']);
-    expect(json.exitCode, ExitCode.timeout);
-    expect(
-      (jsonDecode(json.err) as Map)['error'],
-      containsPair('code', 'TIMEOUT'),
-    );
-  });
+      final json = await _run(['wait', '--timeout', '0.2', '--json']);
+      expect(json.exitCode, ExitCode.timeout);
+      expect(json.out, isEmpty);
+      expect(
+        (jsonDecode(json.err) as Map)['error'],
+        containsPair('code', 'TIMEOUT'),
+      );
+    },
+  );
 
   test(
     'events prints each event as a JSON line and ends with the app',
@@ -1061,9 +1170,9 @@ void main() {
 
   test('a --timeout that is not a finite number is refused', () async {
     final app = await _FakeApp.start(_endpoint, {
-      Methods.wait: (_, _) => {'outcomes': <Object?>[]},
+      Methods.wait: (_, _) => _waited([]),
     });
-    for (final timeout in ['Infinity', '-Infinity', 'NaN', '0', '-1']) {
+    for (final timeout in ['Infinity', '-Infinity', 'NaN', '-1', 'soon']) {
       final run = await _run(['wait', '--timeout', timeout]);
       expect(run.exitCode, ExitCode.badArguments, reason: timeout);
       expect(run.err, contains('--timeout'), reason: timeout);
@@ -1078,7 +1187,7 @@ void main() {
     await _FakeApp.start(_endpoint, {
       // Not the shape the client reads.
       Methods.queueList: (_, _) => {'jobs': 'none'},
-      Methods.wait: (_, _) => {'outcomes': 'none'},
+      Methods.wait: (_, _) => {'ended': 'none'},
       Methods.subscribe: (_, peer) {
         Timer.run(() => peer.notify(Events.jobFinished, {'id': 'x'}));
         return const <String, Object?>{};
@@ -1218,13 +1327,11 @@ void main() {
         'added': <Object?>[],
         'alreadyQueued': true,
       },
-      Methods.wait: (_, _) => {
-        'outcomes': [
-          _outcome(1, 'DONE', needsALook: true),
-          _outcome(2, 'REMOVED'),
-          _outcome(3, 'CANCELLED'),
-        ],
-      },
+      Methods.wait: (_, _) => _waited([
+        _ended(1, 'DONE', needsALook: true),
+        _ended(2, 'REMOVED'),
+        _ended(3, 'CANCELLED'),
+      ]),
       Methods.subscribe: (_, peer) {
         // `wait` follows the events too; only `events` is told these.
         if (!following) return const <String, Object?>{};

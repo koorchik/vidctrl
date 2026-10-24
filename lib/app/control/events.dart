@@ -60,14 +60,11 @@ List<ControlEvent> queueEvents(
     }
     final progress = job.progress;
     if (job.isActive && progress != null && progress != was.progress) {
-      final remaining = progress.remaining;
       events.add(
         ControlEvent(Events.jobProgress, {
           'job': job.id,
-          'fraction': progress.fraction,
-          'remainingSeconds': ?(remaining == null
-              ? null
-              : remaining.inMilliseconds / 1000),
+          'fraction': wireFraction(progress.fraction),
+          'remainingSeconds': ?wireSeconds(progress.remaining),
         }),
       );
     }
@@ -170,6 +167,6 @@ Map<String, Object?> comparisonJson(int job, QualityMeasured check) => {
   'job': job,
   'status': ComparisonCodes.measured,
   'closeness': codeOf(check.closeness),
-  'xpsnr': wireDb(check.lumaDb),
-  'vmaf': ?check.vmaf,
+  'xpsnr': wireScore(wireDb(check.lumaDb)),
+  'vmaf': ?wireScore(check.vmaf),
 };
