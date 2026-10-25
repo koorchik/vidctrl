@@ -330,6 +330,155 @@ the repository. They take minutes of encoding, so CI runs only the quick
 check: FFmpeg is found, has the encoders the app needs, and converts one
 short clip.
 
+### What the tests check
+
+**1,024 automatic tests** (at version 0.5.4), each named for what a person
+would notice if it broke. Every push runs the 910 fast ones and the quick
+FFmpeg check on Linux, Windows and macOS; the real conversions run before
+any change to the engine goes out.
+
+| What | Tests | Run |
+|---|---:|---|
+| 🎯 What each goal does to each kind of video | 126 | every push |
+| 🔬 Choosing the quality, and the expected size | 125 | every push |
+| 📋 The queue: order, pause, cancel, no file lost | 116 | every push |
+| 🪟 The screen: plain words, nothing cut off, two looks, two languages | 147 | every push |
+| 🎞️ Reading videos and writing FFmpeg's commands | 86 | every push |
+| 🤖 Control by an AI agent (`vidctrl-client`) | 281 | every push |
+| 🖥️ The computer: icon, sleep, updates | 29 | every push |
+| ⚙️ Real conversions with FFmpeg, on generated clips | 63 | before an engine change |
+| ✅ The quick check of the FFmpeg that ships | 5 | every push |
+| 📸 Every screen drawn in both looks | 46 | after a change to the screen |
+
+<details>
+<summary>🎯 What each goal does to each kind of video (126)</summary>
+
+- A video that is already right is left alone; one that only needs its
+  sound converted keeps its picture untouched.
+- Archive: 10-bit AV1 by default, HEVC where FFmpeg has no AV1, the graphics
+  card only where one really works, NVIDIA kept to a level every player
+  plays.
+- The camera's make and model, date and place survive the move to MP4; the
+  original's QuickTime file type does not.
+- Where each colour sample sits is said in the result, for every camera
+  layout, from the processor and from the graphics card.
+- Irregular frame timing (phones, screen recordings) is made constant
+  without losing a picture or moving one.
+- Sound: modest AAC kept, an editor's PCM or FLAC made 320k AAC, mono and
+  surround each given their own rate.
+- Resolve on Linux, file by file: AAC, MP3, AC-3, Opus in MKV, AVI, VP9,
+  4:2:2 HEVC; what plays in each edition and what has to change.
+- Save space: 4K to 1080p, portrait videos by their height, 60 frames to 30,
+  HDR mapped for ordinary screens.
+- Get the sound, Remove personal data and Change file type: the right file
+  type for each sound, nothing re-encoded that can be moved.
+- Every output name, in every goal, safe in any file system.
+
+</details>
+
+<details>
+<summary>🔬 Choosing the quality, and the expected size (125)</summary>
+
+- How close a result looks, from VMAF or XPSNR, at each boundary
+  ("looks the same" at VMAF 95, not at 94.9).
+- A video is as close as its poorest piece, not its average.
+- The search for a better quality: never below the best, at most six tries,
+  "not worth it" past 80% of the original's size, a stopped search choosing
+  nothing.
+- Which results can be compared fairly, and which cannot (resized, retimed,
+  tone-mapped).
+- Where the pieces are taken, that none runs past the end, and that a
+  finished sample corrects the estimate.
+- The verdicts and the hardest frame, original and copy, in the (i) window.
+
+</details>
+
+<details>
+<summary>📋 The queue: order, pause, cancel, no file lost (116)</summary>
+
+- One job at a time, in order; the same job is never queued twice.
+- A job keeps its settings when the panel changes later.
+- Pause, continue, cancel and reorder, including in the moment a job starts.
+- An existing file is never overwritten, the original never the target;
+  an unfinished file is hidden and removed on failure or cancel.
+- Closing the window while converting asks first, and "Quit" waits for FFmpeg
+  to stop.
+- Progress, speed and time left never run backwards; sizes of tens of
+  gigabytes do not overflow.
+
+</details>
+
+<details>
+<summary>🪟 The screen: plain words, nothing cut off, two looks, two languages (147)</summary>
+
+- No technical term on the main screen except as smaller detail, checked
+  word by word in English and Ukrainian.
+- The "What to do" panel shows every control without scrolling, uncut: 48
+  combinations of window size, computer, language and look.
+- Drop, Add to queue, done: the simple path works with no other step.
+- Menus open inside the window, the header ends where the panel does, the
+  language and look are remembered.
+- Sizes, lengths and scores read the way each language writes them.
+
+</details>
+
+<details>
+<summary>🎞️ Reading videos and writing FFmpeg's commands (86)</summary>
+
+- Bit depth and colour layout of every pixel format, variable frame rate,
+  cover art not mistaken for the video, colours left unstated.
+- Which tags are personal (place, date, camera, timecode) and which are not.
+- File names with spaces, colons or a leading dash stay one argument.
+- "Show the command" pastes and runs as is in bash and PowerShell.
+- A camera's upper-case `.MOV` is offered in the Linux file dialog.
+
+</details>
+
+<details>
+<summary>🤖 Control by an AI agent (281)</summary>
+
+- Every method goes through the same rules as the buttons, and the window
+  shows what the agent does.
+- Answers carry codes, never sentences; every error says why.
+- Waiting for jobs misses none, counts retries and cancels right, and ends
+  when the window closes.
+- One window owns the connection; a stale one is taken over, a live one
+  never.
+- The manual the client prints matches the goals the app has.
+
+</details>
+
+<details>
+<summary>🖥️ The computer: icon, sleep, updates (29)</summary>
+
+- The computer is kept awake while converting, and the system itself is
+  asked whether it agreed.
+- FFmpeg ends with the app even when the app is killed.
+- The Linux icon is registered once and moved with the app.
+- Versions are compared as people expect (`1.0.0-beta.2` before
+  `1.0.0-beta.11`).
+
+</details>
+
+<details>
+<summary>⚙️ Real conversions with FFmpeg (63) and the quick check (5)</summary>
+
+- Every goal converts generated clips for real, and each result is read
+  back with ffprobe; where the picture matters, it is decoded and checked
+  too.
+- HLG colour tags, the camera's date, place and timecode, 10-bit and 4:2:2
+  sources come through.
+- A screen recording keeps its still pictures and its length.
+- A grainy video gets the quality it needs; one that would hardly shrink is
+  left as it is.
+- Expected sizes match the real ones closely.
+- Cancelling, pausing, closing the window or a broken input leave no
+  unfinished file behind.
+- The quick check: the shipped FFmpeg is found, has every encoder, and its
+  AV1 comes as close to the original as it should.
+
+</details>
+
 ## Publishing a release
 
 Pushing a version tag publishes a release on GitHub with the app for Linux,
