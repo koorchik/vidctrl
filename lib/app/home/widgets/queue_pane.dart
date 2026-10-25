@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../format.dart';
+import '../../queue/keeping_awake.dart';
 import '../../queue/queue_controller.dart';
 import '../../queue/queue_state.dart';
 import '../../queue/queue_summary.dart';
+import '../../theme.dart';
 import '../headings.dart';
 import 'job_tile.dart';
 import '../size_change_text.dart';
@@ -23,6 +25,7 @@ class QueuePane extends ConsumerWidget {
     final state = ref.watch(queueProvider);
     final queue = ref.read(queueProvider.notifier);
     final progress = overallProgress(state);
+    final keepingAwake = ref.watch(keepingAwakeProvider);
 
     return Card(
       child: Padding(
@@ -64,8 +67,18 @@ class QueuePane extends ConsumerWidget {
             ),
             if (state.busy) ...[
               const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: progress.fraction > 0 ? progress.fraction : null,
+              Row(
+                children: [
+                  Expanded(
+                    child: LinearProgressIndicator(
+                      value: progress.fraction > 0 ? progress.fraction : null,
+                    ),
+                  ),
+                  if (keepingAwake) ...[
+                    const SizedBox(width: 12),
+                    const _KeepingAwake(),
+                  ],
+                ],
               ),
             ],
             if (state.jobs.isEmpty)
@@ -128,5 +141,46 @@ class QueuePane extends ConsumerWidget {
     if (state.busy || state.paused) return null;
     final (:before, :after) = doneSizes(state);
     return format.largerBy(before, after);
+  }
+}
+
+/// Says that the computer will not go to sleep while converting; shown only
+/// while its operating system has agreed to that.
+class _KeepingAwake extends StatelessWidget {
+  const _KeepingAwake();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Tooltip(
+      message: l10n.keepingAwakeHint,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+        decoration: BoxDecoration(
+          color: scheme.tertiaryContainer,
+          borderRadius: BorderRadius.circular(AppLook.of(context).tagRadius),
+          border: Border.all(color: scheme.tertiary.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.bedtime_off_outlined,
+              size: 13,
+              color: scheme.onTertiaryContainer,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              l10n.keepingAwake,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onTertiaryContainer,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

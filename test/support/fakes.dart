@@ -178,20 +178,37 @@ class FakeExecutor implements JobExecutor {
 }
 
 class FakeSleepInhibitor implements SleepInhibitor {
+  final _changes = StreamController<bool>.broadcast(sync: true);
+
   @override
   bool isActive = false;
+
+  @override
+  Stream<bool> get changes => _changes.stream;
 
   /// When set, keeping the computer awake fails.
   bool fails = false;
 
+  /// When set, the operating system says no, as a real one may.
+  bool refuses = false;
+
   @override
   Future<void> acquire() async {
     if (fails) throw StateError('No helper to keep the computer awake');
-    isActive = true;
+    if (!refuses) _set(true);
   }
 
   @override
-  Future<void> release() async => isActive = false;
+  Future<void> release() async => _set(false);
+
+  /// As when the operating system ends it unasked.
+  void end() => _set(false);
+
+  void _set(bool active) {
+    if (active == isActive) return;
+    isActive = active;
+    _changes.add(active);
+  }
 }
 
 /// Pretends to measure: every re-encode comes out at [ratio] of the source

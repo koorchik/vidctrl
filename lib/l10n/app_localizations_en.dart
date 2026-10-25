@@ -684,6 +684,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get queuePaused => 'Paused';
 
   @override
+  String get keepingAwake => 'Computer stays awake';
+
+  @override
+  String get keepingAwakeHint =>
+      'While converting, the computer will not go to sleep. The screen may still turn off.';
+
+  @override
   String get jobWaiting => 'Waiting';
 
   @override

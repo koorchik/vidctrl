@@ -478,7 +478,25 @@ The UI renders presets and options generically; it needs no other change.
   file is gone only when the handle's `result` completes. An app that leaves
   in between abandons a running FFmpeg and the unfinished file, so closing
   the window goes through `QueueController.shutDown()` and
-  `EstimateCache.stopMeasuring()`, which wait.
+  `EstimateCache.stopMeasuring()`, which wait. An app that ends any other
+  way (killed, crashed) cannot wait, so `FfmpegRunner` ties each FFmpeg to
+  it (`platform/end_with_app.dart`): on Windows a job that Windows ends with
+  the app, elsewhere a small `sh` that waits on a pipe from the app and
+  kills FFmpeg once the pipe closes. Windows has no SIGKILL or SIGSTOP:
+  `Process.kill` terminates, and pause holds the whole process with
+  `NtSuspendProcess` (`platform/windows_process.dart`).
+- **Keeping the computer awake:** `systemd-inhibit` on Linux, `caffeinate`
+  on macOS, a power request (`PowerCreateRequest`) on Windows, each ended
+  by the system together with the app. Only the system's sleep: the screen
+  may turn off. The queue's "Computer stays awake" shows only while the
+  system has agreed (`keepingAwakeProvider`): on Linux the helper says so
+  once systemd gave it the lock, and systemd may refuse outside a desktop
+  session. `sleep_inhibitor_test.dart` asks each system itself
+  (`systemd-inhibit --list`, `pmset -g assertions`, `powercfg /requests`).
+- **Windows APIs** are called with `dart:ffi` and `package:ffi`: the
+  `win32` package lacks `PowerCreateRequest`, `NtSuspendProcess` and the
+  job's limit structure. Wine (10) runs the Windows Dart SDK well enough to
+  try such calls before CI: `wine dart.exe run` in a small package.
 - **Expected size** of a quality-targeted encode cannot be calculated; the
   estimator encodes 3-second pieces spread over the video (picture only; the
   sound is calculated) and scales up. It is stopped when converting starts.

@@ -689,6 +689,13 @@ class AppLocalizationsUk extends AppLocalizations {
   String get queuePaused => 'Призупинено';
 
   @override
+  String get keepingAwake => 'Комп\'ютер не засне';
+
+  @override
+  String get keepingAwakeHint =>
+      'Поки йде конвертація, комп\'ютер не засне. Екран може згаснути.';
+
+  @override
   String get jobWaiting => 'Очікує';
 
   @override

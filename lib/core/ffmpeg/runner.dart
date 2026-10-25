@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../platform/end_with_app.dart';
+import '../platform/windows_process.dart';
 import 'capabilities.dart';
 import 'progress_parser.dart';
 
@@ -34,6 +36,7 @@ class FfmpegRunner {
       args,
       environment: ffmpegEnvironment,
     );
+    await endWithApp(process);
     return FfmpegRun._(process);
   }
 }
@@ -105,17 +108,21 @@ class FfmpegRun {
     _process.kill(ProcessSignal.sigkill);
   }
 
-  /// Suspends the process. Returns false where that is not supported.
+  /// Suspends the process. Returns false where that did not work.
   bool pause() {
     if (_paused || _cancelRequested) return _paused;
-    if (Platform.isWindows) return false;
-    _paused = Process.killPid(_process.pid, ProcessSignal.sigstop);
+    _paused = Platform.isWindows
+        ? suspendProcess(_process.pid)
+        : Process.killPid(_process.pid, ProcessSignal.sigstop);
     return _paused;
   }
 
   bool resume() {
     if (!_paused) return true;
-    if (Process.killPid(_process.pid, ProcessSignal.sigcont)) _paused = false;
+    final resumed = Platform.isWindows
+        ? resumeProcess(_process.pid)
+        : Process.killPid(_process.pid, ProcessSignal.sigcont);
+    if (resumed) _paused = false;
     return !_paused;
   }
 }

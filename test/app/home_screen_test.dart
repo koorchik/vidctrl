@@ -276,6 +276,55 @@ void main() {
       );
       expect(find.textContaining('All done'), findsOneWidget);
     });
+
+    testWidgets('while converting, the queue says the computer stays awake', (
+      tester,
+    ) async {
+      final sources = await pumpApp(tester, env);
+      expect(find.text('Computer stays awake'), findsNothing);
+      await addVideos(tester, sources, ['/videos/holiday.mp4']);
+      await addToQueue(tester);
+
+      expect(find.text('Computer stays awake'), findsOneWidget);
+      expect(
+        find.byTooltip(
+          'While converting, the computer will not go to sleep. '
+          'The screen may still turn off.',
+        ),
+        findsOneWidget,
+      );
+
+      env.executor.last.finish(bytes: 150000000);
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Computer stays awake'), findsNothing);
+    });
+
+    testWidgets('the queue stops saying so once the computer may sleep again', (
+      tester,
+    ) async {
+      final sources = await pumpApp(tester, env);
+      await addVideos(tester, sources, ['/videos/holiday.mp4']);
+      await addToQueue(tester);
+      expect(find.text('Computer stays awake'), findsOneWidget);
+
+      env.inhibitor.end();
+      await tester.pump();
+
+      expect(find.text('Computer stays awake'), findsNothing);
+    });
+
+    testWidgets('where the computer cannot be kept awake, nothing says it is', (
+      tester,
+    ) async {
+      env.inhibitor.refuses = true;
+      final sources = await pumpApp(tester, env);
+      await addVideos(tester, sources, ['/videos/holiday.mp4']);
+      await addToQueue(tester);
+
+      expect(env.executor.started, hasLength(1));
+      expect(find.text('Computer stays awake'), findsNothing);
+    });
   });
 
   group('details', () {

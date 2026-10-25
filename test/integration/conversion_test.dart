@@ -1437,10 +1437,6 @@ void main() {
 
     test('pausing halts progress and resuming finishes the job', () async {
       if (unavailable()) return;
-      if (Platform.isWindows) {
-        markTestSkipped('pause is not implemented on Windows yet');
-        return;
-      }
       final source = await media!.clip(
         'to_pause.mp4',
         seconds: 20,
@@ -1464,6 +1460,30 @@ void main() {
       expect(handle.resume(), isTrue);
       final result = await handle.result;
       expect(result.status, ConversionStatus.done);
+    });
+
+    test('a paused job can be cancelled and leaves no file behind', () async {
+      if (unavailable()) return;
+      final source = await media!.clip(
+        'to_cancel_paused.mp4',
+        seconds: 30,
+        size: '1280x720',
+      );
+      final info = await ffprobe.probe(source);
+      final plan = const ArchivePreset().plan(info, const {}, capabilities);
+      final job = jobFor(info, plan);
+      final handle = await executor.start(job);
+      await handle.progress.first;
+      expect(handle.pause(), isTrue);
+
+      final stopwatch = Stopwatch()..start();
+      await handle.cancel();
+      final result = await handle.result;
+
+      expect(result.status, ConversionStatus.cancelled);
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
+      expect(File(job.outputPath).existsSync(), isFalse);
+      expect(leftovers(), isEmpty);
     });
   });
 }

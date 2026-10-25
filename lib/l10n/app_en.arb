@@ -333,6 +333,8 @@
   "queueTitle": "Queue",
   "queueEmpty": "Choose videos and what to do, then press Add to queue. Converting starts by itself.",
   "queuePaused": "Paused",
+  "keepingAwake": "Computer stays awake",
+  "keepingAwakeHint": "While converting, the computer will not go to sleep. The screen may still turn off.",
   "jobWaiting": "Waiting",
   "pausedAt": "Paused at {percent}%",
   "@pausedAt": {

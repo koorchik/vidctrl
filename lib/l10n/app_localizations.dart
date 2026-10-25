@@ -1256,6 +1256,18 @@ abstract class AppLocalizations {
   /// **'Paused'**
   String get queuePaused;
 
+  /// No description provided for @keepingAwake.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer stays awake'**
+  String get keepingAwake;
+
+  /// No description provided for @keepingAwakeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'While converting, the computer will not go to sleep. The screen may still turn off.'**
+  String get keepingAwakeHint;
+
   /// No description provided for @jobWaiting.
   ///
   /// In en, this message translates to:

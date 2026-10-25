@@ -61,9 +61,8 @@ first time: "Windows protected your PC" → More info → Run anyway.
 $macos
 
 So far only the Linux build has been tried on a real machine; the Windows and
-macOS builds come straight from the build servers. On Windows, stopping a
-conversion part-way has failed in tests, and pausing and keeping the computer
-awake are not there yet.
+macOS builds come straight from the build servers, where their conversion
+tests pass.
 
 ## Changes
 

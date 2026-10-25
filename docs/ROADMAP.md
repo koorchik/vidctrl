@@ -20,8 +20,10 @@
   video that needs it, marks one still short of looking the same for a
   look by eye (its hardest frame against the original's, at real size),
   and leaves alone one that would hardly shrink;
-  keep-awake on Linux and macOS; closing the window asks first while
-  converting, and FFmpeg is stopped before the app goes; "Show the command";
+  the computer kept awake while converting, on all three systems, and the
+  queue says so; closing the window asks first while converting, and
+  FFmpeg is stopped before the app goes, and ends with it however the app
+  ends; pause and cancel on all three systems; "Show the command";
   technical names beside plain labels; English and Ukrainian with a
   switcher; two looks with a switcher, a warm light one and a dark
   professional one.
@@ -78,18 +80,13 @@
 7. **Ship.**
    - Set the Apple secrets and try the notarized disk image on a Mac
      (Apple Silicon and Intel).
-   - Windows: keep-awake, pause, and ending FFmpeg when the app ends.
-     Stopping a conversion part-way fails there: of the conversion tests,
-     run once in CI on 2026-10-03, the three that cancel, shut down or stop
-     a measurement did not pass.
    - Installers (AppImage/deb, Windows installer) and signing on Windows.
    - Linux: a desktop entry named after the application identifier, with the
      icons installed beside it. Wayland desktops take the window icon from
      there; until then the app registers one for the current user at each
      start (`lib/core/platform/desktop_entry.dart`).
-   - Make the conversion tests pass on Windows (they pass on macOS). CI runs
-     only the quick FFmpeg check, so they have to be run on a Windows
-     machine.
+   - Try the Windows build on a real machine. Its conversion tests pass in
+     CI (2026-10-25), pause and cancel included.
 
 ## Later
 

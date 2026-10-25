@@ -279,9 +279,7 @@ Early but working on Linux. Not done yet:
 - The macOS download is signed and notarized only once the Apple
   credentials are in the repository's secrets (see Publishing a release).
 - Windows and macOS builds compile in CI but have not been tried on real
-  machines. On macOS the conversion tests pass in CI. On Windows, keeping
-  the computer awake and pausing are not implemented, and the tests of
-  stopping a conversion part-way fail.
+  machines. Their conversion tests pass in CI.
 - Only one video is converted at a time.
 - "Archive" is measured on footage from a Nikon camera, a phone and a
   slideshow, on the processor, NVIDIA graphics and an M1 Mac
