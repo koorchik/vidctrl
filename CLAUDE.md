@@ -468,6 +468,16 @@ The UI renders presets and options generically; it needs no other change.
   (times rounded to milliseconds) and the MP4 encode disagree at 29.97
   frames a second, every other frame was compared with its neighbour, and
   the scores came out up to 19 dB too low.
+- **A constant frame rate comes from the `fps` filter**, never `-fps_mode
+  cfr -r`. A Mac's screen recording writes no frames while the screen is
+  still, so one frame lasts many seconds, and it has B-frames; MOV and MP4
+  derive each frame's duration from decoding order, so the long one goes
+  to an earlier frame. `cfr` believes the durations: it repeated that frame
+  for the whole pause and dropped the frames shown during it (a slide
+  missing, the result 12 s longer on a 44 s clip; FFmpeg 8.0 to 9.0). The
+  filter goes by when each frame is shown (`constantFrameRateFilters` in
+  `blocks.dart`); "keeps the still pictures of a screen recording" in
+  `conversion_test.dart` guards it.
 - **Tone mapping** needs the `zscale` and `tonemap` filters, which not every
   build has; `Capabilities.hasFilter` is checked first.
 - **Cancel kills FFmpeg.** `q` on stdin makes FFmpeg finish the file first,

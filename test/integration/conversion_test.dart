@@ -433,6 +433,46 @@ void main() {
       expect(output.audio.map((a) => a.codec), ['pcm_s24le', 'pcm_s24le']);
       expect(p.extension(output.path), '.mov');
     });
+
+    // A Mac records no frames while the screen is still, so one frame can
+    // last many seconds, and with B-frames MOV gives that duration to an
+    // earlier frame. `-fps_mode cfr` believed it: it repeated that frame for
+    // the whole pause and dropped the frames after it.
+    for (final (name, preset) in <(String, Preset)>[
+      ('archive', const ArchivePreset()),
+      ('space', const SaveSpacePreset()),
+      ('resolve_free', ResolveLinuxPreset.free),
+    ]) {
+      test('$name keeps the still pictures of a screen recording', () async {
+        if (unavailable()) return;
+        final source = await media!.clip(
+          'screen_$name.mov',
+          video: ['-c:v', 'libx264', '-preset', 'ultrafast', '-bf', '2'],
+          seconds: 44,
+          rate: '30',
+          filters: [
+            "drawbox=c=red:t=fill:enable='between(t,3,23)'",
+            "drawbox=c=blue:t=fill:enable='between(t,26,41)'",
+            // One frame for each still.
+            "select='not(between(t,3.02,23))*not(between(t,26.02,41))'",
+          ],
+          extra: ['-fps_mode', 'vfr'],
+        );
+        final input = await ffprobe.probe(source);
+        expect(input.video!.isVariableFrameRate, isTrue);
+
+        final output = await convert(preset, source);
+
+        expect(output.video!.isVariableFrameRate, isFalse);
+        final colours = await media!.coloursPerQuarterSecond(output.path);
+        expect(colours.sublist(4 * 4, 22 * 4), everyElement('red'));
+        expect(colours.sublist(27 * 4, 40 * 4), everyElement('blue'));
+        expect(
+          output.duration.inMilliseconds,
+          closeTo(input.duration.inMilliseconds, 1000),
+        );
+      });
+    }
   });
 
   group('Save space', () {

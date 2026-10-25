@@ -153,7 +153,6 @@ class ArchivePreset implements Preset, RaisesQuality {
       extension: 'mp4',
       nameSuffix: '_${encoderTag(encode)}',
       outputArgs: [
-        if (video.isVariableFrameRate) ...constantFrameRateArgs(video),
         // Apple players only recognise HEVC under this tag.
         if (target == 'hevc') ...['-tag:v', 'hvc1'],
         // Index at the front, so the file starts playing before it has
@@ -177,11 +176,17 @@ class ArchivePreset implements Preset, RaisesQuality {
     );
   }
 
+  /// The same picture for every encoder: a constant rate, then 4:2:0.
+  List<String> _filters(VideoStream video, String pixFmt) => [
+    ...constantFrameRateFilters(video),
+    ...to420Filters(video, pixFmt),
+  ];
+
   VideoEncode _svtAv1(VideoStream video, Capabilities capabilities) {
     return VideoEncode(
       encoder: 'libsvtav1',
       pixFmt: 'yuv420p10le',
-      filters: to420Filters(video, 'yuv420p10le'),
+      filters: _filters(video, 'yuv420p10le'),
       args: [
         '-preset',
         '5',
@@ -200,7 +205,7 @@ class ArchivePreset implements Preset, RaisesQuality {
     return VideoEncode(
       encoder: 'libx265',
       pixFmt: 'yuv420p10le',
-      filters: to420Filters(video, 'yuv420p10le'),
+      filters: _filters(video, 'yuv420p10le'),
       args: [
         '-preset',
         'slow',
@@ -267,7 +272,7 @@ class ArchivePreset implements Preset, RaisesQuality {
     return VideoEncode(
       encoder: encoder,
       pixFmt: 'p010le',
-      filters: to420Filters(video, 'p010le'),
+      filters: _filters(video, 'p010le'),
       args: [
         ...rateControl,
         if (isAv1) ...av1ChromaPositionArgs(video),

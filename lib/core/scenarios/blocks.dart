@@ -65,18 +65,27 @@ List<String> av1ChromaPositionArgs(VideoStream video) {
   return ['-bsf:v', 'av1_metadata=chroma_sample_position=$position'];
 }
 
-/// Arguments that turn irregular frame timing into a constant rate.
+/// The filter that turns irregular frame timing into a constant rate; none
+/// for a video whose timing is regular.
 ///
 /// A phone that records "30 fps" with dropped frames averages a little under
 /// 30, so the declared rate is the better target. Some recorders declare a
 /// timebase-like rate far above the real one; then the average is used.
-List<String> constantFrameRateArgs(VideoStream video) {
+///
+/// The `fps` filter, not `-fps_mode cfr -r`: the output option believes each
+/// frame's duration, and MOV and MP4 derive those from decoding order. A Mac's
+/// screen recording, with B-frames and one frame for a pause of many
+/// seconds, gives the pause to an earlier frame; `cfr` repeated that frame
+/// for all of it and dropped the frames that came during it. The filter goes
+/// by when each frame is shown.
+List<String> constantFrameRateFilters(VideoStream video) {
+  if (!video.isVariableFrameRate) return const [];
   final average = video.averageFrameRate ?? 30;
   final nominal = video.nominalFrameRate;
   final target = nominal != null && nominal <= average * 1.5
       ? nominal
       : average;
-  return ['-fps_mode', 'cfr', '-r', nearestStandardFrameRate(target)];
+  return ['fps=${nearestStandardFrameRate(target)}'];
 }
 
 /// Lossless 24-bit PCM: the audio every Resolve edition on Linux decodes.

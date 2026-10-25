@@ -107,6 +107,34 @@ class TestMedia {
     ];
   }
 
+  /// The colour of the whole picture four times a second, decoded from the
+  /// start (seeking in a file with long frames lands on the wrong ones):
+  /// `red`, `blue` or `other`.
+  Future<List<String>> coloursPerQuarterSecond(String path) async {
+    final result = await Process.run(paths.ffmpeg, [
+      '-v',
+      'error',
+      '-i',
+      path,
+      '-vf',
+      'fps=4,scale=1:1',
+      '-f',
+      'rawvideo',
+      '-pix_fmt',
+      'rgb24',
+      '-',
+    ], stdoutEncoding: null);
+    final rgb = result.stdout as List<int>;
+    return [
+      for (var i = 0; i + 2 < rgb.length; i += 3)
+        switch ((rgb[i], rgb[i + 1], rgb[i + 2])) {
+          (> 200, < 60, < 60) => 'red',
+          (< 60, < 60, > 200) => 'blue',
+          _ => 'other',
+        },
+    ];
+  }
+
   /// A fingerprint of the video stream's compressed data. Equal fingerprints
   /// mean the picture was copied bit for bit, not re-encoded.
   Future<String> videoFingerprint(String path) async {

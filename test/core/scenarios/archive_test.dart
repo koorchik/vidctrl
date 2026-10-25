@@ -122,6 +122,38 @@ void main() {
     });
   });
 
+  group('irregular frame timing', () {
+    final vfr = clip(fps: 27.4, nominalFps: 30);
+
+    // A filter, not `-fps_mode cfr`, which repeats a long frame of a screen
+    // recording over the frames after it.
+    for (final (name, values, capabilities) in [
+      ('AV1', const <String, String>{}, softwareOnly),
+      ('HEVC', const {'codec': 'hevc'}, softwareOnly),
+      ('the graphics card', const {'speed': 'gpu'}, withGpu({'av1_nvenc'})),
+    ]) {
+      test('is made constant by a filter, in $name', () {
+        final result = plan(vfr, values, capabilities);
+
+        expect(video(result).filters, ['fps=30']);
+        expect(result.outputArgs, isNot(contains('-fps_mode')));
+        expect(result.outputArgs, isNot(contains('-r')));
+        expect(result.notes, contains(PlanNote.variableFrameRateFixed));
+      });
+    }
+
+    test('comes before making the picture 4:2:0', () {
+      final result = plan(clip(fps: 27.4, nominalFps: 30, pixFmt: 'yuv422p'));
+
+      expect(video(result).filters.first, 'fps=30');
+      expect(video(result).filters, contains(startsWith('scale=')));
+    });
+
+    test('a constant rate is left as it is', () {
+      expect(video(plan(clip())).filters, isEmpty);
+    });
+  });
+
   group('HEVC', () {
     test('is tagged so Apple players recognise it', () {
       final result = plan(clip(), {'codec': 'hevc'});

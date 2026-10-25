@@ -185,9 +185,7 @@ class ResolveLinuxPreset implements Preset {
     Capabilities capabilities,
   ) {
     final level = choice(values, quality);
-    final frameRate = video.isVariableFrameRate
-        ? constantFrameRateArgs(video)
-        : const <String>[];
+    final frameRate = constantFrameRateFilters(video);
     final notes = [
       if (video.isVariableFrameRate) PlanNote.variableFrameRateFixed,
     ];
@@ -204,13 +202,13 @@ class ResolveLinuxPreset implements Preset {
       video: VideoEncode(
         encoder: intermediate.encoder,
         pixFmt: intermediate.pixFmt,
+        filters: frameRate,
         args: intermediate.args,
       ),
       audio: pcmAudio,
       muxer: 'mov',
       extension: 'mov',
       nameSuffix: '_${intermediate.tag}',
-      outputArgs: frameRate,
       notes: notes,
       estimatedBytes:
           fixedRateVideoBytes(input, intermediate.megabitsAtUhd30) +
@@ -234,7 +232,7 @@ class ResolveLinuxPreset implements Preset {
         ? VideoEncode(
             encoder: 'av1_nvenc',
             pixFmt: 'p010le',
-            filters: to420Filters(video, 'p010le'),
+            filters: [...frameRate, ...to420Filters(video, 'p010le')],
             args: [
               '-preset',
               'p6',
@@ -254,7 +252,7 @@ class ResolveLinuxPreset implements Preset {
         : VideoEncode(
             encoder: 'libsvtav1',
             pixFmt: 'yuv420p10le',
-            filters: to420Filters(video, 'yuv420p10le'),
+            filters: [...frameRate, ...to420Filters(video, 'yuv420p10le')],
             args: [
               '-preset',
               '8',
@@ -272,7 +270,6 @@ class ResolveLinuxPreset implements Preset {
       muxer: 'mp4',
       extension: 'mp4',
       nameSuffix: '_${encoderTag(encode)}',
-      outputArgs: frameRate,
       notes: [...notes, PlanNote.experimentalAv1Intermediate],
       cost: useGpu
           ? const ResourceCost(cpuThreads: 3, usesGpuEncoder: true)

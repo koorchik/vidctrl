@@ -171,8 +171,22 @@ void main() {
       final result = plan(studio, clip(fps: 27.4, nominalFps: 30));
 
       expect(result.kind, PlanKind.encode);
-      expect(result.outputArgs, ['-fps_mode', 'cfr', '-r', '30']);
+      expect((result.video as VideoEncode).filters, ['fps=30']);
+      expect(result.outputArgs, isEmpty);
       expect(result.notes, contains(PlanNote.variableFrameRateFixed));
+    });
+
+    test('the AV1 intermediate is made constant-rate before 4:2:0', () {
+      final result = plan(
+        free,
+        clip(fps: 27.4, nominalFps: 30, pixFmt: 'yuv422p10le'),
+        {'quality': 'smallest'},
+      );
+
+      final filters = (result.video as VideoEncode).filters;
+      expect(filters.first, 'fps=30');
+      expect(filters, contains(startsWith('scale=')));
+      expect(result.outputArgs, isEmpty);
     });
 
     test('"convert video too" re-encodes H.264 like the free edition', () {

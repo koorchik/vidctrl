@@ -84,7 +84,13 @@ class SaveSpacePreset implements Preset {
       encoder: 'libsvtav1',
       pixFmt: _pixFmt,
       // Frames are dropped first, so the others have fewer to work on.
-      filters: [if (halved != null) 'fps=$halved', ...picture],
+      filters: [
+        if (halved != null)
+          'fps=$halved'
+        else
+          ...constantFrameRateFilters(video),
+        ...picture,
+      ],
       args: [
         '-preset',
         '5',
@@ -110,8 +116,6 @@ class SaveSpacePreset implements Preset {
       extension: 'mp4',
       nameSuffix: '_${encoderTag(encode)}',
       outputArgs: [
-        if (halved == null && video.isVariableFrameRate)
-          ...constantFrameRateArgs(video),
         // Index at the front, so the file starts playing before it has
         // fully downloaded.
         '-movflags', '+faststart',

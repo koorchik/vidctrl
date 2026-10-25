@@ -88,9 +88,19 @@ void main() {
         softwareOnly,
       );
 
-      expect(rate(plan), isEmpty);
-      expect(plan.outputArgs, containsAllInOrder(['-fps_mode', 'cfr']));
+      expect(rate(plan), ['30']);
+      expect(plan.outputArgs, isNot(contains('-fps_mode')));
       expect(plan.notes, contains(PlanNote.variableFrameRateFixed));
+    });
+
+    test('irregular timing above 30 is only halved, by one filter', () {
+      final plan = space.plan(
+        clip(fps: 58.6, nominalFps: 60),
+        const {},
+        softwareOnly,
+      );
+
+      expect(rate(plan), ['30000/1001']);
     });
 
     test('HDR is tone-mapped before anything else', () {
