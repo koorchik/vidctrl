@@ -73,7 +73,10 @@ shopt -s nullglob
 for code in "$app"/Contents/Frameworks/*.framework "$app"/Contents/Frameworks/*.dylib; do
   sign "$code"
 done
-sign "$app/Contents/MacOS/ffmpeg" "$app/Contents/MacOS/ffprobe" "$app/Contents/MacOS/vidctrl-client"
+sign "$app/Contents/MacOS/ffmpeg" "$app/Contents/MacOS/ffprobe"
+# A program from `dart build cli` maps its compiled code from its own file,
+# which the hardened runtime answers with SIGKILL unless this allows it.
+sign --entitlements "$root/macos/Runner/Client.entitlements" "$app/Contents/MacOS/vidctrl-client"
 sign --entitlements "$root/macos/Runner/Release.entitlements" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 
