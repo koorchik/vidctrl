@@ -31,14 +31,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  /// The command as the window shows it, or null without one.
+  /// The command as the window shows it, or null without one. Without the
+  /// quotes, which differ by terminal: PowerShell's on Windows quote every
+  /// option.
   String? shownCommand(WidgetTester tester) {
     final command = find.descendant(
       of: find.byType(AlertDialog),
       matching: find.byType(SelectableText),
     );
     if (command.evaluate().isEmpty) return null;
-    return tester.widget<SelectableText>(command).data;
+    return tester.widget<SelectableText>(command).data!.replaceAll("'", '');
   }
 
   testWidgets('shows the command for a video to convert', (tester) async {
