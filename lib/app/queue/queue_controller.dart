@@ -639,20 +639,32 @@ class QueueController extends Notifier<QueueState> {
     );
   }
 
-  /// The arguments [video] would get with the panel's current settings.
-  List<String>? commandForVideo(SourceVideo video) {
+  /// What "Show the command" shows for [video] with the panel's current
+  /// settings; null while it has not been read.
+  VideoCommand? commandForVideo(SourceVideo video) {
     final info = video.info;
     if (info == null) return null;
     final settings = ref.read(recipeProvider);
-    return commandFor(
-      _makeJob(
-        id: -1,
-        sourceId: video.id,
-        info: info,
-        recipe: settings.recipe,
-        output: settings.output,
-        reserved: _reservedOutputs(),
-      ),
+    QueueJob jobWith([QualityChoice? quality]) => _makeJob(
+      id: -1,
+      sourceId: video.id,
+      info: info,
+      recipe: settings.recipe,
+      output: settings.output,
+      reserved: _reservedOutputs(),
+      quality: quality,
+    );
+    final job = jobWith();
+    final quality = job.quality;
+    if (quality == null || quality.converts) {
+      return VideoCommand(plan: job.plan, args: commandFor(job));
+    }
+    // Left as it is, it runs nothing; "Convert anyway" would run this.
+    final anyway = jobWith(quality.anyway());
+    return VideoCommand(
+      plan: anyway.plan,
+      args: commandFor(anyway),
+      keptAsIs: quality,
     );
   }
 
@@ -669,6 +681,22 @@ class QueueController extends Notifier<QueueState> {
       jobs: [for (final job in state.jobs) job.id == id ? change(job) : job],
     );
   }
+}
+
+/// What "Show the command" shows for a video in the list.
+class VideoCommand {
+  const VideoCommand({required this.plan, this.args, this.keptAsIs});
+
+  /// Says why [args] is null: a video already right, or one the goal
+  /// cannot use.
+  final ConversionPlan plan;
+
+  /// The arguments as shown to people; null where nothing runs.
+  final List<String>? args;
+
+  /// Set for a video the goal leaves as it is because converting would
+  /// hardly shrink it; [args] are then what "Convert anyway" would run.
+  final QualityChoice? keptAsIs;
 }
 
 /// What a finished sample says about the whole video: its size and the time

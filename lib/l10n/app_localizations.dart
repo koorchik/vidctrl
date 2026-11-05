@@ -752,6 +752,24 @@ abstract class AppLocalizations {
   /// **'This is what the app runs for this video. Copy it to run it yourself in a terminal, or to adjust it.'**
   String get commandIntro;
 
+  /// No description provided for @commandAlreadyRight.
+  ///
+  /// In en, this message translates to:
+  /// **'This video is already right for this goal, so nothing runs: it stays as it is.'**
+  String get commandAlreadyRight;
+
+  /// No description provided for @commandCannotUse.
+  ///
+  /// In en, this message translates to:
+  /// **'{reason}, so nothing runs for it.'**
+  String commandCannotUse(String reason);
+
+  /// No description provided for @commandKeptAsIs.
+  ///
+  /// In en, this message translates to:
+  /// **'This video stays as it is: converting would save only {percent}%. “Convert anyway” in the queue runs this command.'**
+  String commandKeptAsIs(int percent);
+
   /// No description provided for @commandOneLine.
   ///
   /// In en, this message translates to:

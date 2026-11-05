@@ -156,3 +156,12 @@ List<String> chosenOptions(
   }
   return chosen;
 }
+
+/// Why a goal cannot use a video (a plan of kind `unsupported`), as the
+/// video list says it.
+String unusableReason(AppLocalizations l10n, ConversionPlan plan) =>
+    switch (plan.notes.firstOrNull) {
+      PlanNote.noAudioStream => l10n.statusNoSound,
+      PlanNote.containerCannotHold => l10n.statusCannotHold,
+      _ => l10n.statusUnsupported,
+    };

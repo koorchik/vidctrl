@@ -17,6 +17,7 @@ import '../../sources/preview_controller.dart';
 import '../../sources/sources_controller.dart';
 import '../../theme.dart';
 import '../headings.dart';
+import '../scenario_texts.dart';
 import '../technical_text.dart';
 import 'busy_mark.dart';
 import 'closeness_line.dart';
@@ -407,11 +408,7 @@ class _PreviewLine extends StatelessWidget {
         scheme.primary,
       ),
       PlanKind.unsupported => (
-        switch (preview.plan.notes.firstOrNull) {
-          PlanNote.noAudioStream => l10n.statusNoSound,
-          PlanNote.containerCannotHold => l10n.statusCannotHold,
-          _ => l10n.statusUnsupported,
-        },
+        unusableReason(l10n, preview.plan),
         scheme.error,
       ),
       PlanKind.encode when preview.keptAsIs => (

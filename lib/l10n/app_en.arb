@@ -200,6 +200,15 @@
   "showCommand": "Show the command",
   "commandTitle": "The command for this video",
   "commandIntro": "This is what the app runs for this video. Copy it to run it yourself in a terminal, or to adjust it.",
+  "commandAlreadyRight": "This video is already right for this goal, so nothing runs: it stays as it is.",
+  "commandCannotUse": "{reason}, so nothing runs for it.",
+  "@commandCannotUse": {
+    "placeholders": {"reason": {"type": "String"}}
+  },
+  "commandKeptAsIs": "This video stays as it is: converting would save only {percent}%. “Convert anyway” in the queue runs this command.",
+  "@commandKeptAsIs": {
+    "placeholders": {"percent": {"type": "int"}}
+  },
   "commandOneLine": "One line",
   "commandExplained": "Explained",
   "copy": "Copy",

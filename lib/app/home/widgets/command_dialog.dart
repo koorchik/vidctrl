@@ -5,24 +5,37 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/ffmpeg/command_text.dart';
+import '../../../core/scenarios/scenario.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../queue/queue_controller.dart';
 import '../../sources/sources_controller.dart';
 import '../../theme.dart';
+import '../scenario_texts.dart';
+import 'quality_report.dart';
 
 /// Shows the command [video] would run with the panel's current settings,
-/// as "Show the command" does wherever it is offered.
+/// as "Show the command" does wherever it is offered. Where none runs, the
+/// window says why.
 void showCommandForVideo(
   BuildContext context,
   WidgetRef ref,
   SourceVideo video,
 ) {
-  final args = ref.read(queueProvider.notifier).commandForVideo(video);
-  if (args == null) return;
+  final command = ref.read(queueProvider.notifier).commandForVideo(video);
+  if (command == null) return;
+  final l10n = AppLocalizations.of(context)!;
+  final keptAsIs = command.keptAsIs;
+  final note = keptAsIs != null
+      ? l10n.commandKeptAsIs(savedPercent(keptAsIs))
+      : command.args != null
+      ? null
+      : command.plan.kind == PlanKind.skip
+      ? l10n.commandAlreadyRight
+      : l10n.commandCannotUse(unusableReason(l10n, command.plan));
   unawaited(
     showDialog<void>(
       context: context,
-      builder: (_) => CommandDialog(args: args),
+      builder: (_) => CommandDialog(args: command.args, note: note),
     ),
   );
 }
@@ -33,10 +46,15 @@ void showCommandForVideo(
 /// Two forms: the whole command on one line, or one option per line with a
 /// comment on each. Both can be pasted into a terminal as they are.
 class CommandDialog extends StatefulWidget {
-  const CommandDialog({super.key, required this.args, this.shell});
+  const CommandDialog({super.key, required this.args, this.note, this.shell});
 
-  /// The arguments as shown to people (see `buildFfmpegArgs(forDisplay:)`).
-  final List<String> args;
+  /// The arguments as shown to people (see `buildFfmpegArgs(forDisplay:)`);
+  /// null where nothing runs, and [note] says why.
+  final List<String>? args;
+
+  /// Said in place of the usual introduction: why nothing runs, or why the
+  /// command does not run by itself.
+  final String? note;
 
   /// Defaults to the terminal of the platform the app runs on.
   final ShellStyle? shell;
@@ -49,14 +67,14 @@ class _CommandDialogState extends State<CommandDialog> {
   bool _explained = false;
   bool _copied = false;
 
-  String _text(AppLocalizations l10n) => _explained
+  String _text(AppLocalizations l10n, List<String> args) => _explained
       ? explainedCommand(
           'ffmpeg',
-          widget.args,
+          args,
           shell: widget.shell,
           describe: (part) => describeArg(l10n, part.meaning),
         )
-      : singleLineCommand('ffmpeg', widget.args, shell: widget.shell);
+      : singleLineCommand('ffmpeg', args, shell: widget.shell);
 
   Future<void> _copy(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
@@ -69,7 +87,27 @@ class _CommandDialogState extends State<CommandDialog> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final text = _text(l10n);
+    final intro = Text(
+      widget.note ?? l10n.commandIntro,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: scheme.onSurfaceVariant,
+      ),
+    );
+    final actions = [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: Text(l10n.close),
+      ),
+    ];
+    final args = widget.args;
+    if (args == null) {
+      return AlertDialog(
+        title: Text(l10n.commandTitle),
+        content: SizedBox(width: 420, child: intro),
+        actions: actions,
+      );
+    }
+    final text = _text(l10n, args);
 
     return AlertDialog(
       title: Text(l10n.commandTitle),
@@ -79,12 +117,7 @@ class _CommandDialogState extends State<CommandDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              l10n.commandIntro,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
+            intro,
             const SizedBox(height: 16),
             Row(
               children: [
@@ -161,12 +194,7 @@ class _CommandDialogState extends State<CommandDialog> {
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.close),
-        ),
-      ],
+      actions: actions,
     );
   }
 }

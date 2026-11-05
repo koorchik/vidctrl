@@ -390,6 +390,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'This is what the app runs for this video. Copy it to run it yourself in a terminal, or to adjust it.';
 
   @override
+  String get commandAlreadyRight =>
+      'This video is already right for this goal, so nothing runs: it stays as it is.';
+
+  @override
+  String commandCannotUse(String reason) {
+    return '$reason, so nothing runs for it.';
+  }
+
+  @override
+  String commandKeptAsIs(int percent) {
+    return 'This video stays as it is: converting would save only $percent%. “Convert anyway” in the queue runs this command.';
+  }
+
+  @override
   String get commandOneLine => 'One line';
 
   @override

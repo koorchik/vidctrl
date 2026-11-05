@@ -994,7 +994,8 @@ void main() {
       },
     );
 
-    test('a video left as it is has no command to show', () async {
+    test('a video left as it is shows what "Convert anyway" would run, '
+        'its job nothing', () async {
       env.estimator.choices['/videos/a.mp4'] = fakeChoice(
         QualityOutcome.notWorthIt,
       );
@@ -1004,7 +1005,9 @@ void main() {
       await settle();
 
       expect(queue().commandFor(jobs().single), isNull);
-      expect(queue().commandForVideo(video('a.mp4')), isNull);
+      final command = queue().commandForVideo(video('a.mp4'))!;
+      expect(command.keptAsIs?.outcome, QualityOutcome.notWorthIt);
+      expect(command.args, containsAllInOrder(['-crf', '35']));
     });
 
     test('other goals are not measured before converting', () async {

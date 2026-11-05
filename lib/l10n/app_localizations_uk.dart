@@ -392,6 +392,20 @@ class AppLocalizationsUk extends AppLocalizations {
       'Саме це програма виконує для цього відео. Скопіюйте, щоб запустити самостійно в терміналі або змінити.';
 
   @override
+  String get commandAlreadyRight =>
+      'Це відео вже підходить для цієї мети, тож нічого не запускається: воно залишиться як є.';
+
+  @override
+  String commandCannotUse(String reason) {
+    return '$reason, тож для нього нічого не запускається.';
+  }
+
+  @override
+  String commandKeptAsIs(int percent) {
+    return 'Це відео залишиться як є: перекодування зекономило б лише $percent%. «Конвертувати все одно» в черзі запустить цю команду.';
+  }
+
+  @override
   String get commandOneLine => 'Один рядок';
 
   @override
